@@ -5,6 +5,7 @@ import {
   parseShopifyCommerceEvent,
   safeParseShopifyCommerceEvent,
   createShopifyCommerceOrderingKey,
+  createShopifyOrderOrderingKey,
 } from "./commerce-event.schema.js";
 import { SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION } from "./constants.js";
 
@@ -58,6 +59,20 @@ function orderCompletedEvent() {
   };
 }
 
+function orderCompletedEventWithoutCheckoutToken() {
+  return {
+    ...baseEnvelope(),
+    eventType: "order.completed" as const,
+    payload: {
+      orderId: "order_1",
+      checkoutToken: null,
+      shopifyCustomerId: null,
+      total: null,
+      completedAt: "2024-01-01T00:05:00.000Z",
+    },
+  };
+}
+
 test("parses a valid checkout.observed event", () => {
   const event = parseShopifyCommerceEvent(checkoutObservedEvent());
   assert.equal(event.eventType, "checkout.observed");
@@ -66,6 +81,12 @@ test("parses a valid checkout.observed event", () => {
 test("parses a valid order.completed event", () => {
   const event = parseShopifyCommerceEvent(orderCompletedEvent());
   assert.equal(event.eventType, "order.completed");
+});
+
+test("parses a valid order.completed event without a checkout token", () => {
+  const event = parseShopifyCommerceEvent(orderCompletedEventWithoutCheckoutToken());
+  assert.equal(event.eventType, "order.completed");
+  assert.equal(event.payload.checkoutToken, null);
 });
 
 test("eventType selects the correct payload shape", () => {
@@ -174,9 +195,8 @@ test("ordering key is deterministic", () => {
 });
 
 test("checkout and order events for the same shop/checkout share an ordering key", () => {
-  const checkout = checkoutObservedEvent();
-  const order = { ...orderCompletedEvent(), orderingKey: checkout.orderingKey };
-  assert.equal(checkout.orderingKey, order.orderingKey);
+  const key = createShopifyCommerceOrderingKey("shop_1", "checkout_1");
+  assert.equal(key, "shop_1:checkout_1");
 });
 
 test("different shops produce different ordering keys", () => {
@@ -188,6 +208,11 @@ test("different shops produce different ordering keys", () => {
 test("ordering key rejects empty inputs", () => {
   assert.throws(() => createShopifyCommerceOrderingKey("", "checkout_1"));
   assert.throws(() => createShopifyCommerceOrderingKey("shop_1", ""));
+});
+
+test("order ordering key falls back to order id", () => {
+  const key = createShopifyOrderOrderingKey("shop_1", "order_1");
+  assert.equal(key, "shop_1:order_1");
 });
 
 test("root discriminated union schema matches parseShopifyCommerceEvent", () => {

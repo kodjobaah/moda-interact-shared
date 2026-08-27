@@ -10,17 +10,17 @@ transport, persistence, or framework code of its own.
   events).
 - TypeScript types inferred from those schemas (`z.infer`), so producers and
   consumers share one source of truth.
-- Constants (queue/job names, schema version, event type strings).
-- Parsing helpers and small pure utilities (ordering-key and job-id
-  derivation) needed to construct or validate those contracts.
+- Constants for schema version and event type strings.
+- Parsing helpers and small pure utilities for ordering-key and job-id
+  derivation needed to construct or validate those contracts.
 
 This package does **not** define Prisma models, own migrations, or implement
-any queue/transport client. PostgreSQL and Redis store the *serialized*
-event envelope as JSON; the database layer does not enforce or duplicate its
-shape. Producers must construct and validate an event with the schemas in
-this package before persisting it. Consumers must parse the JSON read back
-from PostgreSQL/Redis with the same schemas before acting on it — never trust
-it as pre-validated.
+any queue/transport client. PostgreSQL stores the *serialized* event envelope
+as JSON; the database layer does not enforce or duplicate its shape.
+Producers must construct and validate an event with the schemas in this
+package before persisting it. Consumers must parse the JSON read back from
+PostgreSQL with the same schemas before acting on it — never trust it as
+pre-validated.
 
 ## Ownership boundary
 

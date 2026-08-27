@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION, SHOPIFY_COMMERCE_EVENT_TYPES } from "./constants.js";
+import {
+  SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION,
+  SHOPIFY_COMMERCE_EVENT_TYPES,
+} from "./constants.js";
 import { ShopifyTenantSchema } from "./common.schema.js";
 import { CheckoutObservedPayloadSchema } from "./checkout-observed.schema.js";
 import { OrderCompletedPayloadSchema } from "./order-completed.schema.js";
@@ -23,14 +26,18 @@ export const ShopifyCheckoutObservedEventSchema = ShopifyCommerceEventBaseSchema
   payload: CheckoutObservedPayloadSchema,
 }).strict();
 
-export type ShopifyCheckoutObservedEvent = z.infer<typeof ShopifyCheckoutObservedEventSchema>;
+export type ShopifyCheckoutObservedEvent = z.infer<
+  typeof ShopifyCheckoutObservedEventSchema
+>;
 
 export const ShopifyOrderCompletedEventSchema = ShopifyCommerceEventBaseSchema.extend({
   eventType: z.literal(SHOPIFY_COMMERCE_EVENT_TYPES.ORDER_COMPLETED),
   payload: OrderCompletedPayloadSchema,
 }).strict();
 
-export type ShopifyOrderCompletedEvent = z.infer<typeof ShopifyOrderCompletedEventSchema>;
+export type ShopifyOrderCompletedEvent = z.infer<
+  typeof ShopifyOrderCompletedEventSchema
+>;
 
 export const ShopifyCommerceEventSchema = z.discriminatedUnion("eventType", [
   ShopifyCheckoutObservedEventSchema,
@@ -61,17 +68,44 @@ export function isOrderCompletedEvent(
 }
 
 /**
- * Stable ordering key for a shop/checkout pair. Checkout and order events for the
- * same checkout must share this key, so deliveryId is intentionally excluded.
- * Values are length-prefixed to avoid ambiguous concatenation (e.g. "1" + "23" vs "12" + "3").
+ * Stable ordering key for a shop/checkout pair.
+ * Checkout and order events for the same checkout must share this key, so
+ * deliveryId is intentionally excluded.
  */
-export function createShopifyCommerceOrderingKey(shopId: string, checkoutToken: string): string {
+export function createShopifyCommerceOrderingKey(
+  shopId: string,
+  checkoutToken: string,
+): string {
   if (typeof shopId !== "string" || shopId.length === 0) {
-    throw new Error("createShopifyCommerceOrderingKey: shopId must be a non-empty string");
-  }
-  if (typeof checkoutToken !== "string" || checkoutToken.length === 0) {
-    throw new Error("createShopifyCommerceOrderingKey: checkoutToken must be a non-empty string");
+    throw new Error(
+      "createShopifyCommerceOrderingKey: shopId must be a non-empty string",
+    );
   }
 
-  return `shopify:${shopId.length}:${shopId}:${checkoutToken.length}:${checkoutToken}`;
+  if (typeof checkoutToken !== "string" || checkoutToken.length === 0) {
+    throw new Error(
+      "createShopifyCommerceOrderingKey: checkoutToken must be a non-empty string",
+    );
+  }
+
+  return `${shopId}:${checkoutToken}`;
+}
+
+export function createShopifyOrderOrderingKey(
+  shopId: string,
+  orderId: string,
+): string {
+  if (typeof shopId !== "string" || shopId.length === 0) {
+    throw new Error(
+      "createShopifyOrderOrderingKey: shopId must be a non-empty string",
+    );
+  }
+
+  if (typeof orderId !== "string" || orderId.length === 0) {
+    throw new Error(
+      "createShopifyOrderOrderingKey: orderId must be a non-empty string",
+    );
+  }
+
+  return `${shopId}:${orderId}`;
 }
