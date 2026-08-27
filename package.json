@@ -1,5 +1,5 @@
 {
-  "name": "@kodjobaah/moda-interact-shared",
+  "name": "@modainteract/moda-interact-shared",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -8,21 +8,32 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./shopify": {
+      "types": "./dist/shopify/index.d.ts",
+      "import": "./dist/shopify/index.js"
+    },
+    "./shopify/node": {
+      "types": "./dist/shopify/node.d.ts",
+      "import": "./dist/shopify/node.js"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
+    "build": "tsup",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/**/*.test.ts",
     "prepack": "npm run build"
   },
   "dependencies": {
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@types/node": "^26.4.0",
     "tsup": "^8.0.0",
+    "tsx": "^4.23.12",
     "typescript": "^5.0.0"
   }
 }
