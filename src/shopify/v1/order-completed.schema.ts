@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ShopifyMoneySchema } from "./common.schema.js";
+import { ShopifyMoneySchema } from "../common.schema.js";
 
 export const OrderCompletedPayloadSchema = z
   .object({

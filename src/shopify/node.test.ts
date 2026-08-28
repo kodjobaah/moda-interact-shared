@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  createPendingRecoveryCandidateJobId,
   createShopifyCheckoutJobId,
   createShopifyOrderJobId,
   createShopifyWebhookJobId,
@@ -45,6 +46,17 @@ test("order job ids are deterministic and resource-scoped", () => {
   assert.equal(id1, id2);
   assert.notEqual(id1, id3);
   assert.ok(id1.startsWith("order-created-"));
+  assert.equal(id1.includes(":"), false);
+});
+
+test("pending recovery candidate id is deterministic per shop/checkout", () => {
+  const id1 = createPendingRecoveryCandidateJobId("shop_1", "checkout_1");
+  const id2 = createPendingRecoveryCandidateJobId("shop_1", "checkout_1");
+  const id3 = createPendingRecoveryCandidateJobId("shop_2", "checkout_1");
+
+  assert.equal(id1, id2);
+  assert.notEqual(id1, id3);
+  assert.ok(id1.startsWith("pending-recovery-"));
   assert.equal(id1.includes(":"), false);
 });
 

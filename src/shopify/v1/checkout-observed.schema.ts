@@ -4,7 +4,7 @@ import {
   ShopifyCheckoutLineItemsSchema,
   ShopifyCustomerReferenceSchema,
   ShopifyMoneySchema,
-} from "./common.schema.js";
+} from "../common.schema.js";
 
 export const CheckoutObservedPayloadSchema = z
   .object({

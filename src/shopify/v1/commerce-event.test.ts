@@ -7,7 +7,7 @@ import {
   createShopifyCommerceOrderingKey,
   createShopifyOrderOrderingKey,
 } from "./commerce-event.schema.js";
-import { SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION } from "./constants.js";
+import { SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION } from "../constants.js";
 
 const tenant = { shopId: "shop_1", shopDomain: "example.myshopify.com" };
 

@@ -28,3 +28,10 @@ export function createShopifyCheckoutJobId(shopId: string, checkoutToken: string
 export function createShopifyOrderJobId(shopId: string, orderGid: string): string {
   return createShopifyWebhookJobDigest("order-created", shopId, orderGid);
 }
+
+export function createPendingRecoveryCandidateJobId(
+  shopId: string,
+  checkoutToken: string,
+): string {
+  return createShopifyWebhookJobDigest("pending-recovery", shopId, checkoutToken);
+}

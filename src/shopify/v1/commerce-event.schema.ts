@@ -2,8 +2,8 @@ import { z } from "zod";
 import {
   SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION,
   SHOPIFY_COMMERCE_EVENT_TYPES,
-} from "./constants.js";
-import { ShopifyTenantSchema } from "./common.schema.js";
+} from "../constants.js";
+import { ShopifyTenantSchema } from "../common.schema.js";
 import { CheckoutObservedPayloadSchema } from "./checkout-observed.schema.js";
 import { OrderCompletedPayloadSchema } from "./order-completed.schema.js";
 
