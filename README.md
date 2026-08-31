@@ -127,6 +127,41 @@ await observeConversationTurn("whatsapp", () =>
 );
 ```
 
+Pass `recordMetrics: false` to activate a helper's span without recording its
+GenAI metrics. The option applies only to that helper invocation, so pass it to
+each nested helper whose metrics should be suppressed:
+
+```ts
+const spansOnly = { recordMetrics: false } as const;
+
+await observeConversationTurn("whatsapp", () =>
+  observeAgentInvocation({ agentName: "commerce-agent" }, () =>
+    observeAgentTool("lookup-products", executeTool, spansOnly),
+    spansOnly,
+  ),
+  spansOnly,
+);
+```
+
+An optional `mapException` callback can replace the application failure with a
+bounded telemetry-safe representation for `span.recordException`. The original
+thrown value is still rethrown unchanged. If the mapper throws or returns no
+usable fields, the exception event is omitted and the span remains `ERROR`;
+the original value is never recorded as fallback. Apply the mapper to every
+nested helper that may observe the same rethrown failure:
+
+```ts
+const safeObservation = {
+  recordMetrics: false,
+  mapException: () => ({
+    name: "ProviderError",
+    message: "Provider operation failed",
+  }),
+} as const;
+
+await observeAgentTool("lookup-products", executeTool, safeObservation);
+```
+
 The helpers use only the global tracer and meter providers installed by the
 Node runtime. They create no SDK, provider, exporter, or network request, and
 remain lightweight no-ops when providers are absent. Six module-singleton

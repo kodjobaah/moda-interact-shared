@@ -64,6 +64,76 @@ test("GenAI spans nest, inherit context, bound attributes, and report status", a
       (error) => error === expectedError,
     );
 
+    const sensitiveError = new Error("SECRET_PROVIDER_RESPONSE_BODY");
+    const controls = {
+      recordMetrics: false,
+      mapException: () => ({
+        name: "ProviderError",
+        message: "Provider operation failed",
+        stack: "s".repeat(2_000),
+      }),
+    } as const;
+    await assert.rejects(
+      observeConversationTurn(
+        "whatsapp",
+        () => observeAgentInvocation(
+          { agentName: "safe-agent" },
+          () => observeAgentTool("safe-tool", async () => {
+            throw sensitiveError;
+          }, controls),
+          controls,
+        ),
+        controls,
+      ),
+      (error) => error === sensitiveError,
+    );
+
+    const mapperFailure = new Error("SECRET_MAPPER_FALLBACK");
+    await assert.rejects(
+      observeAgentTool(
+        "mapper-failure-tool",
+        async () => {
+          throw mapperFailure;
+        },
+        {
+          recordMetrics: false,
+          mapException: () => {
+            throw new Error("mapper failed");
+          },
+        },
+      ),
+      (error) => error === mapperFailure,
+    );
+
+    const thrownValue = { secret: "SECRET_THROWN_VALUE" };
+    await assert.rejects(
+      observeAgentTool(
+        "object-failure-tool",
+        async () => {
+          throw thrownValue;
+        },
+        {
+          recordMetrics: false,
+          mapException: () => "Safe object failure",
+        },
+      ),
+      (error) => error === thrownValue,
+    );
+
+    let successMapperCalled = false;
+    await observeAgentTool(
+      "successful-tool",
+      async () => "done",
+      {
+        recordMetrics: false,
+        mapException: () => {
+          successMapperCalled = true;
+          return "unused";
+        },
+      },
+    );
+    assert.equal(successMapperCalled, false);
+
     const spans = exporter.getFinishedSpans();
     const turn = spanNamed(spans, "conversation.turn whatsapp");
     const agent = spans.find((span) => span.name.startsWith("invoke_agent "));
@@ -75,6 +145,20 @@ test("GenAI spans nest, inherit context, bound attributes, and report status", a
     const failed = spanNamed(spans, "execute_tool failing-tool");
     const failedAgent = spanNamed(spans, "invoke_agent failing-agent");
     const failedTurn = spanNamed(spans, "conversation.turn other");
+    const safeTool = spanNamed(spans, "execute_tool safe-tool");
+    const safeAgent = spanNamed(spans, "invoke_agent safe-agent");
+    const safeTurn = spans.find(
+      (span) => span.name === "conversation.turn whatsapp" &&
+        safeAgent.parentSpanContext?.spanId === span.spanContext().spanId,
+    );
+    const mapperFailureTool = spanNamed(
+      spans,
+      "execute_tool mapper-failure-tool",
+    );
+    const objectFailureTool = spanNamed(
+      spans,
+      "execute_tool object-failure-tool",
+    );
 
     assert.ok(agent);
     assert.ok(tool);
@@ -91,6 +175,15 @@ test("GenAI spans nest, inherit context, bound attributes, and report status", a
     assert.equal(failedAgent.status.code, SpanStatusCode.ERROR);
     assert.equal(failedTurn.status.code, SpanStatusCode.ERROR);
     assert.equal(failed.events.some((event) => event.name === "exception"), true);
+    assert.ok(safeTurn);
+    assert.equal(safeTool.parentSpanContext?.spanId, safeAgent.spanContext().spanId);
+    assert.equal(safeAgent.parentSpanContext?.spanId, safeTurn.spanContext().spanId);
+    assert.equal(safeTool.status.code, SpanStatusCode.ERROR);
+    assert.equal(safeAgent.status.code, SpanStatusCode.ERROR);
+    assert.equal(safeTurn.status.code, SpanStatusCode.ERROR);
+    assert.equal(mapperFailureTool.status.code, SpanStatusCode.ERROR);
+    assert.equal(mapperFailureTool.events.length, 0);
+    assert.equal(objectFailureTool.status.code, SpanStatusCode.ERROR);
     assert.ok(String(agent.attributes["gen_ai.agent.name"]).length <= 80);
     assert.ok(String(tool.attributes["gen_ai.tool.name"]).length <= 80);
     const exportedData = spans.map((span) => ({
@@ -99,6 +192,22 @@ test("GenAI spans nest, inherit context, bound attributes, and report status", a
       events: span.events,
     }));
     assert.doesNotMatch(JSON.stringify(exportedData), /SECRET_TOOL_PAYLOAD/);
+    assert.doesNotMatch(
+      JSON.stringify(exportedData),
+      /SECRET_PROVIDER_RESPONSE_BODY|SECRET_MAPPER_FALLBACK|SECRET_THROWN_VALUE/,
+    );
+    const safeException = safeTool.events.find(
+      (event) => event.name === "exception",
+    );
+    assert.equal(safeException?.attributes?.["exception.type"], "ProviderError");
+    assert.equal(
+      safeException?.attributes?.["exception.message"],
+      "Provider operation failed",
+    );
+    assert.equal(
+      String(safeException?.attributes?.["exception.stacktrace"]).length,
+      1_024,
+    );
   } finally {
     await provider.shutdown();
     context.disable();

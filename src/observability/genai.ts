@@ -1,5 +1,13 @@
 import { metrics, type Attributes, type Counter, type Histogram } from "@opentelemetry/api";
-import { withObservedSpan } from "./index.js";
+import {
+  withObservedSpan,
+  type ObservedSpanOptions,
+} from "./index.js";
+
+export type {
+  ObservedSpanOptions,
+  SpanExceptionMapper,
+} from "./index.js";
 
 const MAX_ATTRIBUTE_LENGTH = 80;
 const meter = metrics.getMeter(
@@ -28,64 +36,95 @@ export type AgentObservation = {
   model?: string;
 };
 
+export type GenAIObservationOptions = ObservedSpanOptions & {
+  recordMetrics?: boolean;
+};
+
 export async function observeConversationTurn<T>(
   channel: "whatsapp" | "other",
   work: () => Promise<T>,
+  options: GenAIObservationOptions = {},
 ): Promise<T> {
-  return observeOperation(
+  const observeSpan = () => withObservedSpan(
+    `conversation.turn ${channel}`,
+    { "moda.messaging.channel": channel },
+    work,
+    options,
+  );
+
+  return observeGenAIOperation(
     turnDuration,
     turnOperations,
     { channel },
-    () => withObservedSpan(
-      `conversation.turn ${channel}`,
-      { "moda.messaging.channel": channel },
-      work,
-    ),
+    observeSpan,
+    options,
   );
 }
 
 export async function observeAgentInvocation<T>(
   observation: AgentObservation,
   work: () => Promise<T>,
+  options: GenAIObservationOptions = {},
 ): Promise<T> {
   const agentName = boundedSpanValue(observation.agentName) ?? "unknown";
 
-  return observeOperation(
+  const observeSpan = () => withObservedSpan(
+    `invoke_agent ${agentName}`,
+    compact({
+      "gen_ai.operation.name": "invoke_agent",
+      "gen_ai.agent.name": agentName,
+      "gen_ai.provider.name": boundedSpanValue(observation.provider),
+      "gen_ai.request.model": boundedSpanValue(observation.model),
+    }),
+    work,
+    options,
+  );
+
+  return observeGenAIOperation(
     agentDuration,
     agentOperations,
     {},
-    () => withObservedSpan(
-      `invoke_agent ${agentName}`,
-      compact({
-        "gen_ai.operation.name": "invoke_agent",
-        "gen_ai.agent.name": agentName,
-        "gen_ai.provider.name": boundedSpanValue(observation.provider),
-        "gen_ai.request.model": boundedSpanValue(observation.model),
-      }),
-      work,
-    ),
+    observeSpan,
+    options,
   );
 }
 
 export async function observeAgentTool<T>(
   toolName: string,
   work: () => Promise<T>,
+  options: GenAIObservationOptions = {},
 ): Promise<T> {
   const safeToolName = boundedSpanValue(toolName) ?? "unknown";
 
-  return observeOperation(
+  const observeSpan = () => withObservedSpan(
+    `execute_tool ${safeToolName}`,
+    {
+      "gen_ai.operation.name": "execute_tool",
+      "gen_ai.tool.name": safeToolName,
+    },
+    work,
+    options,
+  );
+
+  return observeGenAIOperation(
     toolDuration,
     toolOperations,
     {},
-    () => withObservedSpan(
-      `execute_tool ${safeToolName}`,
-      {
-        "gen_ai.operation.name": "execute_tool",
-        "gen_ai.tool.name": safeToolName,
-      },
-      work,
-    ),
+    observeSpan,
+    options,
   );
+}
+
+function observeGenAIOperation<T>(
+  duration: Histogram,
+  operations: Counter,
+  attributes: Attributes,
+  work: () => Promise<T>,
+  options: GenAIObservationOptions,
+): Promise<T> {
+  return options.recordMetrics === false
+    ? work()
+    : observeOperation(duration, operations, attributes, work);
 }
 
 async function observeOperation<T>(
