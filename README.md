@@ -4,8 +4,8 @@ Shared TypeScript contracts and reusable platform primitives used by multiple
 Moda Interact services.
 
 This package is a **library**, not a deployable service. It does not own
-transport, persistence, background workers, provider SDK integration, or
-application business workflows.
+business transports, persistence, background workers, provider SDK integration,
+or application business workflows.
 
 ## Install
 
@@ -28,9 +28,116 @@ including:
 - canonical queue/job-name constants where multiple repositories must agree;
 - deterministic correlation/job identifier helpers;
 - small pure utilities used by more than one service;
-- reusable structured application logging primitives.
+- reusable structured application logging primitives;
+- the reusable base Node OpenTelemetry runtime, including tracing and metrics
+  providers, exporters, sampling, HTTP/Undici instrumentation, lifecycle, and
+  generic observability helpers.
 
 The package deliberately keeps framework and runtime dependencies small.
+
+## Node observability runtime
+
+The package provides a browser-safe semantic observability entry and a
+Node-only runtime entry:
+
+```ts
+import {
+  getActiveTraceId,
+  withObservedSpan,
+} from "@modainteract/moda-interact-shared/observability";
+
+import {
+  initNodeObservability,
+} from "@modainteract/moda-interact-shared/observability/node";
+```
+
+Import `./observability/node` only from a process preload. It installs tracing,
+metrics, HTTP/HTTPS and Undici/fetch instrumentation before framework or worker
+modules load:
+
+```text
+node --import ./observability.mjs <framework-or-worker-entrypoint>
+```
+
+```js
+// observability.mjs
+import { initNodeObservability } from
+  "@modainteract/moda-interact-shared/observability/node";
+
+initNodeObservability({
+  serviceName: "moda-interact-messaging",
+  environment: process.env.DEPLOYMENT_ENVIRONMENT_NAME,
+  instrument: { http: true, fetch: true, prisma: false },
+});
+```
+
+Set `prisma: true` only for processes that load Prisma, and keep the preload
+before the first Prisma application import.
+
+The runtime uses the canonical `service.namespace`, `service.name`, and
+`deployment.environment.name` resource attributes. It honors
+`OTEL_TRACES_SAMPLER`, ratio arguments for ratio samplers, signal-specific or
+generic OTLP endpoints, and bounded batch/export settings. With no trace or
+metric endpoint those pipelines are no-ops while structured stdout logging
+continues.
+
+`forceFlush()` covers traces, metrics, OpenTelemetry Logs, and direct Loki.
+Initialization, export, flush, and shutdown failures are best-effort and do not
+become application startup or business-operation failures.
+
+### BullMQ telemetry
+
+Create the shared BullMQ telemetry adapter once per Queue or Worker options
+object and pass it through BullMQ's native `telemetry` option:
+
+```ts
+import { createBullMQTelemetry } from
+  "@modainteract/moda-interact-shared/observability/bullmq";
+
+const telemetry = createBullMQTelemetry({
+  serviceName: "moda-messaging-worker",
+  enableMetrics: true,
+});
+
+new Worker(queueName, processor, { connection, telemetry });
+```
+
+The adapter uses the global trace and meter providers installed by the Node
+runtime. BullMQ owns propagation metadata in its job options; applications must
+not copy or mutate queue payloads solely to carry trace context. BullMQ metrics
+use queue name, bounded job name, and job state dimensions, never Moda job,
+shop, checkout, conversation, or message IDs.
+
+### GenAI active spans
+
+Use the GenAI helpers to model one inbound conversation turn as an independent
+trace with active agent, tool, and automatically instrumented child spans:
+
+```ts
+import {
+  observeAgentInvocation,
+  observeAgentTool,
+  observeConversationTurn,
+} from "@modainteract/moda-interact-shared/observability/genai";
+
+await observeConversationTurn("whatsapp", () =>
+  observeAgentInvocation({ agentName: "commerce-agent" }, () =>
+    observeAgentTool("lookup-products", executeTool),
+  ),
+);
+```
+
+The helpers use only the global tracer and meter providers installed by the
+Node runtime. They create no SDK, provider, exporter, or network request, and
+remain lightweight no-ops when providers are absent. Six module-singleton
+instruments record turn, agent, and tool duration and operation outcomes.
+Metric attributes are limited to `outcome=success|error`; turn metrics also use
+the closed `channel=whatsapp|other` vocabulary. Arbitrary agent, provider,
+model, tool, and Moda business identifiers never become metric dimensions.
+
+Agent, provider, model, and tool names are trimmed and bounded on spans only.
+Prompt, completion, message, and tool payload bodies are never accepted or
+captured by default.
 
 ## What this package does not own
 
@@ -42,13 +149,13 @@ This package does **not** own:
 - Shopify or Meta webhook HTTP handlers;
 - Shopify or Meta SDK integration;
 - application recovery/business logic;
-- OpenTelemetry spans or application-specific metrics;
-- OpenTelemetry tracing/metrics SDK bootstraps;
+- service/domain-specific span names, business attributes, or application
+  metrics;
 - deployment OTLP endpoint/credential wiring or observability backends;
 - Render deployment configuration.
 
-Those capabilities remain in the repository that owns the corresponding
-runtime concern.
+Those service-specific semantics and deployment concerns remain in the
+repository that owns the corresponding runtime.
 
 ---
 
@@ -579,12 +686,14 @@ choice.
 - stdout and OpenTelemetry emission are isolated and best-effort: a failure in
   either must not change application/business correctness.
 
-### Tracing/metrics remain service-specific
+### Tracing/metrics ownership
 
 The shared logger does **not** create spans, counters or histograms.
 
-Service-specific OpenTelemetry tracing and metrics remain in the owning runtime
-repository, for example:
+The shared observability runtime owns the generic Node SDK, tracing and metrics
+provider mechanics, exporters, sampling, HTTP/Undici instrumentation, generic
+helpers, and lifecycle. Service repositories own their span names, business
+attributes, application-specific metrics, and domain semantics, for example:
 
 ```text
 Shopify operation
@@ -621,6 +730,19 @@ The public package exposes independent entry points.
     Node-only logging bootstrap
     (OpenTelemetry LoggerProvider, batching, OTLP HTTP exporter;
      Winston + winston-loki direct transport)
+
+@modainteract/moda-interact-shared/observability
+    browser-safe generic observability helpers
+
+@modainteract/moda-interact-shared/observability/node
+    reusable Node OpenTelemetry SDK, tracing/metrics providers, exporters,
+    sampling, HTTP/Undici instrumentation, and lifecycle
+
+@modainteract/moda-interact-shared/observability/bullmq
+    Node-only BullMQ native telemetry adapter
+
+@modainteract/moda-interact-shared/observability/genai
+    Node/runtime GenAI conversation-turn, agent, and tool active-span helpers
 ```
 
 Consumers should prefer the narrowest appropriate subpath.
@@ -637,27 +759,31 @@ Examples of repository ownership:
 - normalizes/validates Shopify events;
 - publishes the appropriate queue jobs;
 - uses the shared structured logger for generic log mechanics;
-- owns Shopify-specific observability semantics and OpenTelemetry.
+- uses the shared observability runtime for generic OpenTelemetry mechanics;
+- owns Shopify-specific observability semantics and application metrics.
 
 **moda-interact-background**
 
 - parses shared cross-service contracts before acting;
 - runs BullMQ workers and recovery workflows;
 - uses the shared logger for generic structured logging;
-- owns worker/recovery OpenTelemetry.
+- uses the shared observability runtime for generic OpenTelemetry mechanics;
+- owns worker/recovery observability semantics and application metrics.
 
 **moda-interact-messaging**
 
 - owns Meta/WhatsApp ingress;
 - uses the shared logger for generic structured logging;
-- owns Meta/WhatsApp-specific observability and OpenTelemetry.
+- uses the shared observability runtime for generic OpenTelemetry mechanics;
+- owns Meta/WhatsApp-specific observability semantics and application metrics.
 
 **moda-interact-admin**
 
 - owns the internal admin application;
 - may use the same shared logger where server-side operational logging is
   required;
-- owns admin-specific application telemetry.
+- uses the shared observability runtime for generic OpenTelemetry mechanics;
+- owns admin-specific observability semantics and application metrics.
 
 **moda-interact-database**
 

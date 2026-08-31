@@ -1,6 +1,6 @@
 {
   "name": "@modainteract/moda-interact-shared",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -27,6 +27,22 @@
     "./logging/node": {
       "types": "./dist/logging/node.d.ts",
       "import": "./dist/logging/node.js"
+    },
+    "./observability": {
+      "types": "./dist/observability/index.d.ts",
+      "import": "./dist/observability/index.js"
+    },
+    "./observability/node": {
+      "types": "./dist/observability/node.d.ts",
+      "import": "./dist/observability/node.js"
+    },
+    "./observability/bullmq": {
+      "types": "./dist/observability/bullmq.d.ts",
+      "import": "./dist/observability/bullmq.js"
+    },
+    "./observability/genai": {
+      "types": "./dist/observability/genai.d.ts",
+      "import": "./dist/observability/genai.js"
     }
   },
   "files": [
@@ -41,15 +57,27 @@
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/api-logs": "0.221.0",
+    "@opentelemetry/context-async-hooks": "^2.10.0",
     "@opentelemetry/exporter-logs-otlp-http": "0.221.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.221.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.221.0",
+    "@opentelemetry/instrumentation-http": "0.221.0",
+    "@opentelemetry/instrumentation-undici": "0.31.0",
     "@opentelemetry/resources": "^2.10.0",
     "@opentelemetry/sdk-logs": "0.221.0",
+    "@opentelemetry/sdk-metrics": "^2.10.0",
+    "@opentelemetry/sdk-node": "0.221.0",
+    "@opentelemetry/sdk-trace-base": "^2.10.0",
+    "@prisma/instrumentation": "^6.19.3",
+    "bullmq-otel": "^2.0.1",
     "winston": "3.19.0",
     "winston-loki": "6.1.7",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
+    "bullmq": "^6.3.1",
+    "ioredis": "^6.0.0",
     "tsup": "^8.0.0",
     "tsx": "^4.23.12",
     "typescript": "^5.0.0"
