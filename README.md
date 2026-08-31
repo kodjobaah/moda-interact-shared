@@ -503,7 +503,7 @@ not recursively written back through the shared logger.
 
 ### Loki labels and cardinality
 
-The only default Loki labels are the canonical low-cardinality identity:
+Moda explicitly configures exactly three canonical low-cardinality labels:
 
 ```text
 service_namespace
@@ -511,9 +511,15 @@ service_name
 environment
 ```
 
+`winston-loki@6.1.7` additionally adds its own low-cardinality `level` label
+to every pushed stream, so a stream carries the three Moda labels plus
+`level`. This is transport-library behaviour and does not change Moda's label
+configuration.
+
 Dynamic/high-cardinality identifiers must **not** be promoted to Loki stream
 labels. The implementation explicitly retains
-`useWinstonMetaAsLabels: false`. In particular, do not label by:
+`useWinstonMetaAsLabels: false`, so winston metadata is never promoted to
+labels. In particular, do not label by:
 
 ```text
 traceId
