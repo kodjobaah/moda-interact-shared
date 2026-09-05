@@ -7,6 +7,8 @@ import {
 } from "../constants.js";
 import {
   createShopifyOrderCorrelationOrderingKey,
+  createShopifyCartActivityOrderingKey,
+  isCartActivityEventV2,
   createShopifyPendingRecoveryOrderingKey,
   parseShopifyRecoveryEventV2,
   safeParseShopifyRecoveryEventV2,
@@ -58,6 +60,18 @@ function checkoutUpdatedV2Event() {
   };
 }
 
+function cartActivityV2Event() {
+  return {
+    ...baseEnvelope(),
+    providerTopic: "carts/update",
+    eventType: SHOPIFY_RECOVERY_EVENT_TYPES_V2.CART_ACTIVITY,
+    payload: {
+      cartToken: "cart_1",
+      isEmpty: null,
+    },
+  };
+}
+
 function orderCompletedV2Event() {
   return {
     ...baseEnvelope(),
@@ -75,6 +89,116 @@ function orderCompletedV2Event() {
 test("parses v2 checkout.created", () => {
   const event = parseShopifyRecoveryEventV2(checkoutCreatedV2Event());
   assert.equal(event.eventType, "checkout.created");
+});
+
+test("legacy v2 events without international context remain compatible", () => {
+  const event = parseShopifyRecoveryEventV2(checkoutCreatedV2Event());
+  assert.equal(event.internationalContext, undefined);
+});
+
+test("parses independently combined canonical international context", () => {
+  const event = parseShopifyRecoveryEventV2({
+    ...checkoutCreatedV2Event(),
+    internationalContext: {
+      languageTag: "fr-FR",
+      languageSource: "shopify",
+      countryCode: "GB",
+      currencyCode: "CHF",
+      timeZone: "Europe/London",
+    },
+  });
+
+  assert.deepEqual(event.internationalContext, {
+    languageTag: "fr-FR",
+    languageSource: "shopify",
+    countryCode: "GB",
+    currencyCode: "CHF",
+    timeZone: "Europe/London",
+  });
+});
+
+test("rejects invalid international context dimensions independently", () => {
+  for (const [field, value] of [
+    ["languageTag", "not a language"],
+    ["countryCode", "ZZ"],
+    ["currencyCode", "ZZZ"],
+    ["timeZone", "Mars/Olympus"],
+  ]) {
+    assert.throws(() =>
+      parseShopifyRecoveryEventV2({
+        ...checkoutCreatedV2Event(),
+        internationalContext: {
+          languageTag: null,
+          languageSource: null,
+          countryCode: null,
+          currencyCode: null,
+          timeZone: null,
+          [field]: value,
+        },
+      }),
+    );
+  }
+});
+
+test("keeps provider fields outside the international context contract", () => {
+  assert.throws(() =>
+    parseShopifyRecoveryEventV2({
+      ...checkoutCreatedV2Event(),
+      internationalContext: {
+        languageTag: "en-GB",
+        languageSource: "shopify",
+        countryCode: "GB",
+        currencyCode: "GBP",
+        timeZone: "Europe/London",
+        customer_locale: "en_GB",
+      },
+    }),
+  );
+});
+
+test("does not infer missing international dimensions", () => {
+  const event = parseShopifyRecoveryEventV2({
+    ...checkoutCreatedV2Event(),
+    internationalContext: {
+      languageTag: null,
+      languageSource: null,
+      countryCode: "CH",
+      currencyCode: "CHF",
+      timeZone: null,
+    },
+  });
+
+  assert.deepEqual(event.internationalContext, {
+    languageTag: null,
+    languageSource: null,
+    countryCode: "CH",
+    currencyCode: "CHF",
+    timeZone: null,
+  });
+});
+
+test("parses v2 cart.activity with nullable emptiness", () => {
+  const event = parseShopifyRecoveryEventV2(cartActivityV2Event());
+  assert.equal(event.eventType, "cart.activity");
+  assert.equal(event.payload.isEmpty, null);
+});
+
+test("cart.activity payload accepts only a cart token and boolean/null emptiness", () => {
+  for (const isEmpty of [true, false, null]) {
+    const event = parseShopifyRecoveryEventV2({
+      ...cartActivityV2Event(),
+      payload: { cartToken: "cart_1", isEmpty },
+    });
+    assert.ok(isCartActivityEventV2(event));
+    assert.equal(event.payload.isEmpty, isEmpty);
+  }
+
+  assert.throws(() =>
+    parseShopifyRecoveryEventV2({
+      ...cartActivityV2Event(),
+      payload: { cartToken: "cart_1", isEmpty: "unknown" },
+    }),
+  );
 });
 
 test("parses v2 checkout.updated with only checkoutToken", () => {
@@ -164,6 +288,22 @@ test("pending-recovery ordering key is deterministic and tenant-scoped", () => {
 
   assert.equal(key1, key2);
   assert.notEqual(key1, key3);
+});
+
+test("cart activity ordering key is deterministic and tenant-scoped", () => {
+  const key1 = createShopifyCartActivityOrderingKey("shop_1", "cart_1");
+  const key2 = createShopifyCartActivityOrderingKey("shop_1", "cart_1");
+  const key3 = createShopifyCartActivityOrderingKey("shop_2", "cart_1");
+
+  assert.equal(key1, "cart:6:shop_1:6:cart_1");
+  assert.equal(key1, key2);
+  assert.notEqual(key1, key3);
+  assert.notEqual(
+    createShopifyCartActivityOrderingKey("shop:1", "cart_1"),
+    createShopifyCartActivityOrderingKey("shop", "1:cart_1"),
+  );
+  assert.throws(() => createShopifyCartActivityOrderingKey("", "cart_1"));
+  assert.throws(() => createShopifyCartActivityOrderingKey("shop_1", ""));
 });
 
 test("v1 parser remains importable/parseable for transition", () => {

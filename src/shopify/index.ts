@@ -5,6 +5,7 @@ export * from "./v1/order-completed.schema.js";
 export * from "./v1/commerce-event.schema.js";
 export * from "./v2/checkout-created.schema.js";
 export * from "./v2/checkout-updated.schema.js";
+export * from "./v2/cart-activity.schema.js";
 export * from "./v2/order-completed.schema.js";
 export * from "./v2/recovery-event.schema.js";
 export * from "./queue-contracts.js";

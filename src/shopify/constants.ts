@@ -11,6 +11,7 @@ export const SHOPIFY_COMMERCE_EVENT_TYPES = {
 } as const;
 
 export const SHOPIFY_RECOVERY_EVENT_TYPES_V2 = {
+  CART_ACTIVITY: "cart.activity",
   CHECKOUT_CREATED: "checkout.created",
   CHECKOUT_UPDATED: "checkout.updated",
   ORDER_COMPLETED: "order.completed",

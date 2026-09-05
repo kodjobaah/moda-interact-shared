@@ -3,6 +3,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: {
     index: "src/index.ts",
+    internationalization: "src/internationalization.ts",
     "shopify/index": "src/shopify/index.ts",
     "shopify/node": "src/shopify/node.ts",
     "logging/index": "src/logging/index.ts",

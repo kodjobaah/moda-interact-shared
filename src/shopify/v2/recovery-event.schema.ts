@@ -4,9 +4,11 @@ import {
   SHOPIFY_RECOVERY_EVENT_TYPES_V2,
 } from "../constants.js";
 import { ShopifyTenantSchema } from "../common.schema.js";
+import { InternationalContextSchema } from "../../internationalization.js";
 import { CheckoutCreatedPayloadV2Schema } from "./checkout-created.schema.js";
 import { CheckoutUpdatedPayloadV2Schema } from "./checkout-updated.schema.js";
 import { OrderCompletedPayloadV2Schema } from "./order-completed.schema.js";
+import { ShopifyCartActivityPayloadV2Schema } from "./cart-activity.schema.js";
 
 const ShopifyRecoveryEventBaseV2Schema = z
   .object({
@@ -21,6 +23,7 @@ const ShopifyRecoveryEventBaseV2Schema = z
     receivedAt: z.iso.datetime(),
     traceId: z.string().min(1),
     orderingKey: z.string().min(1),
+    internationalContext: InternationalContextSchema.optional(),
   })
   .strict();
 
@@ -32,6 +35,16 @@ export const ShopifyCheckoutCreatedEventV2Schema =
 
 export type ShopifyCheckoutCreatedEventV2 = z.infer<
   typeof ShopifyCheckoutCreatedEventV2Schema
+>;
+
+export const ShopifyCartActivityEventV2Schema =
+  ShopifyRecoveryEventBaseV2Schema.extend({
+    eventType: z.literal(SHOPIFY_RECOVERY_EVENT_TYPES_V2.CART_ACTIVITY),
+    payload: ShopifyCartActivityPayloadV2Schema,
+  }).strict();
+
+export type ShopifyCartActivityEventV2 = z.infer<
+  typeof ShopifyCartActivityEventV2Schema
 >;
 
 export const ShopifyCheckoutUpdatedEventV2Schema =
@@ -55,6 +68,7 @@ export type ShopifyOrderCompletedEventV2 = z.infer<
 >;
 
 export const ShopifyRecoveryEventV2Schema = z.discriminatedUnion("eventType", [
+  ShopifyCartActivityEventV2Schema,
   ShopifyCheckoutCreatedEventV2Schema,
   ShopifyCheckoutUpdatedEventV2Schema,
   ShopifyOrderCompletedEventV2Schema,
@@ -75,6 +89,12 @@ export function isCheckoutCreatedEventV2(
   event: ShopifyRecoveryEventV2,
 ): event is ShopifyCheckoutCreatedEventV2 {
   return event.eventType === SHOPIFY_RECOVERY_EVENT_TYPES_V2.CHECKOUT_CREATED;
+}
+
+export function isCartActivityEventV2(
+  event: ShopifyRecoveryEventV2,
+): event is ShopifyCartActivityEventV2 {
+  return event.eventType === SHOPIFY_RECOVERY_EVENT_TYPES_V2.CART_ACTIVITY;
 }
 
 export function isCheckoutUpdatedEventV2(
@@ -106,6 +126,25 @@ export function createShopifyPendingRecoveryOrderingKey(
   }
 
   return `${shopId}:${checkoutToken}`;
+}
+
+export function createShopifyCartActivityOrderingKey(
+  shopId: string,
+  cartToken: string,
+): string {
+  if (typeof shopId !== "string" || shopId.length === 0) {
+    throw new Error(
+      "createShopifyCartActivityOrderingKey: shopId must be a non-empty string",
+    );
+  }
+
+  if (typeof cartToken !== "string" || cartToken.length === 0) {
+    throw new Error(
+      "createShopifyCartActivityOrderingKey: cartToken must be a non-empty string",
+    );
+  }
+
+  return `cart:${shopId.length}:${shopId}:${cartToken.length}:${cartToken}`;
 }
 
 export function createShopifyOrderCorrelationOrderingKey(input: {
