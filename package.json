@@ -1,6 +1,6 @@
 {
   "name": "@modainteract/moda-interact-shared",
-  "version": "0.6.3",
+  "version": "0.7.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,6 +15,14 @@
     "./internationalization": {
       "types": "./dist/internationalization.d.ts",
       "import": "./dist/internationalization.js"
+    },
+    "./merchant-communications": {
+      "types": "./dist/merchant-communications.d.ts",
+      "import": "./dist/merchant-communications.js"
+    },
+    "./merchant-communications/node": {
+      "types": "./dist/merchant-communications.node.d.ts",
+      "import": "./dist/merchant-communications.node.js"
     },
     "./shopify": {
       "types": "./dist/shopify/index.d.ts",
