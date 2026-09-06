@@ -24,6 +24,10 @@
       "types": "./dist/merchant-communications/node.d.ts",
       "import": "./dist/merchant-communications/node.js"
     },
+    "./testing/node": {
+      "types": "./dist/testing/node.d.ts",
+      "import": "./dist/testing/node.js"
+    },
     "./shopify": {
       "types": "./dist/shopify/index.d.ts",
       "import": "./dist/shopify/index.js"
@@ -66,6 +70,8 @@
     "test": "tsx --test \"src/**/*.test.ts\"",
     "validate:internationalization-entrypoint": "npm run build && node scripts/validate-internationalization-entrypoint.mjs",
     "validate:merchant-communications-node": "npm run build && node scripts/validate-merchant-communications-node.mjs",
+    "validate:testing-node": "npm run build && node scripts/validate-testing-node.mjs",
+    "validate:testing-node-live": "npm run build && node scripts/validate-testing-node-live.mjs",
     "prepack": "npm run build"
   },
   "dependencies": {

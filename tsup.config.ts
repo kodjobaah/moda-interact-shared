@@ -6,6 +6,7 @@ export default defineConfig({
     internationalization: "src/internationalization.ts",
     "merchant-communications": "src/merchant-communications.ts",
     "merchant-communications/node": "src/merchant-communications.node.ts",
+    "testing/node": "src/testing/node.ts",
     "shopify/index": "src/shopify/index.ts",
     "shopify/node": "src/shopify/node.ts",
     "logging/index": "src/logging/index.ts",
