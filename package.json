@@ -1,6 +1,6 @@
 {
   "name": "@modainteract/moda-interact-shared",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -15,6 +15,10 @@
     "./internationalization": {
       "types": "./dist/internationalization.d.ts",
       "import": "./dist/internationalization.js"
+    },
+    "./billing": {
+      "types": "./dist/billing.d.ts",
+      "import": "./dist/billing.js"
     },
     "./merchant-communications": {
       "types": "./dist/merchant-communications.d.ts",

@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     internationalization: "src/internationalization.ts",
+    billing: "src/billing.ts",
     "merchant-communications": "src/merchant-communications.ts",
     "merchant-communications/node": "src/merchant-communications.node.ts",
     "testing/node": "src/testing/node.ts",
