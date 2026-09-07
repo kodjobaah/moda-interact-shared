@@ -23,8 +23,8 @@ type BillingSystemMessageCodeTypeAssertion = Assert<BillingSystemMessageCodeDoes
 function validStatus() {
   return {
     schemaVersion: WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION,
-    shopId: "gid://shopify/Shop/123",
     providerAccountId: "meta-account-123",
+    providerPhoneNumberId: "meta-phone-123",
     providerMessageId: "wamid.message-123",
     status: "DELIVERED" as const,
     occurredAt: "2026-09-07T18:00:00.000Z",
@@ -51,12 +51,40 @@ test("parses a normalized provider status with bounded pricing metadata", () => 
 });
 
 test("rejects malformed provider status identity, timestamp, status, metadata, and extra fields", () => {
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), schemaVersion: 1 }).success, false);
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), providerAccountId: "" }).success, false);
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), providerAccountId: "   " }).success, false);
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), providerAccountId: "a".repeat(129) }).success, false);
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), providerPhoneNumberId: "" }).success, false);
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), providerPhoneNumberId: "   " }).success, false);
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), providerPhoneNumberId: "a".repeat(129) }).success, false);
   assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), providerMessageId: "" }).success, false);
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), providerMessageId: "   " }).success, false);
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), providerMessageId: "a".repeat(129) }).success, false);
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), shopId: "gid://shopify/Shop/123" }).success, false);
   assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), occurredAt: "not-a-date" }).success, false);
   assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), status: "QUEUED" }).success, false);
   assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), pricing: { category: "x".repeat(129) } }).success, false);
   assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), customer: { phone: "+123" } }).success, false);
   assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), pricing: {} }).success, false);
+});
+
+test("accepts every provider status literal and optional bounded pricing", () => {
+  for (const status of ["SENT", "DELIVERED", "READ", "FAILED"] as const) {
+    assert.equal(NormalizedWhatsAppStatusSchema.safeParse({ ...validStatus(), status }).success, true);
+  }
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({
+    ...validStatus(),
+    pricing: undefined,
+  }).success, true);
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({
+    ...validStatus(),
+    pricing: { billable: false },
+  }).success, true);
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({
+    ...validStatus(),
+    pricing: { amount: "1.00" },
+  }).success, false);
 });
 
 test("creates lifecycle-scoped deterministic billing identities", () => {

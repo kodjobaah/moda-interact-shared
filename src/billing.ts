@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const ARCH007_BILLING_CONTRACT_SCHEMA_VERSION = 1 as const;
-export const WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION = 1 as const;
+export const WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION = 2 as const;
 
 export const BILLING_PLAN_KINDS = ["FREE", "PAID_METERED"] as const;
 export const BillingPlanKindSchema = z.enum(BILLING_PLAN_KINDS);
@@ -64,8 +64,8 @@ export type WhatsAppProviderPricingMetadata = z.infer<
 export const NormalizedWhatsAppStatusSchema = z
   .object({
     schemaVersion: z.literal(WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION),
-    shopId: z.string().trim().min(1).max(MAX_ID_LENGTH),
     providerAccountId: z.string().trim().min(1).max(MAX_ID_LENGTH),
+    providerPhoneNumberId: z.string().trim().min(1).max(MAX_ID_LENGTH),
     providerMessageId: z.string().trim().min(1).max(MAX_ID_LENGTH),
     status: WhatsAppProviderStatusSchema,
     occurredAt: z.iso.datetime({ offset: true }),
