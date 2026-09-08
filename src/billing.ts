@@ -11,6 +11,7 @@ export const BILLING_USAGE_METRICS = [
   "RECOVERY_CONVERSATION",
   "OUTBOUND_AUTOMATED_MESSAGE",
   "DELIVERED_WHATSAPP_MESSAGE",
+  "RECOVERY_CREDIT_PACK_PURCHASE",
 ] as const;
 export const BillingUsageMetricSchema = z.enum(BILLING_USAGE_METRICS);
 export type BillingUsageMetric = z.infer<typeof BillingUsageMetricSchema>;

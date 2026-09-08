@@ -35,6 +35,12 @@ function validStatus() {
 test("exports canonical billing values", () => {
   assert.deepEqual(BillingPlanKindSchema.options, BILLING_PLAN_KINDS);
   assert.deepEqual(BillingUsageMetricSchema.options, BILLING_USAGE_METRICS);
+  assert.deepEqual(BILLING_USAGE_METRICS, [
+    "RECOVERY_CONVERSATION",
+    "OUTBOUND_AUTOMATED_MESSAGE",
+    "DELIVERED_WHATSAPP_MESSAGE",
+    "RECOVERY_CREDIT_PACK_PURCHASE",
+  ]);
   assert.deepEqual(Object.values(BILLING_SYSTEM_MESSAGE_CODES), [
     "BILLING_FREE_ALLOWANCE_WARNING",
     "BILLING_FREE_ALLOWANCE_EXHAUSTED",
@@ -44,6 +50,10 @@ test("exports canonical billing values", () => {
     "BILLING_SAFETY_LIMIT_REACHED",
   ]);
   assert.equal(BillingSystemMessageCodeSchema.parse("BILLING_PLAN_UPGRADED"), "BILLING_PLAN_UPGRADED");
+  assert.equal(
+    BillingUsageMetricSchema.parse("RECOVERY_CREDIT_PACK_PURCHASE"),
+    "RECOVERY_CREDIT_PACK_PURCHASE",
+  );
 });
 
 test("parses a normalized provider status with bounded pricing metadata", () => {
