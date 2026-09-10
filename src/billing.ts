@@ -23,6 +23,13 @@ export const BILLING_SYSTEM_MESSAGE_CODES = {
   PLAN_DOWNGRADE_SCHEDULED: "BILLING_PLAN_DOWNGRADE_SCHEDULED",
   SUBSCRIPTION_ENDED: "BILLING_SUBSCRIPTION_ENDED",
   SAFETY_LIMIT_REACHED: "BILLING_SAFETY_LIMIT_REACHED",
+  PLAN_CHANGE_ACTION_REQUIRED: "BILLING_PLAN_CHANGE_ACTION_REQUIRED",
+  CANCELLATION_REQUEST_RECEIVED: "BILLING_CANCELLATION_REQUEST_RECEIVED",
+  CANCELLATION_COMPLETED: "BILLING_CANCELLATION_COMPLETED",
+  CANCELLATION_REJECTED: "BILLING_CANCELLATION_REJECTED",
+  REFUND_REQUEST_RECEIVED: "BILLING_REFUND_REQUEST_RECEIVED",
+  REFUND_COMPLETED: "BILLING_REFUND_COMPLETED",
+  REFUND_REJECTED: "BILLING_REFUND_REJECTED",
 } as const;
 
 const BILLING_SYSTEM_MESSAGE_CODE_VALUES = [
@@ -32,10 +39,83 @@ const BILLING_SYSTEM_MESSAGE_CODE_VALUES = [
   BILLING_SYSTEM_MESSAGE_CODES.PLAN_DOWNGRADE_SCHEDULED,
   BILLING_SYSTEM_MESSAGE_CODES.SUBSCRIPTION_ENDED,
   BILLING_SYSTEM_MESSAGE_CODES.SAFETY_LIMIT_REACHED,
+  BILLING_SYSTEM_MESSAGE_CODES.PLAN_CHANGE_ACTION_REQUIRED,
+  BILLING_SYSTEM_MESSAGE_CODES.CANCELLATION_REQUEST_RECEIVED,
+  BILLING_SYSTEM_MESSAGE_CODES.CANCELLATION_COMPLETED,
+  BILLING_SYSTEM_MESSAGE_CODES.CANCELLATION_REJECTED,
+  BILLING_SYSTEM_MESSAGE_CODES.REFUND_REQUEST_RECEIVED,
+  BILLING_SYSTEM_MESSAGE_CODES.REFUND_COMPLETED,
+  BILLING_SYSTEM_MESSAGE_CODES.REFUND_REJECTED,
 ] as const;
 
 export const BillingSystemMessageCodeSchema = z.enum(BILLING_SYSTEM_MESSAGE_CODE_VALUES);
 export type BillingSystemMessageCode = z.infer<typeof BillingSystemMessageCodeSchema>;
+
+export const SUBSCRIPTION_CANCELLATION_MODES = [
+  "END_OF_CYCLE",
+  "IMMEDIATE_NO_PRORATION",
+  "IMMEDIATE_PRORATED",
+  "IMMEDIATE_SKIP_FINAL_USAGE",
+] as const;
+
+export const SubscriptionCancellationModeSchema = z.enum(SUBSCRIPTION_CANCELLATION_MODES);
+export type SubscriptionCancellationMode = z.infer<typeof SubscriptionCancellationModeSchema>;
+
+export type ShopifySubscriptionCancellationArgs = Readonly<{
+  deferCancellation: boolean;
+  prorate: boolean;
+  skipFinalUsageCharge: boolean;
+}>;
+
+export const SHOPIFY_SUBSCRIPTION_CANCELLATION_ARGS = {
+  END_OF_CYCLE: {
+    deferCancellation: true,
+    prorate: false,
+    skipFinalUsageCharge: false,
+  },
+  IMMEDIATE_NO_PRORATION: {
+    deferCancellation: false,
+    prorate: false,
+    skipFinalUsageCharge: false,
+  },
+  IMMEDIATE_PRORATED: {
+    deferCancellation: false,
+    prorate: true,
+    skipFinalUsageCharge: false,
+  },
+  IMMEDIATE_SKIP_FINAL_USAGE: {
+    deferCancellation: false,
+    prorate: false,
+    skipFinalUsageCharge: true,
+  },
+} as const satisfies Readonly<
+  Record<SubscriptionCancellationMode, ShopifySubscriptionCancellationArgs>
+>;
+
+export type PurchasedRecoveryCreditCounterSnapshot = Readonly<{
+  grantedQuantity: number;
+  committedQuantity: number;
+  reservedQuantity: number;
+  refundingQuantity: number;
+}>;
+
+export function availablePurchasedRecoveryCredits(
+  counter: PurchasedRecoveryCreditCounterSnapshot,
+): number {
+  for (const [name, value] of Object.entries(counter)) {
+    if (!Number.isInteger(value) || value < 0) {
+      throw new Error(`${name} must be a non-negative integer`);
+    }
+  }
+
+  return Math.max(
+    counter.grantedQuantity
+      - counter.committedQuantity
+      - counter.reservedQuantity
+      - counter.refundingQuantity,
+    0,
+  );
+}
 
 export const WHATSAPP_PROVIDER_STATUSES = [
   "SENT",
