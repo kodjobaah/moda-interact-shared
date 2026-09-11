@@ -55,6 +55,7 @@ test("exports canonical billing values", () => {
   assert.deepEqual(Object.values(BILLING_SYSTEM_MESSAGE_CODES), [
     "BILLING_FREE_ALLOWANCE_WARNING",
     "BILLING_FREE_ALLOWANCE_EXHAUSTED",
+    "BILLING_RECOVERY_CAPACITY_EXHAUSTED",
     "BILLING_PLAN_UPGRADED",
     "BILLING_PLAN_DOWNGRADE_SCHEDULED",
     "BILLING_SUBSCRIPTION_ENDED",
@@ -67,7 +68,16 @@ test("exports canonical billing values", () => {
     "BILLING_REFUND_COMPLETED",
     "BILLING_REFUND_REJECTED",
   ]);
+  assert.equal(
+    BILLING_SYSTEM_MESSAGE_CODES.RECOVERY_CAPACITY_EXHAUSTED,
+    BillingSystemMessageCodeSchema.parse("BILLING_RECOVERY_CAPACITY_EXHAUSTED"),
+  );
   assert.equal(BillingSystemMessageCodeSchema.parse("BILLING_PLAN_UPGRADED"), "BILLING_PLAN_UPGRADED");
+  assert.equal(
+    BillingSystemMessageCodeSchema.parse("BILLING_FREE_ALLOWANCE_EXHAUSTED"),
+    "BILLING_FREE_ALLOWANCE_EXHAUSTED",
+  );
+  assert.throws(() => BillingSystemMessageCodeSchema.parse("BILLING_UNKNOWN_CODE"));
   assert.equal(
     BillingUsageMetricSchema.parse("RECOVERY_CREDIT_PACK_PURCHASE"),
     "RECOVERY_CREDIT_PACK_PURCHASE",
