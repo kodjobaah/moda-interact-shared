@@ -7,9 +7,13 @@ import {
   BillingPlanKindSchema,
   BillingSystemMessageCodeSchema,
   BillingUsageMetricSchema,
+  SHOPIFY_SUBSCRIPTION_CANCELLATION_ARGS,
+  SUBSCRIPTION_CANCELLATION_MODES,
+  SubscriptionCancellationModeSchema,
   type BillingSystemMessageCode,
   NormalizedWhatsAppStatusSchema,
   WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION,
+  availablePurchasedRecoveryCredits,
   createMerchantBillingSystemSourceKey,
   createRecoveryIdempotencyKey,
   createShopifyUsageIdempotencyKey,
@@ -48,12 +52,119 @@ test("exports canonical billing values", () => {
     "BILLING_PLAN_DOWNGRADE_SCHEDULED",
     "BILLING_SUBSCRIPTION_ENDED",
     "BILLING_SAFETY_LIMIT_REACHED",
+    "BILLING_PLAN_CHANGE_ACTION_REQUIRED",
+    "BILLING_CANCELLATION_REQUEST_RECEIVED",
+    "BILLING_CANCELLATION_COMPLETED",
+    "BILLING_CANCELLATION_REJECTED",
+    "BILLING_REFUND_REQUEST_RECEIVED",
+    "BILLING_REFUND_COMPLETED",
+    "BILLING_REFUND_REJECTED",
   ]);
   assert.equal(BillingSystemMessageCodeSchema.parse("BILLING_PLAN_UPGRADED"), "BILLING_PLAN_UPGRADED");
   assert.equal(
     BillingUsageMetricSchema.parse("RECOVERY_CREDIT_PACK_PURCHASE"),
     "RECOVERY_CREDIT_PACK_PURCHASE",
   );
+});
+
+test("supports the canonical top-up refund message contracts", () => {
+  const refundCodes = [
+    BILLING_SYSTEM_MESSAGE_CODES.REFUND_REQUEST_RECEIVED,
+    BILLING_SYSTEM_MESSAGE_CODES.REFUND_COMPLETED,
+    BILLING_SYSTEM_MESSAGE_CODES.REFUND_REJECTED,
+  ] as const;
+
+  assert.deepEqual(refundCodes, [
+    "BILLING_REFUND_REQUEST_RECEIVED",
+    "BILLING_REFUND_COMPLETED",
+    "BILLING_REFUND_REJECTED",
+  ]);
+  for (const code of refundCodes) {
+    assert.equal(BillingSystemMessageCodeSchema.parse(code), code);
+  }
+
+  const sourceKeys = refundCodes.map((code) =>
+    createMerchantBillingSystemSourceKey("shop-1", code, "refund-1"),
+  );
+  assert.deepEqual(sourceKeys, [
+    "billing-system:shop-1:BILLING_REFUND_REQUEST_RECEIVED:refund-1:1",
+    "billing-system:shop-1:BILLING_REFUND_COMPLETED:refund-1:1",
+    "billing-system:shop-1:BILLING_REFUND_REJECTED:refund-1:1",
+  ]);
+  assert.deepEqual(
+    sourceKeys,
+    refundCodes.map((code) =>
+      createMerchantBillingSystemSourceKey("shop-1", code, "refund-1"),
+    ),
+  );
+
+  const boundedSourceKey = createMerchantBillingSystemSourceKey(
+    "shop-" + "x".repeat(300),
+    BILLING_SYSTEM_MESSAGE_CODES.REFUND_COMPLETED,
+    "refund-" + "y".repeat(300),
+  );
+  assert.ok(boundedSourceKey.length <= 255);
+  assert.equal(
+    boundedSourceKey,
+    createMerchantBillingSystemSourceKey(
+      "shop-" + "x".repeat(300),
+      BILLING_SYSTEM_MESSAGE_CODES.REFUND_COMPLETED,
+      "refund-" + "y".repeat(300),
+    ),
+  );
+});
+
+test("exports the exact cancellation modes and Shopify provider mapping", () => {
+  assert.deepEqual(SubscriptionCancellationModeSchema.options, SUBSCRIPTION_CANCELLATION_MODES);
+  assert.deepEqual(SUBSCRIPTION_CANCELLATION_MODES, [
+    "END_OF_CYCLE",
+    "IMMEDIATE_NO_PRORATION",
+    "IMMEDIATE_PRORATED",
+    "IMMEDIATE_SKIP_FINAL_USAGE",
+  ]);
+  assert.deepEqual(SHOPIFY_SUBSCRIPTION_CANCELLATION_ARGS, {
+    END_OF_CYCLE: { deferCancellation: true, prorate: false, skipFinalUsageCharge: false },
+    IMMEDIATE_NO_PRORATION: { deferCancellation: false, prorate: false, skipFinalUsageCharge: false },
+    IMMEDIATE_PRORATED: { deferCancellation: false, prorate: true, skipFinalUsageCharge: false },
+    IMMEDIATE_SKIP_FINAL_USAGE: { deferCancellation: false, prorate: false, skipFinalUsageCharge: true },
+  });
+
+  for (const args of Object.values(SHOPIFY_SUBSCRIPTION_CANCELLATION_ARGS)) {
+    assert.equal(args.prorate && args.skipFinalUsageCharge, false);
+  }
+});
+
+test("calculates available purchased recovery credits and rejects invalid counters", () => {
+  assert.equal(availablePurchasedRecoveryCredits({
+    grantedQuantity: 100,
+    committedQuantity: 20,
+    reservedQuantity: 10,
+    refundingQuantity: 0,
+  }), 70);
+  assert.equal(availablePurchasedRecoveryCredits({
+    grantedQuantity: 100,
+    committedQuantity: 20,
+    reservedQuantity: 10,
+    refundingQuantity: 30,
+  }), 40);
+  assert.equal(availablePurchasedRecoveryCredits({
+    grantedQuantity: 10,
+    committedQuantity: 5,
+    reservedQuantity: 5,
+    refundingQuantity: 5,
+  }), 0);
+  assert.throws(() => availablePurchasedRecoveryCredits({
+    grantedQuantity: -1,
+    committedQuantity: 0,
+    reservedQuantity: 0,
+    refundingQuantity: 0,
+  }), /grantedQuantity must be a non-negative integer/);
+  assert.throws(() => availablePurchasedRecoveryCredits({
+    grantedQuantity: 1.5,
+    committedQuantity: 0,
+    reservedQuantity: 0,
+    refundingQuantity: 0,
+  }), /grantedQuantity must be a non-negative integer/);
 });
 
 test("parses a normalized provider status with bounded pricing metadata", () => {
