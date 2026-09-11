@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   BILLING_PLAN_KINDS,
+  BILLING_SUBSCRIPTION_RECONCILE_JOB_NAME,
+  BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME,
+  BILLING_SUBSCRIPTION_RECONCILE_SCHEMA_VERSION,
+  APP_PRICING_BILLING_PERIOD_DRAIN_WINDOW_MS,
   BILLING_SYSTEM_MESSAGE_CODES,
   BILLING_USAGE_METRICS,
   BillingPlanKindSchema,
@@ -15,9 +19,12 @@ import {
   WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION,
   availablePurchasedRecoveryCredits,
   createMerchantBillingSystemSourceKey,
+  createBillingSubscriptionReconcileJobId,
   createRecoveryIdempotencyKey,
   createShopifyUsageIdempotencyKey,
   parseNormalizedWhatsAppStatus,
+  parseBillingSubscriptionReconcileJob,
+  safeParseBillingSubscriptionReconcileJob,
 } from "./billing.js";
 
 type Assert<T extends true> = T;
@@ -67,6 +74,45 @@ test("exports canonical billing values", () => {
   );
 });
 
+test("exports the subscription reconciliation contract and drain policy", () => {
+  assert.equal(BILLING_SUBSCRIPTION_RECONCILE_SCHEMA_VERSION, 1);
+  assert.equal(BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME, "billing-subscription-reconcile");
+  assert.equal(BILLING_SUBSCRIPTION_RECONCILE_JOB_NAME, "reconcile-subscription");
+  assert.equal(APP_PRICING_BILLING_PERIOD_DRAIN_WINDOW_MS, 300000);
+});
+
+test("parses the strict subscription reconciliation v1 payload", () => {
+  const payload = {
+    schemaVersion: 1,
+    shopId: "shop-1",
+    subscriptionId: "subscription-1",
+    expectedNextReconcileAt: "2026-09-11T18:00:00+00:00",
+  };
+
+  assert.deepEqual(parseBillingSubscriptionReconcileJob(payload), payload);
+  assert.equal("APP_PRICING_BILLING_PERIOD_DRAIN_WINDOW_MS" in payload, false);
+  assert.equal(safeParseBillingSubscriptionReconcileJob(payload).success, true);
+  assert.equal(safeParseBillingSubscriptionReconcileJob({ ...payload, schemaVersion: 2 }).success, false);
+  assert.equal(safeParseBillingSubscriptionReconcileJob({ ...payload, schemaVersion: undefined }).success, false);
+  assert.equal(safeParseBillingSubscriptionReconcileJob(({ ...payload, shopId: undefined })).success, false);
+  assert.equal(safeParseBillingSubscriptionReconcileJob({ ...payload, shopId: "" }).success, false);
+  assert.equal(safeParseBillingSubscriptionReconcileJob({ ...payload, shopId: "   " }).success, false);
+  assert.equal(safeParseBillingSubscriptionReconcileJob(({ ...payload, subscriptionId: undefined })).success, false);
+  assert.equal(safeParseBillingSubscriptionReconcileJob({ ...payload, subscriptionId: "" }).success, false);
+  assert.equal(safeParseBillingSubscriptionReconcileJob({ ...payload, expectedNextReconcileAt: "2026-09-11T18:00:00" }).success, false);
+  assert.equal(safeParseBillingSubscriptionReconcileJob({ ...payload, unexpected: true }).success, false);
+});
+
+test("creates a deterministic colon-free subscription reconciliation job ID", () => {
+  const timestamp = "2026-09-11T18:00:00+00:00";
+  const jobId = createBillingSubscriptionReconcileJobId("subscription-1", timestamp);
+
+  assert.equal(jobId, createBillingSubscriptionReconcileJobId("subscription-1", timestamp));
+  assert.notEqual(jobId, createBillingSubscriptionReconcileJobId("subscription-1", "2026-09-11T18:05:00+00:00"));
+  assert.equal(jobId.includes(":"), false);
+  assert.ok(jobId.length <= 128);
+  assert.throws(() => createBillingSubscriptionReconcileJobId("", timestamp));
+  assert.throws(() => createBillingSubscriptionReconcileJobId("subscription-1", "invalid"));
 test("supports the canonical top-up refund message contracts", () => {
   const refundCodes = [
     BILLING_SYSTEM_MESSAGE_CODES.REFUND_REQUEST_RECEIVED,
