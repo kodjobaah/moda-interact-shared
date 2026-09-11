@@ -113,6 +113,51 @@ test("creates a deterministic colon-free subscription reconciliation job ID", ()
   assert.ok(jobId.length <= 128);
   assert.throws(() => createBillingSubscriptionReconcileJobId("", timestamp));
   assert.throws(() => createBillingSubscriptionReconcileJobId("subscription-1", "invalid"));
+test("supports the canonical top-up refund message contracts", () => {
+  const refundCodes = [
+    BILLING_SYSTEM_MESSAGE_CODES.REFUND_REQUEST_RECEIVED,
+    BILLING_SYSTEM_MESSAGE_CODES.REFUND_COMPLETED,
+    BILLING_SYSTEM_MESSAGE_CODES.REFUND_REJECTED,
+  ] as const;
+
+  assert.deepEqual(refundCodes, [
+    "BILLING_REFUND_REQUEST_RECEIVED",
+    "BILLING_REFUND_COMPLETED",
+    "BILLING_REFUND_REJECTED",
+  ]);
+  for (const code of refundCodes) {
+    assert.equal(BillingSystemMessageCodeSchema.parse(code), code);
+  }
+
+  const sourceKeys = refundCodes.map((code) =>
+    createMerchantBillingSystemSourceKey("shop-1", code, "refund-1"),
+  );
+  assert.deepEqual(sourceKeys, [
+    "billing-system:shop-1:BILLING_REFUND_REQUEST_RECEIVED:refund-1:1",
+    "billing-system:shop-1:BILLING_REFUND_COMPLETED:refund-1:1",
+    "billing-system:shop-1:BILLING_REFUND_REJECTED:refund-1:1",
+  ]);
+  assert.deepEqual(
+    sourceKeys,
+    refundCodes.map((code) =>
+      createMerchantBillingSystemSourceKey("shop-1", code, "refund-1"),
+    ),
+  );
+
+  const boundedSourceKey = createMerchantBillingSystemSourceKey(
+    "shop-" + "x".repeat(300),
+    BILLING_SYSTEM_MESSAGE_CODES.REFUND_COMPLETED,
+    "refund-" + "y".repeat(300),
+  );
+  assert.ok(boundedSourceKey.length <= 255);
+  assert.equal(
+    boundedSourceKey,
+    createMerchantBillingSystemSourceKey(
+      "shop-" + "x".repeat(300),
+      BILLING_SYSTEM_MESSAGE_CODES.REFUND_COMPLETED,
+      "refund-" + "y".repeat(300),
+    ),
+  );
 });
 
 test("exports the exact cancellation modes and Shopify provider mapping", () => {
