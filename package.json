@@ -72,6 +72,7 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test \"src/**/*.test.ts\"",
+    "validate:billing-entrypoint": "npm run build && node scripts/validate-billing-entrypoint.mjs",
     "validate:internationalization-entrypoint": "npm run build && node scripts/validate-internationalization-entrypoint.mjs",
     "validate:merchant-communications-node": "npm run build && node scripts/validate-merchant-communications-node.mjs",
     "validate:testing-node": "npm run build && node scripts/validate-testing-node.mjs",
