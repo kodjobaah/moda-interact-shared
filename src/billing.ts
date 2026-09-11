@@ -2,6 +2,10 @@ import { z } from "zod";
 
 export const ARCH007_BILLING_CONTRACT_SCHEMA_VERSION = 1 as const;
 export const WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION = 2 as const;
+export const BILLING_SUBSCRIPTION_RECONCILE_SCHEMA_VERSION = 1 as const;
+export const BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME = "billing-subscription-reconcile";
+export const BILLING_SUBSCRIPTION_RECONCILE_JOB_NAME = "reconcile-subscription";
+export const APP_PRICING_BILLING_PERIOD_DRAIN_WINDOW_MS = 300000 as const;
 
 export const BILLING_PLAN_KINDS = ["FREE", "PAID_METERED"] as const;
 export const BillingPlanKindSchema = z.enum(BILLING_PLAN_KINDS);
@@ -129,6 +133,29 @@ export type WhatsAppProviderStatus = z.infer<typeof WhatsAppProviderStatusSchema
 const MAX_ID_LENGTH = 128;
 const MAX_SHORT_TEXT_LENGTH = 128;
 
+export const BillingSubscriptionReconcileJobSchema = z
+  .object({
+    schemaVersion: z.literal(BILLING_SUBSCRIPTION_RECONCILE_SCHEMA_VERSION),
+    shopId: z.string().trim().min(1).max(MAX_ID_LENGTH),
+    subscriptionId: z.string().trim().min(1).max(MAX_ID_LENGTH),
+    expectedNextReconcileAt: z.iso.datetime({ offset: true }),
+  })
+  .strict();
+
+export type BillingSubscriptionReconcileJob = z.infer<
+  typeof BillingSubscriptionReconcileJobSchema
+>;
+
+export function parseBillingSubscriptionReconcileJob(
+  input: unknown,
+): BillingSubscriptionReconcileJob {
+  return BillingSubscriptionReconcileJobSchema.parse(input);
+}
+
+export function safeParseBillingSubscriptionReconcileJob(input: unknown) {
+  return BillingSubscriptionReconcileJobSchema.safeParse(input);
+}
+
 export const WhatsAppProviderPricingMetadataSchema = z
   .object({
     billable: z.boolean().optional(),
@@ -177,6 +204,18 @@ function fnv1a64(value: string): string {
     hash = BigInt.asUintN(64, hash * 0x100000001b3n);
   }
   return hash.toString(16).padStart(16, "0");
+}
+
+export function createBillingSubscriptionReconcileJobId(
+  subscriptionId: string,
+  expectedNextReconcileAt: string,
+): string {
+  assertKeyPart("subscriptionId", subscriptionId);
+  if (subscriptionId.trim().length > MAX_ID_LENGTH) {
+    throw new Error(`subscriptionId must be at most ${MAX_ID_LENGTH} characters`);
+  }
+  z.iso.datetime({ offset: true }).parse(expectedNextReconcileAt);
+  return `billing-subscription-reconcile-${fnv1a64(`${subscriptionId.trim()}\u0000${expectedNextReconcileAt}`)}`;
 }
 
 function boundedKey(prefix: string, parts: string[], maxLength: number): string {
