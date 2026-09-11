@@ -24,6 +24,7 @@ for (const exportName of [
   "BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME",
   "BILLING_SUBSCRIPTION_RECONCILE_JOB_NAME",
   "APP_PRICING_BILLING_PERIOD_DRAIN_WINDOW_MS",
+  "BILLING_SYSTEM_MESSAGE_CODES",
   "BillingSubscriptionReconcileJobSchema",
   "parseBillingSubscriptionReconcileJob",
   "safeParseBillingSubscriptionReconcileJob",
@@ -35,6 +36,10 @@ for (const exportName of [
     `billing subpath is missing runtime export: ${exportName}`,
   );
 }
+assert.equal(
+  billing.BILLING_SYSTEM_MESSAGE_CODES.RECOVERY_CAPACITY_EXHAUSTED,
+  "BILLING_RECOVERY_CAPACITY_EXHAUSTED",
+);
 
 const declaration = readFileSync(resolve(root, billingExport.types), "utf8");
 assert.match(
