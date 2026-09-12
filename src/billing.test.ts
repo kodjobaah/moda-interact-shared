@@ -11,9 +11,6 @@ import {
   BillingPlanKindSchema,
   BillingSystemMessageCodeSchema,
   BillingUsageMetricSchema,
-  SHOPIFY_SUBSCRIPTION_CANCELLATION_ARGS,
-  SUBSCRIPTION_CANCELLATION_MODES,
-  SubscriptionCancellationModeSchema,
   type BillingSystemMessageCode,
   NormalizedWhatsAppStatusSchema,
   WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION,
@@ -54,16 +51,11 @@ test("exports canonical billing values", () => {
   ]);
   assert.deepEqual(Object.values(BILLING_SYSTEM_MESSAGE_CODES), [
     "BILLING_FREE_ALLOWANCE_WARNING",
-    "BILLING_FREE_ALLOWANCE_EXHAUSTED",
     "BILLING_RECOVERY_CAPACITY_EXHAUSTED",
     "BILLING_PLAN_UPGRADED",
     "BILLING_PLAN_DOWNGRADE_SCHEDULED",
     "BILLING_SUBSCRIPTION_ENDED",
     "BILLING_SAFETY_LIMIT_REACHED",
-    "BILLING_PLAN_CHANGE_ACTION_REQUIRED",
-    "BILLING_CANCELLATION_REQUEST_RECEIVED",
-    "BILLING_CANCELLATION_COMPLETED",
-    "BILLING_CANCELLATION_REJECTED",
     "BILLING_REFUND_REQUEST_RECEIVED",
     "BILLING_REFUND_COMPLETED",
     "BILLING_REFUND_REJECTED",
@@ -73,10 +65,16 @@ test("exports canonical billing values", () => {
     BillingSystemMessageCodeSchema.parse("BILLING_RECOVERY_CAPACITY_EXHAUSTED"),
   );
   assert.equal(BillingSystemMessageCodeSchema.parse("BILLING_PLAN_UPGRADED"), "BILLING_PLAN_UPGRADED");
-  assert.equal(
-    BillingSystemMessageCodeSchema.parse("BILLING_FREE_ALLOWANCE_EXHAUSTED"),
-    "BILLING_FREE_ALLOWANCE_EXHAUSTED",
-  );
+  assert.equal("FREE_ALLOWANCE_EXHAUSTED" in BILLING_SYSTEM_MESSAGE_CODES, false);
+  assert.equal("PLAN_CHANGE_ACTION_REQUIRED" in BILLING_SYSTEM_MESSAGE_CODES, false);
+  assert.equal("CANCELLATION_REQUEST_RECEIVED" in BILLING_SYSTEM_MESSAGE_CODES, false);
+  assert.equal("CANCELLATION_COMPLETED" in BILLING_SYSTEM_MESSAGE_CODES, false);
+  assert.equal("CANCELLATION_REJECTED" in BILLING_SYSTEM_MESSAGE_CODES, false);
+  assert.equal(BillingSystemMessageCodeSchema.safeParse("BILLING_FREE_ALLOWANCE_EXHAUSTED").success, false);
+  assert.equal(BillingSystemMessageCodeSchema.safeParse("BILLING_PLAN_CHANGE_ACTION_REQUIRED").success, false);
+  assert.equal(BillingSystemMessageCodeSchema.safeParse("BILLING_CANCELLATION_REQUEST_RECEIVED").success, false);
+  assert.equal(BillingSystemMessageCodeSchema.safeParse("BILLING_CANCELLATION_COMPLETED").success, false);
+  assert.equal(BillingSystemMessageCodeSchema.safeParse("BILLING_CANCELLATION_REJECTED").success, false);
   assert.throws(() => BillingSystemMessageCodeSchema.parse("BILLING_UNKNOWN_CODE"));
   assert.equal(
     BillingUsageMetricSchema.parse("RECOVERY_CREDIT_PACK_PURCHASE"),
@@ -170,26 +168,6 @@ test("supports the canonical top-up refund message contracts", () => {
       createMerchantBillingSystemSourceKey("shop-1", code, "refund-1"),
     ),
   );
-});
-
-test("exports the exact cancellation modes and Shopify provider mapping", () => {
-  assert.deepEqual(SubscriptionCancellationModeSchema.options, SUBSCRIPTION_CANCELLATION_MODES);
-  assert.deepEqual(SUBSCRIPTION_CANCELLATION_MODES, [
-    "END_OF_CYCLE",
-    "IMMEDIATE_NO_PRORATION",
-    "IMMEDIATE_PRORATED",
-    "IMMEDIATE_SKIP_FINAL_USAGE",
-  ]);
-  assert.deepEqual(SHOPIFY_SUBSCRIPTION_CANCELLATION_ARGS, {
-    END_OF_CYCLE: { deferCancellation: true, prorate: false, skipFinalUsageCharge: false },
-    IMMEDIATE_NO_PRORATION: { deferCancellation: false, prorate: false, skipFinalUsageCharge: false },
-    IMMEDIATE_PRORATED: { deferCancellation: false, prorate: true, skipFinalUsageCharge: false },
-    IMMEDIATE_SKIP_FINAL_USAGE: { deferCancellation: false, prorate: false, skipFinalUsageCharge: true },
-  });
-
-  for (const args of Object.values(SHOPIFY_SUBSCRIPTION_CANCELLATION_ARGS)) {
-    assert.equal(args.prorate && args.skipFinalUsageCharge, false);
-  }
 });
 
 test("calculates available purchased recovery credits and rejects invalid counters", () => {
