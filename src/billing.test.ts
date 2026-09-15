@@ -19,6 +19,8 @@ import {
   createBillingSubscriptionReconcileJobId,
   createRecoveryIdempotencyKey,
   createShopifyUsageIdempotencyKey,
+  deriveShopifyProviderContextIdentity,
+  isSameShopifyPurchaseProviderContext,
   parseNormalizedWhatsAppStatus,
   parseBillingSubscriptionReconcileJob,
   safeParseBillingSubscriptionReconcileJob,
@@ -87,6 +89,74 @@ test("exports the subscription reconciliation contract and drain policy", () => 
   assert.equal(BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME, "billing-subscription-reconcile");
   assert.equal(BILLING_SUBSCRIPTION_RECONCILE_JOB_NAME, "reconcile-subscription");
   assert.equal(APP_PRICING_BILLING_PERIOD_DRAIN_WINDOW_MS, 300000);
+});
+
+test("derives legacy and native Shopify provider-context identities deterministically", () => {
+  assert.equal(
+    deriveShopifyProviderContextIdentity({
+      providerSubscriptionId: "  legacy-subscription-1  ",
+      planHandle: "ignored",
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+    }),
+    "legacy-subscription-1",
+  );
+
+  const input = {
+    providerSubscriptionId: null,
+    planHandle: "  pro/annual plan  ",
+    currentPeriodStart: "2026-09-01T00:00:00.000Z",
+    currentPeriodEnd: new Date("2026-10-01T00:00:00.000Z"),
+  } as const;
+  const identity = deriveShopifyProviderContextIdentity(input);
+  assert.equal(identity, "app-pricing:v1:pro%2Fannual%20plan:2026-09-01T00:00:00.000Z:2026-10-01T00:00:00.000Z");
+  assert.equal(identity, deriveShopifyProviderContextIdentity(input));
+  assert.notEqual(identity, deriveShopifyProviderContextIdentity({ ...input, planHandle: "starter" }));
+  assert.notEqual(identity, deriveShopifyProviderContextIdentity({ ...input, currentPeriodStart: "2026-09-02T00:00:00.000Z" }));
+  assert.notEqual(identity, deriveShopifyProviderContextIdentity({ ...input, currentPeriodEnd: "2026-10-02T00:00:00.000Z" }));
+});
+
+test("rejects invalid native Shopify provider-context fallback evidence", () => {
+  const base = {
+    providerSubscriptionId: null,
+    planHandle: "pro",
+    currentPeriodStart: "2026-09-01T00:00:00.000Z",
+    currentPeriodEnd: "2026-10-01T00:00:00.000Z",
+  } as const;
+  const invalidInputs = [
+    { ...base, planHandle: "   " },
+    { ...base, currentPeriodStart: null },
+    { ...base, currentPeriodEnd: "not-a-date" },
+    { ...base, currentPeriodStart: "2026-10-01T00:00:00.000Z" },
+    { ...base, currentPeriodEnd: "2026-09-01T00:00:00.000Z" },
+  ];
+
+  for (const input of invalidInputs) {
+    assert.throws(
+      () => deriveShopifyProviderContextIdentity(input),
+      /^Error: SHOPIFY_PROVIDER_CONTEXT_INVALID:/,
+    );
+  }
+});
+
+test("compares Shopify provider context without comparing event handles", () => {
+  const purchase = {
+    providerContextIdentity: " app-pricing:v1:pro:start:end ",
+    shopifyPlanHandleSnapshot: " pro ",
+    billingPeriodId: " period-1 ",
+    eventHandle: "purchase-event",
+  };
+  const current = {
+    providerContextIdentity: "app-pricing:v1:pro:start:end",
+    shopifyPlanHandle: "pro",
+    billingPeriodId: "period-1",
+    eventHandle: "current-event",
+  };
+
+  assert.equal(isSameShopifyPurchaseProviderContext(purchase, current), true);
+  assert.equal(isSameShopifyPurchaseProviderContext(purchase, { ...current, providerContextIdentity: "other" }), false);
+  assert.equal(isSameShopifyPurchaseProviderContext(purchase, { ...current, shopifyPlanHandle: "starter" }), false);
+  assert.equal(isSameShopifyPurchaseProviderContext(purchase, { ...current, billingPeriodId: "period-2" }), false);
 });
 
 test("parses the strict subscription reconciliation v1 payload", () => {
