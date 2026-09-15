@@ -157,6 +157,18 @@ test("compares Shopify provider context without comparing event handles", () => 
   assert.equal(isSameShopifyPurchaseProviderContext(purchase, { ...current, providerContextIdentity: "other" }), false);
   assert.equal(isSameShopifyPurchaseProviderContext(purchase, { ...current, shopifyPlanHandle: "starter" }), false);
   assert.equal(isSameShopifyPurchaseProviderContext(purchase, { ...current, billingPeriodId: "period-2" }), false);
+  assert.equal(isSameShopifyPurchaseProviderContext({ ...purchase, providerContextIdentity: " " }, current), false);
+  assert.equal(isSameShopifyPurchaseProviderContext(purchase, { ...current, shopifyPlanHandle: " " }), false);
+  assert.equal(isSameShopifyPurchaseProviderContext(purchase, { ...current, billingPeriodId: " " }), false);
+  assert.equal(isSameShopifyPurchaseProviderContext({
+    providerContextIdentity: " ",
+    shopifyPlanHandleSnapshot: " ",
+    billingPeriodId: " ",
+  }, {
+    providerContextIdentity: " ",
+    shopifyPlanHandle: " ",
+    billingPeriodId: " ",
+  }), false);
 });
 
 test("parses the strict subscription reconciliation v1 payload", () => {

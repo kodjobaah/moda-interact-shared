@@ -79,6 +79,8 @@ export function isSameShopifyPurchaseProviderContext(
   ].every(([purchaseValue, currentValue]) =>
     typeof purchaseValue === "string"
       && typeof currentValue === "string"
+      && purchaseValue.trim().length > 0
+      && currentValue.trim().length > 0
       && purchaseValue.trim() === currentValue.trim(),
   );
 }
