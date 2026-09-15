@@ -7,6 +7,84 @@ export const BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME = "billing-subscription-r
 export const BILLING_SUBSCRIPTION_RECONCILE_JOB_NAME = "reconcile-subscription";
 export const APP_PRICING_BILLING_PERIOD_DRAIN_WINDOW_MS = 300000 as const;
 
+const SHOPIFY_PROVIDER_CONTEXT_INVALID_PREFIX = "SHOPIFY_PROVIDER_CONTEXT_INVALID:";
+
+export type ShopifyProviderContextIdentityInput = Readonly<{
+  providerSubscriptionId: string | null;
+  planHandle: string;
+  currentPeriodStart: Date | string | null;
+  currentPeriodEnd: Date | string | null;
+}>;
+
+export type ShopifyPurchaseProviderContext = Readonly<{
+  providerContextIdentity: string;
+  shopifyPlanHandleSnapshot: string;
+  billingPeriodId: string;
+}>;
+
+export type ShopifyCurrentProviderContext = Readonly<{
+  providerContextIdentity: string;
+  shopifyPlanHandle: string;
+  billingPeriodId: string;
+}>;
+
+function invalidShopifyProviderContext(reason: string): never {
+  throw new Error(`${SHOPIFY_PROVIDER_CONTEXT_INVALID_PREFIX}${reason}`);
+}
+
+function normalizeShopifyProviderContextDate(
+  name: string,
+  value: Date | string | null,
+): Date {
+  if (value === null || (typeof value !== "string" && !(value instanceof Date))) {
+    return invalidShopifyProviderContext(`${name} must be a valid date`);
+  }
+
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return invalidShopifyProviderContext(`${name} must be a valid date`);
+  }
+  return date;
+}
+
+export function deriveShopifyProviderContextIdentity(
+  input: ShopifyProviderContextIdentityInput,
+): string {
+  const providerSubscriptionId = typeof input.providerSubscriptionId === "string"
+    ? input.providerSubscriptionId.trim()
+    : "";
+  if (providerSubscriptionId) return providerSubscriptionId;
+
+  if (typeof input.planHandle !== "string" || input.planHandle.trim().length === 0) {
+    return invalidShopifyProviderContext("planHandle must be a non-empty string");
+  }
+
+  const start = normalizeShopifyProviderContextDate("currentPeriodStart", input.currentPeriodStart);
+  const end = normalizeShopifyProviderContextDate("currentPeriodEnd", input.currentPeriodEnd);
+  if (start >= end) {
+    return invalidShopifyProviderContext("currentPeriodStart must be before currentPeriodEnd");
+  }
+
+  return `app-pricing:v1:${encodeURIComponent(input.planHandle.trim())}:${start.toISOString()}:${end.toISOString()}`;
+}
+
+export function isSameShopifyPurchaseProviderContext(
+  purchase: ShopifyPurchaseProviderContext,
+  current: ShopifyCurrentProviderContext,
+): boolean {
+  return [
+    [purchase.providerContextIdentity, current.providerContextIdentity],
+    [purchase.shopifyPlanHandleSnapshot, current.shopifyPlanHandle],
+    [purchase.billingPeriodId, current.billingPeriodId],
+  ].every(([purchaseValue, currentValue]) =>
+    typeof purchaseValue === "string"
+      && typeof currentValue === "string"
+      && purchaseValue.trim().length > 0
+      && currentValue.trim().length > 0
+      && purchaseValue.trim() === currentValue.trim(),
+  );
+}
+
 export const BILLING_PLAN_KINDS = ["FREE", "PAID_METERED"] as const;
 export const BillingPlanKindSchema = z.enum(BILLING_PLAN_KINDS);
 export type BillingPlanKind = z.infer<typeof BillingPlanKindSchema>;
