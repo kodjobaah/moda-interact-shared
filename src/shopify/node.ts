@@ -35,3 +35,27 @@ export function createPendingRecoveryCandidateJobId(
 ): string {
   return createShopifyWebhookJobDigest("pending-recovery", shopId, checkoutToken);
 }
+
+export function createShopifyDiscountSyncJobId(event: {
+  shopId: string;
+  reason: "SUBSCRIPTION_ACTIVATED" | "REINSTALL_RECONCILED" | "SCOPES_UPDATED" | "DISCOUNT_WEBHOOK";
+  requestedAt: string;
+  deliveryId?: string | null;
+}): string {
+  if (typeof event.shopId !== "string" || event.shopId.trim().length === 0) {
+    throw new Error("createShopifyDiscountSyncJobId: shopId must be a non-empty string");
+  }
+
+  if (event.reason === "DISCOUNT_WEBHOOK") {
+    if (typeof event.deliveryId !== "string" || event.deliveryId.trim().length === 0) {
+      throw new Error("createShopifyDiscountSyncJobId: deliveryId is required for DISCOUNT_WEBHOOK");
+    }
+    return createShopifyWebhookJobDigest("discount-sync", event.shopId, event.deliveryId);
+  }
+
+  if (typeof event.requestedAt !== "string" || event.requestedAt.trim().length === 0) {
+    throw new Error("createShopifyDiscountSyncJobId: requestedAt must be a non-empty ISO datetime string");
+  }
+
+  return createShopifyWebhookJobDigest("discount-sync", `${event.shopId}:${event.reason}`, event.requestedAt);
+}

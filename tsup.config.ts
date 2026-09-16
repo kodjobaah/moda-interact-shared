@@ -5,6 +5,7 @@ export default defineConfig({
     index: "src/index.ts",
     internationalization: "src/internationalization.ts",
     billing: "src/billing.ts",
+    "recovery-policy": "src/recovery-policy.ts",
     whatsapp: "src/whatsapp.ts",
     "merchant-communications": "src/merchant-communications.ts",
     "merchant-communications/node": "src/merchant-communications.node.ts",
