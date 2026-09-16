@@ -1,6 +1,6 @@
 {
   "name": "@modainteract/moda-interact-shared",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,6 +19,10 @@
     "./billing": {
       "types": "./dist/billing.d.ts",
       "import": "./dist/billing.js"
+    },
+    "./recovery-policy": {
+      "types": "./dist/recovery-policy.d.ts",
+      "import": "./dist/recovery-policy.js"
     },
     "./whatsapp": {
       "types": "./dist/whatsapp.d.ts",
@@ -77,6 +81,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "validate:billing-entrypoint": "npm run build && node scripts/validate-billing-entrypoint.mjs",
+    "validate:recovery-policy-entrypoint": "npm run build && node scripts/validate-recovery-policy-entrypoint.mjs",
     "validate:internationalization-entrypoint": "npm run build && node scripts/validate-internationalization-entrypoint.mjs",
     "validate:merchant-communications-node": "npm run build && node scripts/validate-merchant-communications-node.mjs",
     "validate:testing-node": "npm run build && node scripts/validate-testing-node.mjs",
