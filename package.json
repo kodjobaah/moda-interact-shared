@@ -1,6 +1,6 @@
 {
   "name": "@modainteract/moda-interact-shared",
-  "version": "0.12.2",
+  "version": "0.13.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -71,6 +71,14 @@
     "./observability/genai": {
       "types": "./dist/observability/genai.d.ts",
       "import": "./dist/observability/genai.js"
+    },
+    "./commerce": {
+      "types": "./dist/commerce/index.d.ts",
+      "import": "./dist/commerce/index.js"
+    },
+    "./commerce/runner": {
+      "types": "./dist/commerce/runner/index.d.ts",
+      "import": "./dist/commerce/runner/index.js"
     }
   },
   "files": [
@@ -86,7 +94,8 @@
     "validate:merchant-communications-node": "npm run build && node scripts/validate-merchant-communications-node.mjs",
     "validate:testing-node": "npm run build && node scripts/validate-testing-node.mjs",
     "validate:testing-node-live": "npm run build && node scripts/validate-testing-node-live.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "validate:commerce-entrypoints": "node scripts/validate-commerce-entrypoints.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
@@ -105,12 +114,14 @@
     "@prisma/instrumentation": "^6.19.3",
     "bullmq-otel": "^2.0.1",
     "intl-messageformat": "^10.7.18",
+    "semver": "7.8.5",
     "winston": "3.19.0",
     "winston-loki": "6.1.7",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
+    "@types/semver": "7.8.0",
     "bullmq": "^6.3.1",
     "ioredis": "^6.0.0",
     "tsup": "^8.0.0",
