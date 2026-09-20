@@ -1,3 +1,7 @@
+import {
+  definitionStorageBytes,
+  DEFINITION_SIZE_MESSAGE,
+} from "./definition-size";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -558,4 +562,89 @@ test("optional required keyword follows JSON Schema semantics; nullable enums st
     }).success,
     false,
   );
+});
+
+// Pretty JSON stripped of indentation retains jsonb's separator spaces. These
+// boundary fixtures use no exponent numbers, so this is an independent text oracle.
+const persistedFixtureText = (value: unknown) =>
+  JSON.stringify(value, null, 1).replace(/,\n */g, ", ").replace(/\n */g, "");
+test("R1 draft and strict whole definitions honor jsonb byte boundaries", () => {
+  for (const strict of [false, true])
+    for (const multibyte of [false, true]) {
+      const schema = strict
+        ? CommerceToolDefinitionSchema
+        : CommerceToolDraftDefinitionSchema;
+      const value = structuredClone(exampleDefinition);
+      assert.equal(value.execution.kind, "SHOPIFY_STOREFRONT_QUERY");
+      if (value.execution.kind !== "SHOPIFY_STOREFRONT_QUERY")
+        throw new Error("fixture");
+      value.execution.variables = Object.fromEntries(
+        Array.from({ length: 9 }, (_, i) => [
+          `v${i}`,
+          { literal: multibyte ? "é🙂".repeat(1100) : "x".repeat(6600) },
+        ]),
+      );
+      value.execution.variables.padding = { literal: "" };
+      const fixedBytes = Buffer.byteLength(persistedFixtureText(value));
+      for (const target of [65535, 65536, 65537]) {
+        value.execution.variables.padding = {
+          literal: "x".repeat(target - fixedBytes),
+        };
+        assert.equal(Buffer.byteLength(persistedFixtureText(value)), target);
+        assert.equal(definitionStorageBytes(value), target);
+        // Compact JSON would wrongly admit the over-boundary case.
+        assert(Buffer.byteLength(JSON.stringify(value)) < 65536);
+        const result = schema.safeParse(value);
+        assert.equal(
+          result.success,
+          target <= 65536,
+          `${strict}/${multibyte}/${target}`,
+        );
+        if (!result.success)
+          assert.deepEqual(
+            result.error.issues.map((i) => i.message),
+            [DEFINITION_SIZE_MESSAGE],
+          );
+      }
+    }
+});
+test("R1 aggregate oversized review reproductions reject only for whole-definition size", () => {
+  const draft = {
+    name: "oversize_tool",
+    definitionVersion: "1.0.0",
+    description: "Review fixture",
+    inputSchema: {},
+    execution: { x: "x".repeat(40000) },
+    responseTemplate: { x: "x".repeat(40000) },
+  };
+  const strict = structuredClone(exampleDefinition);
+  if (strict.execution.kind !== "SHOPIFY_STOREFRONT_QUERY")
+    throw new Error("fixture");
+  strict.execution.variables = Object.fromEntries(
+    Array.from({ length: 10 }, (_, i) => [
+      `v${i}`,
+      { literal: "x".repeat(8000) },
+    ]),
+  );
+  for (const [schema, value] of [
+    [CommerceToolDraftDefinitionSchema, draft],
+    [CommerceToolDefinitionSchema, strict],
+  ] as const) {
+    const result = schema.safeParse(value);
+    assert.equal(result.success, false);
+    if (!result.success)
+      assert.deepEqual(
+        result.error.issues.map((i) => i.message),
+        [DEFINITION_SIZE_MESSAGE],
+      );
+  }
+});
+test("R1 storage size includes escaped/multibyte strings and expanded numeric exponents without changing hashes", () => {
+  const value = { value: [1e21, 1e-7, -1.25e-7, 1.23e22, 'é🙂\n\t"\\'] };
+  const postgresText =
+    '{"value": [1000000000000000000000, 0.0000001, -0.000000125, 12300000000000000000000, ' +
+    JSON.stringify(value.value[4]) +
+    "]}";
+  assert.equal(definitionStorageBytes(value), Buffer.byteLength(postgresText));
+  assert.equal(canonicalJson({ n: 1e21 }), '{"n":1e+21}');
 });

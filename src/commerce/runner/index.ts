@@ -291,16 +291,36 @@ export async function runCommerceTurn(
           ),
         b.deadlineMs,
       );
-      if (
-        !step ||
-        !Array.isArray(step.calls) ||
-        !Number.isSafeInteger(step.outputTokens) ||
-        step.outputTokens < 0 ||
-        step.outputTokens > b.outputTokens ||
-        step.calls.length > 32 ||
-        jsonBytes(step) > 262144
-      )
+      // Adapter output is untrusted even when its TypeScript declaration is valid.
+      // Keep serialization/shape failures distinct from invalid host input.
+      try {
+        if (
+          !step ||
+          typeof step !== "object" ||
+          Array.isArray(step) ||
+          !Array.isArray(step.calls) ||
+          !Number.isSafeInteger(step.outputTokens) ||
+          step.outputTokens < 0 ||
+          step.outputTokens > b.outputTokens ||
+          step.calls.length > 32 ||
+          step.calls.some(
+            (call) =>
+              !call ||
+              typeof call !== "object" ||
+              Array.isArray(call) ||
+              typeof call.name !== "string" ||
+              !call.name.length ||
+              !Object.hasOwn(call, "arguments") ||
+              !call.arguments ||
+              typeof call.arguments !== "object" ||
+              Array.isArray(call.arguments),
+          ) ||
+          jsonBytes(step) > 262144
+        )
+          throw new Failure("INVALID_FINAL");
+      } catch {
         throw new Failure("INVALID_FINAL");
+      }
       const finals = step.calls.filter((c) => c.name === "finalResponse");
       if (finals.length) {
         if (finals.length !== 1 || step.calls.length !== 1)

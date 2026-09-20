@@ -9,7 +9,11 @@ const manifest=c.exampleManifest(digest);
 assert(c.CommerceManifestSchema.safeParse(manifest).success);
 const result=await runCommerceTurn({turn:c.exampleTurn,grant:c.exampleGrant(manifest),manifest,prompts:manifest.capabilities.map(x=>({name:x.promptName,text:'Fixture only'})),hostInstructions:[],context:{},history:[],language:{tag:null,source:null},signal:new AbortController().signal,dependencies:{digest,now:()=>Date.now(),tools:[],model:{invoke:async()=>({calls:[{name:'finalResponse',arguments:c.exampleFinal}],outputTokens:30})}}});
 assert(result.ok);assert.equal(runnerVersion,'1.0.0');
-console.log('PASS commerce and commerce/runner clean-process imports, schema and scripted finalResponse');
+const oversized={name:'oversize_tool',definitionVersion:'1.0.0',description:'Fixture',inputSchema:{},execution:{x:'x'.repeat(40000)},responseTemplate:{x:'x'.repeat(40000)}};
+assert.equal(c.CommerceToolDraftDefinitionSchema.safeParse(oversized).success,false);
+const malformed=await runCommerceTurn({turn:c.exampleTurn,grant:c.exampleGrant(manifest),manifest,prompts:manifest.capabilities.map(x=>({name:x.promptName,text:'Fixture only'})),hostInstructions:[],context:{},history:[],language:{tag:null,source:null},signal:new AbortController().signal,dependencies:{digest,now:()=>Date.now(),tools:[],model:{invoke:async()=>({calls:[null],outputTokens:1})}}});
+assert.deepEqual(malformed,{ok:false,error:{code:'INVALID_FINAL',retryable:false}});
+console.log('PASS commerce and commerce/runner clean-process imports, schema, scripted finalResponse and R1/R2 regressions');
 `;
 // Deliberately pass only basic runtime variables, never provider/database credentials.
 const result = spawnSync(

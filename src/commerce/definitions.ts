@@ -16,6 +16,10 @@ import {
   compileSubset,
 } from "./subset";
 import { canonicalJson } from "./canonical-json";
+import {
+  definitionFitsStorage,
+  DEFINITION_SIZE_MESSAGE,
+} from "./definition-size";
 export const ToolNameSchema = z
   .string()
   .regex(/^[a-z][a-z0-9_]{0,127}$/)
@@ -140,6 +144,7 @@ export const CommerceToolDefinitionSchema = z
     execution: CommerceExecutionSchema,
     responseTemplate: ResponseTemplateSchema,
   })
+  .refine(definitionFitsStorage, { message: DEFINITION_SIZE_MESSAGE })
   .superRefine((d, ctx) => {
     const properties = d.inputSchema.properties!;
     const containsAuthority = (schema: SubsetSchema): boolean =>
@@ -174,7 +179,7 @@ export const CommerceToolDraftDefinitionSchema = z
     execution: draftObject,
     responseTemplate: draftObject,
   })
-  .refine((v) => new TextEncoder().encode(canonicalJson(v)).length <= 131072);
+  .refine(definitionFitsStorage, { message: DEFINITION_SIZE_MESSAGE });
 export type CommerceToolDefinition = z.infer<
   typeof CommerceToolDefinitionSchema
 >;

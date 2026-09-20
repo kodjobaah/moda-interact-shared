@@ -475,3 +475,50 @@ test("history exceeding 32,000 Unicode code points fails before model work", asy
   assert.equal(result.ok, false);
   assert.deepEqual(f.counts(), { model: 0, tools: 0 });
 });
+
+test("R2 malformed adapter calls are INVALID_FINAL with no remote side effects", async () => {
+  const cyclic: Record<string, unknown> = {};
+  cyclic.self = cyclic;
+  const calls: unknown[] = [
+    null,
+    1,
+    "call",
+    [],
+    {},
+    { arguments: {} },
+    { name: null, arguments: {} },
+    { name: 42, arguments: {} },
+    { name: "", arguments: {} },
+    { name: "finalResponse" },
+    ...[
+      null,
+      [],
+      "secret provider output",
+      42,
+      {},
+      { replyText: "partial" },
+      cyclic,
+    ].map((argumentsValue) => ({
+      name: "finalResponse",
+      arguments: argumentsValue,
+    })),
+  ];
+  for (const malformed of calls) {
+    const f = fixture(
+      [{ calls: [malformed], outputTokens: 1 } as ModelStep],
+      true,
+    );
+    assert.deepEqual(await runCommerceTurn(f.input), {
+      ok: false,
+      error: { code: "INVALID_FINAL", retryable: false },
+    });
+    assert.deepEqual(f.counts(), { model: 1, tools: 0 });
+  }
+  const host = fixture([final()]);
+  host.input.turn.inboundVersion = 0;
+  assert.deepEqual(await runCommerceTurn(host.input), {
+    ok: false,
+    error: { code: "INVALID_INPUT", retryable: false },
+  });
+  assert.deepEqual(host.counts(), { model: 0, tools: 0 });
+});

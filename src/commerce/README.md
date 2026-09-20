@@ -18,6 +18,9 @@ revision identity, and current policy. Assertions here describe purpose-bound
 turn data; the Commerce/Background owners supply JWT signing and verification.
 
 `CommerceToolDraftDefinitionSchema` accepts bounded incomplete objects for editing.
+Both draft and strict definitions enforce the full 65,536-byte PostgreSQL jsonb text
+limit, including separator spaces, UTF-8 text and expanded exponent numbers. This
+storage measurement is separate from canonical hashing.
 `CommerceToolDefinitionSchema` checks the strict structural definition and mappings.
 **Publication also requires `validateDefinitionForPublication` with the authoritative
 CommerceDefinitionCompiler.** That compiler validates the fixed GraphQL document
