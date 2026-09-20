@@ -89,6 +89,20 @@ test("discount webhook payload requires delivery and topic", () => {
   }));
 });
 
+test("admin-requested discount sync payload is accepted", () => {
+  const parsed = parseShopifyDiscountSyncJob({
+    schemaVersion: 1,
+    shopId: "shop_1",
+    shopDomain: "shop.example.com",
+    reason: "ADMIN_REQUESTED",
+    requestedAt: "2026-09-20T09:30:00.000Z",
+    deliveryId: null,
+    webhookTopic: null,
+  });
+
+  assert.equal(parsed.reason, "ADMIN_REQUESTED");
+});
+
 test("non-webhook payload rejects unexpected webhook topic", () => {
   assert.throws(() => parseShopifyDiscountSyncJob({
     schemaVersion: 1,
@@ -119,7 +133,7 @@ test("discount sync job ids are deterministic and dedupe by delivery for webhook
   assert.equal(id1.includes(":"), false);
 });
 
-test("subscription and reinstall reasons produce bounded stable ids", () => {
+test("non-webhook discount sync reasons produce bounded stable ids", () => {
   const ids = SHOPIFY_DISCOUNT_SYNC_REASONS.filter((reason) => reason !== "DISCOUNT_WEBHOOK")
     .map((reason) => createShopifyDiscountSyncJobId({
       shopId: "shop_1",
@@ -127,7 +141,7 @@ test("subscription and reinstall reasons produce bounded stable ids", () => {
       requestedAt: "2026-09-16T12:00:00.000Z",
     }));
 
-  assert.equal(ids.length, 3);
+  assert.equal(ids.length, 4);
   ids.forEach((id) => {
     assert.ok(id.startsWith("discount-sync-"));
     assert.equal(id.includes(":"), false);

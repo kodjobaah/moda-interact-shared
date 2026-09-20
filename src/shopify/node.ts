@@ -38,7 +38,7 @@ export function createPendingRecoveryCandidateJobId(
 
 export function createShopifyDiscountSyncJobId(event: {
   shopId: string;
-  reason: "SUBSCRIPTION_ACTIVATED" | "REINSTALL_RECONCILED" | "SCOPES_UPDATED" | "DISCOUNT_WEBHOOK";
+  reason: "SUBSCRIPTION_ACTIVATED" | "REINSTALL_RECONCILED" | "SCOPES_UPDATED" | "ADMIN_REQUESTED" | "DISCOUNT_WEBHOOK";
   requestedAt: string;
   deliveryId?: string | null;
 }): string {
