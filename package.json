@@ -1,6 +1,6 @@
 {
   "name": "@modainteract/moda-interact-shared",
-  "version": "0.13.1",
+  "version": "0.14.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -88,6 +88,7 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test \"src/**/*.test.ts\"",
+    "test:arch020-external-contracts": "tsx --test src/commerce/external-contracts.test.ts",
     "validate:billing-entrypoint": "npm run build && node scripts/validate-billing-entrypoint.mjs",
     "validate:recovery-policy-entrypoint": "npm run build && node scripts/validate-recovery-policy-entrypoint.mjs",
     "validate:internationalization-entrypoint": "npm run build && node scripts/validate-internationalization-entrypoint.mjs",

@@ -4,6 +4,25 @@ Public entry points are `@modainteract/moda-interact-shared/commerce` and
 `@modainteract/moda-interact-shared/commerce/runner`. They are provider-neutral.
 Existing WhatsApp, billing and recovery-policy exports are unchanged.
 
+## External read-only HTTP contracts
+
+The commerce entry point also exports the strict C21 external-tool contracts:
+`ExternalHttpExecutionSchema`, `ExternalResponseFormatSchema`,
+`ResponseProcessingSchema`, `TransformResponseSchema`,
+`TransformSampleSchema`, the visual/code processor input and result types, and
+the connection DTO schemas/types (`ConnectionRevisionView`, `ConnectionView`,
+`CredentialStatus`, `ConnectionCommand`, `RevisionInput` and
+`ConnectionResult`). These are data contracts only. Transport, credentials,
+encryption, visual processing and JavaScript execution remain Commerce-owned.
+
+External definitions support only fixed HTTPS-origin GET paths supplied by a pinned
+connection revision. They map top-level scalar inputs or scalar literals into a
+bounded, safe query object. They never appear in MCP descriptors: descriptors keep
+only the existing name, description and input schema. Visual processing accepts JSON;
+JavaScript processing uses the versioned `quickjs-sync.v1` configuration and an
+empty result path. Both output paths validate the closed, authored result schema
+under the `values` wrapper before templates can consume it.
+
 The contract version is `commerce.v1`; the runner API version is `1.0.0`.
 Package SemVer is separate. A host must satisfy the pinned manifest's SemVer
 runnerCompatibility range. Unknown wire versions or missing/mismatched
