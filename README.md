@@ -17,6 +17,220 @@ Production services should use the exact package version selected by the
 corresponding Moda Interact architecture/release task rather than relying on a
 floating version.
 
+## Public entry points
+
+This reference covers the source API at package version **0.13.1**. Prefer the
+specific entry point for the contract you consume. Only paths listed in
+`package.json` `exports` are public imports; a file under `src` or `dist` is not
+necessarily a supported package subpath. Type-only exports require `import type`.
+
+| Import suffix after `@modainteract/moda-interact-shared` | Use it for |
+|---|---|
+| (none) | Convenience re-exports of internationalization, billing, merchant communications, recovery policy and Shopify contracts only. |
+| `/internationalization` | Language/country/currency/time-zone normalization, international context and ICU message catalogue validation/rendering. |
+| `/billing` | Billing plan/usage contracts, provider-status normalization, subscription-reconciliation jobs, purchased-credit counters and deterministic billing identifiers. |
+| `/recovery-policy` | Recovery offer modes and validation of an already-resolved effective recovery policy. Does not retrieve or decide merchant entitlements. |
+| `/whatsapp` | Normalized inbound WhatsApp content/message schemas and parsers. Provider delivery statuses are in `/billing`. |
+| `/merchant-communications` | Merchant communication and translation job contracts, constants and validation. |
+| `/merchant-communications/node` | Node-only deterministic translation queue-job identifiers. |
+| `/shopify` | Shopify commerce/recovery event schemas, parsers, event versions and shared queue contracts. |
+| `/shopify/node` | Node-only hashed webhook, checkout, order, recovery and discount-sync job identifiers. |
+| `/logging` | Structured logger, levels, redaction and bounded serialization, with logger/sink types. |
+| `/logging/node` | Node logging bootstrap, configuration and flushing for process-owned destinations. |
+| `/observability` | Lightweight active-trace and observed-span helpers using installed global providers. |
+| `/observability/node` | Node OpenTelemetry initialization and lifecycle; import from process preload. |
+| `/observability/bullmq` | BullMQ telemetry adapter and options. Use in Node queue/worker configuration. |
+| `/observability/genai` | Conversation, agent and tool observation helpers with bounded metrics and span metadata. |
+| `/testing/node` | Node-only disposable PostgreSQL/Redis test infrastructure and command helpers; not application startup or production provisioning. |
+| `/commerce` | Commerce schemas, definitions, selection helpers, response validation, canonical hashing inputs and synthetic examples. |
+| `/commerce/runner` | Dependency-injected Commerce turn runner and model/tool adapter types. |
+
+The root entry does **not** re-export WhatsApp, Commerce, the runner, logging,
+observability or Node helpers. Do not replace a documented subpath import with a
+root import without checking its exports. `/node` entries and the BullMQ adapter
+belong in server processes; keep them out of browser bundles.
+
+The [complete export inventory](#complete-export-inventory) below includes runtime
+values and TypeScript types for every public entry point. Existing logging,
+observability and Shopify examples follow the Commerce guide.
+
+## Contract parsing and identifiers
+
+Import the producer/consumer's matching schema, then validate untrusted input at
+the boundary. A TypeScript type alone does not validate a received payload.
+
+```ts
+import { NormalizedWhatsAppInboundMessageSchema } from
+  "@modainteract/moda-interact-shared/whatsapp";
+
+// rawPayload is the normalized contract, not a raw Meta webhook body.
+function acceptNormalizedMessage(rawPayload: unknown) {
+  const parsed = NormalizedWhatsAppInboundMessageSchema.safeParse(rawPayload);
+  if (!parsed.success) return { ok: false as const, issues: parsed.error.issues };
+  return { ok: true as const, message: parsed.data };
+}
+```
+
+Schemas expose Zod `parse` (throws on invalid input) and `safeParse` (discriminated
+success/error result). Named `parse…` / `safeParse…` helpers are available only
+where listed in the inventory. Producers and consumers must agree on the event
+version; the existence of legacy and newer Shopify exports is not an instruction
+to mix their shapes. Use the queue/job identifier helper for the particular
+business operation, rather than treating all identifiers as interchangeable.
+
+Internationalization provides normalization and message rendering, not the
+application's decision about when to change a conversation language. Effective
+recovery policy validation likewise does not load a merchant's current policy.
+
+## Commerce definitions, grants and execution
+
+Commerce is exposed through two explicit imports:
+
+```ts
+import {
+  ToolBindingsSchema,
+  CommerceToolDefinitionSchema,
+  CommerceManifestSchema,
+  CommerceConversationGrantSchema,
+} from "@modainteract/moda-interact-shared/commerce";
+import { runCommerceTurn, type RunnerTool } from
+  "@modainteract/moda-interact-shared/commerce/runner";
+```
+
+### Which structure goes where
+
+| Structure / API | Meaning and owner |
+|---|---|
+| `ToolBindingSchema`, `ToolBindingsSchema` | Saved `{toolId, toolRevisionId}` associations from a behaviour to exact tool revisions. Studio/Commerce authors these; Background does not populate capability drafts. |
+| `CommerceToolDraftDefinitionSchema` | Allows structurally bounded incomplete authoring data. Passing it does not make a draft publishable. |
+| `CommerceToolDefinitionSchema` | Full tool name, version, description, input schema, execution definition and response template. Stored/executed by Commerce. |
+| `validateDefinitionForPublication` | Uses a supplied `CommerceDefinitionCompiler` to check the full definition, mapped arguments and response-template paths. Commerce supplies schema-backed compilation. |
+| `ToolDescriptorSchema`, `definitionToMcpDescriptor` | Full versioned descriptor versus the MCP-facing name/description/inputSchema projection. The server-only execution definition is not exposed as model instructions. |
+| `GrantedToolSchema`, `GrantedToolsSchema` | Pinned tool identity, exact revision, name/version and originating capability keys selected for a conversation. |
+| `CommerceManifestSchema` | Resolved release, selected capabilities, descriptors, granted tools and response contract. Commerce provides it; callers validate it. |
+| `CommerceConversationGrantSchema` | Persisted conversation permission snapshot. Background stores the resolved selection and reuses it on later turns. |
+| `CommerceTurnIdentitySchema`, `CommerceAssertionSchema` | Turn identity and resolve/execute assertion shapes. These do not sign or verify JWT signatures; transport/authentication belongs to the services. |
+| `selectCapabilities`, `deduplicateTools` | Pure selection and tool-combination helpers over caller-supplied facts. No database or Shopify lookup. |
+| `manifestMatchesGrant`, `currentlyGrantedTools` | Compare pinned selection and current availability. Do not replace signature, tenant, lease or persistence checks. |
+| `CommerceToolInputs`, `CommerceToolOutputs` | Named supported operation contracts; custom authored inputs still use the validated definition's schema. |
+| `CommerceBasketSchema`, `CommerceProductSchema`, `CommerceOfferSchema`, `CommerceEvidenceSchema`, `CommerceAlternativeSchema` | Bounded commerce facts/evidence exchanged between services. Parsing does not prove external facts are true or current. |
+| `CommerceToolResultSchema`, `commerceToolResultSchema` | Standard result envelope; the factory accepts a specific data schema. |
+
+A stored binding contains references, not code or model arguments:
+
+```ts
+const bindings = ToolBindingsSchema.parse([
+  { toolId: "tool_basket", toolRevisionId: "revision_basket_v1" },
+  { toolId: "tool_offers", toolRevisionId: "revision_offers_v2" },
+]);
+```
+
+These identifiers are illustrative. The list allows at most 32 entries with
+unique tool IDs; each entry is strict. Publication must additionally verify that
+the referenced revision exists, belongs to its tool and is published. Shared
+schema parsing cannot check those database relationships.
+
+The normal flow is:
+
+1. Studio saves exact bindings into a behaviour draft; Commerce publishes a fixed
+   revision and includes it in a release.
+2. Commerce resolves eligible release members using authoritative merchant facts.
+3. Background receives the manifest and persists its `grantedTools`, release and
+   selected capability keys in a conversation grant.
+4. Background checks MCP descriptors against that manifest/grant and constructs
+   runtime `RunnerTool` adapters. The model chooses a tool and supplies arguments;
+   the adapter forwards execution to Commerce.
+5. Later turns reuse the original grant. A new release cannot add tools to that
+   conversation; current revocation may remove execution permission.
+
+### Turn runner integration
+
+`RunnerTool` is an in-memory adapter, distinct from the stored tool-binding schema:
+
+```ts
+import type { ToolDescriptor, GrantedTool, CommerceToolResult } from
+  "@modainteract/moda-interact-shared/commerce";
+
+// Shape of the exported RunnerTool interface, shown for explanation.
+type RunnerToolShape = {
+  descriptor: ToolDescriptor;
+  isAuthorized: (tool: GrantedTool, signal: AbortSignal) => Promise<boolean>;
+  execute: (
+    arguments_: Record<string, unknown>,
+    signal: AbortSignal,
+  ) => Promise<CommerceToolResult>;
+  extractEvidence?: (result: CommerceToolResult) => unknown[];
+};
+```
+
+Import `RunnerTool` rather than copying this explanatory shape. `runCommerceTurn`
+takes `RunCommerceTurnInput`: turn, grant, manifest, prompts, host instructions,
+trusted context, history, resolved language, abort signal and dependencies. The
+host provides `model.invoke`, `tools`, `now` and a canonical-string `digest`
+function. Optional budgets bound model steps, remote calls, deadline and output
+tokens. The model adapter returns `ModelStep` tool calls and output-token usage;
+it does not send a WhatsApp message itself.
+
+The return type is discriminated:
+
+```ts
+import type { CommerceFinalResponse } from
+  "@modainteract/moda-interact-shared/commerce";
+import type { RunnerErrorCode } from
+  "@modainteract/moda-interact-shared/commerce/runner";
+
+// Shape of RunCommerceTurnResult, shown for explanation.
+type TurnResultShape =
+  | { ok: true; result: CommerceFinalResponse;
+      usage: { modelSteps: number; remoteCalls: number } }
+  | { ok: false; error: { code: RunnerErrorCode; retryable: boolean } };
+```
+
+The runner owns bounded orchestration, authorization callbacks and final-response
+validation. It does not own an MCP HTTP client, a model SDK, Prisma, conversation
+leases or WhatsApp delivery. Background owns those production adapters; preview
+can inject isolated fixture/model adapters. Never replace an unavailable
+production adapter with `example*` data.
+
+`runnerVersion` describes runner compatibility independently of the npm package
+version. `PLATFORM_INSTRUCTIONS` is the runner's fixed grounding, authorization,
+language and finalization guidance. Authored capability/release text cannot expand
+permissions or override those rules.
+
+### Response contracts and final responses
+
+`CommerceResponseContractSchema` validates the release-owned
+`{version: "response.v1", instructions, detailsSchema}` definition.
+`EMPTY_RESPONSE_CONTRACT` is the empty-details baseline. Use the supported
+`DetailsSchemaSchema` / `InputSchemaSchema` subset rather than assuming arbitrary
+JSON Schema keywords are accepted; `validateSubset`, `matchesSubset` and
+`compileSubset` expose the same subset validation/matching machinery.
+
+`CommerceFinalResponseSchema` validates the fixed envelope: `answerKind`,
+`replyText`, `referralReason`, `detectedLanguageTag`,
+`detectedLanguageConfidence`, `evidenceIds` and `details`.
+`finalResponseSchema(definition)` additionally validates the selected release's
+details schema. `finalResponseToolSchema(definition)` produces the host-local
+finalization tool's input schema. `verifyResponseContract` checks the definition
+against its hash using the caller's digest implementation.
+
+An ANSWER requires null referral reason; a REFER_TO_STORE response requires the
+appropriate reason, empty evidence IDs and empty details. Language detection
+fields are either both null or a valid pair. Only reply text is customer-facing;
+structured details never authorize actions or replace delivery/routing decisions.
+
+Use `canonicalJson`, `responseContractCanonicalJson`, `toolHashInput` and
+`capabilityHashInput` for their specific canonicalization/hashing boundaries.
+Do not hash arbitrary object serialization in place of these helpers.
+`mapToolArguments` maps validated authored inputs/fixed values; it does not call
+Shopify. `POLICY_OPERATIONS` and `POLICY_OPERATION_DESCRIPTORS` describe supported
+operation identities; actual provider implementations remain in Commerce.
+
+`exampleTool`, `exampleDefinition`, `exampleTurn`, `exampleManifest`,
+`exampleGrant` and `exampleFinal` are synthetic fixtures for examples and tests,
+not seeds for a merchant's production configuration.
+
+
 ## What this package owns
 
 The package contains code that genuinely belongs at a cross-service boundary,
@@ -883,3 +1097,1093 @@ capability and should therefore be released as a **minor** version increment.
 Publishing the package and changing consuming services are coordinated tasks;
 a consuming service must not assume an unpublished local shared export exists
 in the npm artifact it installs.
+
+## Complete export inventory
+Enumerated from the TypeScript module exports for every `package.json` public
+entry point, including re-exports and type-only symbols. Source files are linked
+for exact signatures, fields, defaults and validation constraints. This inventory
+does not make internal modules into public import paths. When changing exports,
+update both the entry-point guide and this inventory.
+
+<details>
+<summary>Package root — 182 exports</summary>
+
+Import: `@modainteract/moda-interact-shared`.
+
+From [src/billing.ts](src/billing.ts):
+
+Runtime exports:
+
+- `APP_PRICING_BILLING_PERIOD_DRAIN_WINDOW_MS`
+- `ARCH007_BILLING_CONTRACT_SCHEMA_VERSION`
+- `availablePurchasedRecoveryCredits`
+- `BILLING_PLAN_KINDS`
+- `BILLING_SUBSCRIPTION_RECONCILE_JOB_NAME`
+- `BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME`
+- `BILLING_SUBSCRIPTION_RECONCILE_SCHEMA_VERSION`
+- `BILLING_SYSTEM_MESSAGE_CODES`
+- `BILLING_USAGE_METRICS`
+- `BillingPlanKindSchema`
+- `BillingSubscriptionReconcileJobSchema`
+- `BillingSystemMessageCodeSchema`
+- `BillingUsageMetricSchema`
+- `createBillingSubscriptionReconcileJobId`
+- `createMerchantBillingSystemSourceKey`
+- `createRecoveryIdempotencyKey`
+- `createShopifyUsageIdempotencyKey`
+- `deriveShopifyProviderContextIdentity`
+- `isSameShopifyPurchaseProviderContext`
+- `NormalizedWhatsAppStatusSchema`
+- `parseBillingSubscriptionReconcileJob`
+- `parseNormalizedWhatsAppStatus`
+- `safeParseBillingSubscriptionReconcileJob`
+- `safeParseNormalizedWhatsAppStatus`
+- `WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION`
+- `WHATSAPP_PROVIDER_STATUSES`
+- `WhatsAppProviderPricingMetadataSchema`
+- `WhatsAppProviderStatusSchema`
+
+Type-only exports:
+
+- `BillingPlanKind`
+- `BillingSubscriptionReconcileJob`
+- `BillingSystemMessageCode`
+- `BillingUsageMetric`
+- `NormalizedWhatsAppStatus`
+- `PurchasedRecoveryCreditCounterSnapshot`
+- `ShopifyCurrentProviderContext`
+- `ShopifyProviderContextIdentityInput`
+- `ShopifyPurchaseProviderContext`
+- `WhatsAppProviderPricingMetadata`
+- `WhatsAppProviderStatus`
+
+From [src/internationalization.ts](src/internationalization.ts):
+
+Runtime exports:
+
+- `canonicaliseLanguageTag`
+- `CountryCodeSchema`
+- `createInternationalizationRuntime`
+- `CurrencyCodeSchema`
+- `InternationalContextSchema`
+- `LanguageSourceSchema`
+- `LanguageTagSchema`
+- `mergeInternationalContext`
+- `normalizeCountryCode`
+- `normalizeCurrencyCode`
+- `normalizeTimeZone`
+- `resolveLocaleDirection`
+- `TimeZoneIdSchema`
+- `validateIcuCatalogue`
+
+Type-only exports:
+
+- `CatalogueValidationOptions`
+- `CountryCode`
+- `CurrencyCode`
+- `IcuMessageCatalogue`
+- `IcuMessageValues`
+- `InternationalContext`
+- `InternationalizationRuntime`
+- `InternationalizationRuntimeOptions`
+- `LanguageSource`
+- `LanguageTag`
+- `TimeZoneId`
+
+From [src/merchant-communications.ts](src/merchant-communications.ts):
+
+Runtime exports:
+
+- `AuthoredSupportBodySchema`
+- `countUnicodeGraphemes`
+- `MERCHANT_COMMUNICATIONS_JOB_NAMES`
+- `MERCHANT_COMMUNICATIONS_QUEUE_NAME`
+- `MERCHANT_COMMUNICATIONS_SCHEMA_VERSION`
+- `MerchantMessageTranslationContractSchema`
+- `MerchantMessageTranslationStatusSchema`
+- `MerchantSupportMessageContractSchema`
+- `MerchantSupportMessageKindSchema`
+- `MerchantSupportMessageStateSchema`
+- `MerchantTranslationBatchContractSchema`
+- `MerchantTranslationBatchStatusSchema`
+- `MerchantTranslationDirectionSchema`
+- `MerchantTranslationReconciliationRequestContractSchema`
+- `MerchantTranslationReconciliationScopeSchema`
+- `MerchantTranslationReconciliationStatusSchema`
+- `PLATFORM_SUPPORT_LANGUAGE_TAG`
+- `requiresMerchantTranslation`
+- `TranslatedSupportBodySchema`
+- `TranslationBatchPollJobSchema`
+- `TranslationBatchResultsJobSchema`
+- `TranslationBatchSubmitJobSchema`
+- `TranslationDispatchJobSchema`
+- `TranslationReconcileJobSchema`
+
+Type-only exports:
+
+- `MerchantMessageTranslationContract`
+- `MerchantMessageTranslationStatus`
+- `MerchantSupportMessageContract`
+- `MerchantSupportMessageKind`
+- `MerchantSupportMessageState`
+- `MerchantTranslationBatchContract`
+- `MerchantTranslationBatchStatus`
+- `MerchantTranslationDirection`
+- `MerchantTranslationReconciliationRequestContract`
+- `MerchantTranslationReconciliationScope`
+- `MerchantTranslationReconciliationStatus`
+- `TranslationBatchPollJob`
+- `TranslationBatchResultsJob`
+- `TranslationBatchSubmitJob`
+- `TranslationDispatchJob`
+- `TranslationReconcileJob`
+
+From [src/recovery-policy.ts](src/recovery-policy.ts):
+
+Runtime exports:
+
+- `EffectiveRecoveryPolicySchema`
+- `parseEffectiveRecoveryPolicy`
+- `RECOVERY_OFFER_MODES`
+- `RecoveryOfferModeSchema`
+- `safeParseEffectiveRecoveryPolicy`
+
+Type-only exports:
+
+- `EffectiveRecoveryPolicy`
+- `RecoveryOfferMode`
+
+From [src/shopify/common.schema.ts](src/shopify/common.schema.ts):
+
+Runtime exports:
+
+- `MAX_LINE_ITEMS`
+- `MAX_URL_LENGTH`
+- `ShopifyCheckoutLineItemSchema`
+- `ShopifyCheckoutLineItemsSchema`
+- `ShopifyCustomerReferenceSchema`
+- `ShopifyMoneySchema`
+- `ShopifyTenantSchema`
+
+Type-only exports:
+
+- `ShopifyCheckoutLineItem`
+- `ShopifyCustomerReference`
+- `ShopifyMoney`
+- `ShopifyTenant`
+
+From [src/shopify/constants.ts](src/shopify/constants.ts):
+
+Runtime exports:
+
+- `SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION`
+- `SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION_V1`
+- `SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION_V2`
+- `SHOPIFY_COMMERCE_EVENT_TYPES`
+- `SHOPIFY_RECOVERY_EVENT_TYPES_V2`
+- `SHOPIFY_WEBHOOK_OUTBOX_DESTINATIONS`
+
+From [src/shopify/queue-contracts.ts](src/shopify/queue-contracts.ts):
+
+Runtime exports:
+
+- `parseShopifyDiscountSyncJob`
+- `safeParseShopifyDiscountSyncJob`
+- `SHOPIFY_DISCOUNT_SYNC_REASONS`
+- `SHOPIFY_DISCOUNT_SYNC_WEBHOOK_TOPICS`
+- `SHOPIFY_WEBHOOK_QUEUE_CONTRACTS`
+- `ShopifyDiscountSyncJobSchema`
+- `ShopifyDiscountSyncReasonSchema`
+- `ShopifyDiscountSyncWebhookTopicSchema`
+
+Type-only exports:
+
+- `ShopifyDiscountSyncJob`
+
+From [src/shopify/v1/checkout-observed.schema.ts](src/shopify/v1/checkout-observed.schema.ts):
+
+Runtime exports:
+
+- `CheckoutObservedPayloadSchema`
+
+Type-only exports:
+
+- `CheckoutObservedPayload`
+
+From [src/shopify/v1/commerce-event.schema.ts](src/shopify/v1/commerce-event.schema.ts):
+
+Runtime exports:
+
+- `createShopifyCommerceOrderingKey`
+- `createShopifyOrderOrderingKey`
+- `isCheckoutObservedEvent`
+- `isOrderCompletedEvent`
+- `parseShopifyCommerceEvent`
+- `safeParseShopifyCommerceEvent`
+- `ShopifyCheckoutObservedEventSchema`
+- `ShopifyCommerceEventSchema`
+- `ShopifyOrderCompletedEventSchema`
+
+Type-only exports:
+
+- `ShopifyCheckoutObservedEvent`
+- `ShopifyCommerceEvent`
+- `ShopifyCommerceEventType`
+- `ShopifyOrderCompletedEvent`
+
+From [src/shopify/v1/order-completed.schema.ts](src/shopify/v1/order-completed.schema.ts):
+
+Runtime exports:
+
+- `OrderCompletedPayloadSchema`
+
+Type-only exports:
+
+- `OrderCompletedPayload`
+
+From [src/shopify/v2/cart-activity.schema.ts](src/shopify/v2/cart-activity.schema.ts):
+
+Runtime exports:
+
+- `ShopifyCartActivityPayloadV2Schema`
+
+Type-only exports:
+
+- `ShopifyCartActivityPayloadV2`
+
+From [src/shopify/v2/checkout-created.schema.ts](src/shopify/v2/checkout-created.schema.ts):
+
+Runtime exports:
+
+- `CheckoutCreatedPayloadV2Schema`
+
+Type-only exports:
+
+- `CheckoutCreatedPayloadV2`
+
+From [src/shopify/v2/checkout-updated.schema.ts](src/shopify/v2/checkout-updated.schema.ts):
+
+Runtime exports:
+
+- `CheckoutUpdatedPayloadV2Schema`
+
+Type-only exports:
+
+- `CheckoutUpdatedPayloadV2`
+
+From [src/shopify/v2/order-completed.schema.ts](src/shopify/v2/order-completed.schema.ts):
+
+Runtime exports:
+
+- `OrderCompletedPayloadV2Schema`
+
+Type-only exports:
+
+- `OrderCompletedPayloadV2`
+
+From [src/shopify/v2/recovery-event.schema.ts](src/shopify/v2/recovery-event.schema.ts):
+
+Runtime exports:
+
+- `createShopifyCartActivityOrderingKey`
+- `createShopifyOrderCorrelationOrderingKey`
+- `createShopifyPendingRecoveryOrderingKey`
+- `isCartActivityEventV2`
+- `isCheckoutCreatedEventV2`
+- `isCheckoutUpdatedEventV2`
+- `isOrderCompletedEventV2`
+- `parseShopifyRecoveryEventV2`
+- `safeParseShopifyRecoveryEventV2`
+- `ShopifyCartActivityEventV2Schema`
+- `ShopifyCheckoutCreatedEventV2Schema`
+- `ShopifyCheckoutUpdatedEventV2Schema`
+- `ShopifyOrderCompletedEventV2Schema`
+- `ShopifyRecoveryEventV2Schema`
+
+Type-only exports:
+
+- `ShopifyCartActivityEventV2`
+- `ShopifyCheckoutCreatedEventV2`
+- `ShopifyCheckoutUpdatedEventV2`
+- `ShopifyOrderCompletedEventV2`
+- `ShopifyRecoveryEventTypeV2`
+- `ShopifyRecoveryEventV2`
+
+</details>
+
+<details>
+<summary>/internationalization — 25 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/internationalization`.
+
+From [src/internationalization.ts](src/internationalization.ts):
+
+Runtime exports:
+
+- `canonicaliseLanguageTag`
+- `CountryCodeSchema`
+- `createInternationalizationRuntime`
+- `CurrencyCodeSchema`
+- `InternationalContextSchema`
+- `LanguageSourceSchema`
+- `LanguageTagSchema`
+- `mergeInternationalContext`
+- `normalizeCountryCode`
+- `normalizeCurrencyCode`
+- `normalizeTimeZone`
+- `resolveLocaleDirection`
+- `TimeZoneIdSchema`
+- `validateIcuCatalogue`
+
+Type-only exports:
+
+- `CatalogueValidationOptions`
+- `CountryCode`
+- `CurrencyCode`
+- `IcuMessageCatalogue`
+- `IcuMessageValues`
+- `InternationalContext`
+- `InternationalizationRuntime`
+- `InternationalizationRuntimeOptions`
+- `LanguageSource`
+- `LanguageTag`
+- `TimeZoneId`
+
+</details>
+
+<details>
+<summary>/billing — 39 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/billing`.
+
+From [src/billing.ts](src/billing.ts):
+
+Runtime exports:
+
+- `APP_PRICING_BILLING_PERIOD_DRAIN_WINDOW_MS`
+- `ARCH007_BILLING_CONTRACT_SCHEMA_VERSION`
+- `availablePurchasedRecoveryCredits`
+- `BILLING_PLAN_KINDS`
+- `BILLING_SUBSCRIPTION_RECONCILE_JOB_NAME`
+- `BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME`
+- `BILLING_SUBSCRIPTION_RECONCILE_SCHEMA_VERSION`
+- `BILLING_SYSTEM_MESSAGE_CODES`
+- `BILLING_USAGE_METRICS`
+- `BillingPlanKindSchema`
+- `BillingSubscriptionReconcileJobSchema`
+- `BillingSystemMessageCodeSchema`
+- `BillingUsageMetricSchema`
+- `createBillingSubscriptionReconcileJobId`
+- `createMerchantBillingSystemSourceKey`
+- `createRecoveryIdempotencyKey`
+- `createShopifyUsageIdempotencyKey`
+- `deriveShopifyProviderContextIdentity`
+- `isSameShopifyPurchaseProviderContext`
+- `NormalizedWhatsAppStatusSchema`
+- `parseBillingSubscriptionReconcileJob`
+- `parseNormalizedWhatsAppStatus`
+- `safeParseBillingSubscriptionReconcileJob`
+- `safeParseNormalizedWhatsAppStatus`
+- `WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION`
+- `WHATSAPP_PROVIDER_STATUSES`
+- `WhatsAppProviderPricingMetadataSchema`
+- `WhatsAppProviderStatusSchema`
+
+Type-only exports:
+
+- `BillingPlanKind`
+- `BillingSubscriptionReconcileJob`
+- `BillingSystemMessageCode`
+- `BillingUsageMetric`
+- `NormalizedWhatsAppStatus`
+- `PurchasedRecoveryCreditCounterSnapshot`
+- `ShopifyCurrentProviderContext`
+- `ShopifyProviderContextIdentityInput`
+- `ShopifyPurchaseProviderContext`
+- `WhatsAppProviderPricingMetadata`
+- `WhatsAppProviderStatus`
+
+</details>
+
+<details>
+<summary>/recovery-policy — 7 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/recovery-policy`.
+
+From [src/recovery-policy.ts](src/recovery-policy.ts):
+
+Runtime exports:
+
+- `EffectiveRecoveryPolicySchema`
+- `parseEffectiveRecoveryPolicy`
+- `RECOVERY_OFFER_MODES`
+- `RecoveryOfferModeSchema`
+- `safeParseEffectiveRecoveryPolicy`
+
+Type-only exports:
+
+- `EffectiveRecoveryPolicy`
+- `RecoveryOfferMode`
+
+</details>
+
+<details>
+<summary>/whatsapp — 7 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/whatsapp`.
+
+From [src/whatsapp.ts](src/whatsapp.ts):
+
+Runtime exports:
+
+- `NormalizedWhatsAppInboundMessageSchema`
+- `parseNormalizedWhatsAppInboundMessage`
+- `safeParseNormalizedWhatsAppInboundMessage`
+- `WHATSAPP_INBOUND_MESSAGE_SCHEMA_VERSION`
+- `WhatsAppInboundContentSchema`
+
+Type-only exports:
+
+- `NormalizedWhatsAppInboundMessage`
+- `WhatsAppInboundContent`
+
+</details>
+
+<details>
+<summary>/merchant-communications — 40 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/merchant-communications`.
+
+From [src/merchant-communications.ts](src/merchant-communications.ts):
+
+Runtime exports:
+
+- `AuthoredSupportBodySchema`
+- `countUnicodeGraphemes`
+- `MERCHANT_COMMUNICATIONS_JOB_NAMES`
+- `MERCHANT_COMMUNICATIONS_QUEUE_NAME`
+- `MERCHANT_COMMUNICATIONS_SCHEMA_VERSION`
+- `MerchantMessageTranslationContractSchema`
+- `MerchantMessageTranslationStatusSchema`
+- `MerchantSupportMessageContractSchema`
+- `MerchantSupportMessageKindSchema`
+- `MerchantSupportMessageStateSchema`
+- `MerchantTranslationBatchContractSchema`
+- `MerchantTranslationBatchStatusSchema`
+- `MerchantTranslationDirectionSchema`
+- `MerchantTranslationReconciliationRequestContractSchema`
+- `MerchantTranslationReconciliationScopeSchema`
+- `MerchantTranslationReconciliationStatusSchema`
+- `PLATFORM_SUPPORT_LANGUAGE_TAG`
+- `requiresMerchantTranslation`
+- `TranslatedSupportBodySchema`
+- `TranslationBatchPollJobSchema`
+- `TranslationBatchResultsJobSchema`
+- `TranslationBatchSubmitJobSchema`
+- `TranslationDispatchJobSchema`
+- `TranslationReconcileJobSchema`
+
+Type-only exports:
+
+- `MerchantMessageTranslationContract`
+- `MerchantMessageTranslationStatus`
+- `MerchantSupportMessageContract`
+- `MerchantSupportMessageKind`
+- `MerchantSupportMessageState`
+- `MerchantTranslationBatchContract`
+- `MerchantTranslationBatchStatus`
+- `MerchantTranslationDirection`
+- `MerchantTranslationReconciliationRequestContract`
+- `MerchantTranslationReconciliationScope`
+- `MerchantTranslationReconciliationStatus`
+- `TranslationBatchPollJob`
+- `TranslationBatchResultsJob`
+- `TranslationBatchSubmitJob`
+- `TranslationDispatchJob`
+- `TranslationReconcileJob`
+
+</details>
+
+<details>
+<summary>/merchant-communications/node — 5 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/merchant-communications/node`.
+
+From [src/merchant-communications.node.ts](src/merchant-communications.node.ts):
+
+Runtime exports:
+
+- `createTranslationBatchPollJobId`
+- `createTranslationBatchResultsJobId`
+- `createTranslationBatchSubmitJobId`
+- `createTranslationDispatchJobId`
+- `createTranslationReconcileJobId`
+
+</details>
+
+<details>
+<summary>/testing/node — 27 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/testing/node`.
+
+From [src/testing/node.ts](src/testing/node.ts):
+
+Runtime exports:
+
+- `createCommandRunner`
+- `createDockerRunner`
+- `DEFAULT_COMMAND_TIMEOUT_MS`
+- `DEFAULT_DOCKER_COMMAND_TIMEOUT_MS`
+- `DEFAULT_HOST`
+- `DEFAULT_POLL_INTERVAL_MS`
+- `DEFAULT_POSTGRES_IMAGE`
+- `DEFAULT_POSTGRES_STARTUP_TIMEOUT_MS`
+- `DEFAULT_REDIS_IMAGE`
+- `DEFAULT_REDIS_STARTUP_TIMEOUT_MS`
+- `deployPrismaMigrations`
+- `EphemeralPostgres`
+- `EphemeralRedis`
+- `withDisposableIntegrationInfrastructure`
+
+Type-only exports:
+
+- `CommandOptions`
+- `CommandResult`
+- `CommandRunner`
+- `DisposableEnvironment`
+- `DisposableIntegrationCallback`
+- `DisposableIntegrationInfrastructure`
+- `DisposableIntegrationInfrastructureOptions`
+- `DockerRunner`
+- `EphemeralPostgresOptions`
+- `EphemeralRedisOptions`
+- `MigrationDeployOptions`
+- `PostgresConnectionDetails`
+- `RedisConnectionDetails`
+
+</details>
+
+<details>
+<summary>/shopify — 71 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/shopify`.
+
+From [src/shopify/common.schema.ts](src/shopify/common.schema.ts):
+
+Runtime exports:
+
+- `MAX_LINE_ITEMS`
+- `MAX_URL_LENGTH`
+- `ShopifyCheckoutLineItemSchema`
+- `ShopifyCheckoutLineItemsSchema`
+- `ShopifyCustomerReferenceSchema`
+- `ShopifyMoneySchema`
+- `ShopifyTenantSchema`
+
+Type-only exports:
+
+- `ShopifyCheckoutLineItem`
+- `ShopifyCustomerReference`
+- `ShopifyMoney`
+- `ShopifyTenant`
+
+From [src/shopify/constants.ts](src/shopify/constants.ts):
+
+Runtime exports:
+
+- `SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION`
+- `SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION_V1`
+- `SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION_V2`
+- `SHOPIFY_COMMERCE_EVENT_TYPES`
+- `SHOPIFY_RECOVERY_EVENT_TYPES_V2`
+- `SHOPIFY_WEBHOOK_OUTBOX_DESTINATIONS`
+
+From [src/shopify/queue-contracts.ts](src/shopify/queue-contracts.ts):
+
+Runtime exports:
+
+- `parseShopifyDiscountSyncJob`
+- `safeParseShopifyDiscountSyncJob`
+- `SHOPIFY_DISCOUNT_SYNC_REASONS`
+- `SHOPIFY_DISCOUNT_SYNC_WEBHOOK_TOPICS`
+- `SHOPIFY_WEBHOOK_QUEUE_CONTRACTS`
+- `ShopifyDiscountSyncJobSchema`
+- `ShopifyDiscountSyncReasonSchema`
+- `ShopifyDiscountSyncWebhookTopicSchema`
+
+Type-only exports:
+
+- `ShopifyDiscountSyncJob`
+
+From [src/shopify/v1/checkout-observed.schema.ts](src/shopify/v1/checkout-observed.schema.ts):
+
+Runtime exports:
+
+- `CheckoutObservedPayloadSchema`
+
+Type-only exports:
+
+- `CheckoutObservedPayload`
+
+From [src/shopify/v1/commerce-event.schema.ts](src/shopify/v1/commerce-event.schema.ts):
+
+Runtime exports:
+
+- `createShopifyCommerceOrderingKey`
+- `createShopifyOrderOrderingKey`
+- `isCheckoutObservedEvent`
+- `isOrderCompletedEvent`
+- `parseShopifyCommerceEvent`
+- `safeParseShopifyCommerceEvent`
+- `ShopifyCheckoutObservedEventSchema`
+- `ShopifyCommerceEventSchema`
+- `ShopifyOrderCompletedEventSchema`
+
+Type-only exports:
+
+- `ShopifyCheckoutObservedEvent`
+- `ShopifyCommerceEvent`
+- `ShopifyCommerceEventType`
+- `ShopifyOrderCompletedEvent`
+
+From [src/shopify/v1/order-completed.schema.ts](src/shopify/v1/order-completed.schema.ts):
+
+Runtime exports:
+
+- `OrderCompletedPayloadSchema`
+
+Type-only exports:
+
+- `OrderCompletedPayload`
+
+From [src/shopify/v2/cart-activity.schema.ts](src/shopify/v2/cart-activity.schema.ts):
+
+Runtime exports:
+
+- `ShopifyCartActivityPayloadV2Schema`
+
+Type-only exports:
+
+- `ShopifyCartActivityPayloadV2`
+
+From [src/shopify/v2/checkout-created.schema.ts](src/shopify/v2/checkout-created.schema.ts):
+
+Runtime exports:
+
+- `CheckoutCreatedPayloadV2Schema`
+
+Type-only exports:
+
+- `CheckoutCreatedPayloadV2`
+
+From [src/shopify/v2/checkout-updated.schema.ts](src/shopify/v2/checkout-updated.schema.ts):
+
+Runtime exports:
+
+- `CheckoutUpdatedPayloadV2Schema`
+
+Type-only exports:
+
+- `CheckoutUpdatedPayloadV2`
+
+From [src/shopify/v2/order-completed.schema.ts](src/shopify/v2/order-completed.schema.ts):
+
+Runtime exports:
+
+- `OrderCompletedPayloadV2Schema`
+
+Type-only exports:
+
+- `OrderCompletedPayloadV2`
+
+From [src/shopify/v2/recovery-event.schema.ts](src/shopify/v2/recovery-event.schema.ts):
+
+Runtime exports:
+
+- `createShopifyCartActivityOrderingKey`
+- `createShopifyOrderCorrelationOrderingKey`
+- `createShopifyPendingRecoveryOrderingKey`
+- `isCartActivityEventV2`
+- `isCheckoutCreatedEventV2`
+- `isCheckoutUpdatedEventV2`
+- `isOrderCompletedEventV2`
+- `parseShopifyRecoveryEventV2`
+- `safeParseShopifyRecoveryEventV2`
+- `ShopifyCartActivityEventV2Schema`
+- `ShopifyCheckoutCreatedEventV2Schema`
+- `ShopifyCheckoutUpdatedEventV2Schema`
+- `ShopifyOrderCompletedEventV2Schema`
+- `ShopifyRecoveryEventV2Schema`
+
+Type-only exports:
+
+- `ShopifyCartActivityEventV2`
+- `ShopifyCheckoutCreatedEventV2`
+- `ShopifyCheckoutUpdatedEventV2`
+- `ShopifyOrderCompletedEventV2`
+- `ShopifyRecoveryEventTypeV2`
+- `ShopifyRecoveryEventV2`
+
+</details>
+
+<details>
+<summary>/shopify/node — 5 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/shopify/node`.
+
+From [src/shopify/node.ts](src/shopify/node.ts):
+
+Runtime exports:
+
+- `createPendingRecoveryCandidateJobId`
+- `createShopifyCheckoutJobId`
+- `createShopifyDiscountSyncJobId`
+- `createShopifyOrderJobId`
+- `createShopifyWebhookJobId`
+
+</details>
+
+<details>
+<summary>/logging — 15 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/logging`.
+
+From [src/logging/logger.ts](src/logging/logger.ts):
+
+Runtime exports:
+
+- `createLogger`
+
+From [src/logging/redaction.ts](src/logging/redaction.ts):
+
+Runtime exports:
+
+- `CIRCULAR`
+- `isSensitiveLogKey`
+- `LOG_VALUE_LIMITS`
+- `MAX_DEPTH_REACHED`
+- `REDACTED`
+- `sanitizeLogFields`
+- `TRUNCATED`
+
+From [src/logging/types.ts](src/logging/types.ts):
+
+Runtime exports:
+
+- `LOG_LEVELS`
+
+Type-only exports:
+
+- `LogFields`
+- `LoggerOptions`
+- `LogLevel`
+- `LogRecord`
+- `LogSink`
+- `StructuredLogger`
+
+</details>
+
+<details>
+<summary>/logging/node — 10 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/logging/node`.
+
+From [src/logging/node.ts](src/logging/node.ts):
+
+Runtime exports:
+
+- `getNodeOpenTelemetryLoggingRuntime`
+- `initNodeOpenTelemetryLogging`
+- `parseOtlpHeaders`
+- `resolveLogsEndpoint`
+
+Type-only exports:
+
+- `NodeOpenTelemetryLoggingOptions`
+- `NodeOpenTelemetryLoggingRuntime`
+
+From [src/logging/node/loki.ts](src/logging/node/loki.ts):
+
+Runtime exports:
+
+- `getNodeLokiLoggingRuntime`
+- `initNodeLokiLogging`
+
+Type-only exports:
+
+- `NodeLokiLoggingOptions`
+- `NodeLokiLoggingRuntime`
+
+</details>
+
+<details>
+<summary>/observability — 4 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/observability`.
+
+From [src/observability/index.ts](src/observability/index.ts):
+
+Runtime exports:
+
+- `getActiveTraceId`
+- `withObservedSpan`
+
+Type-only exports:
+
+- `ObservedSpanOptions`
+- `SpanExceptionMapper`
+
+</details>
+
+<details>
+<summary>/observability/node — 7 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/observability/node`.
+
+From [src/observability/node.ts](src/observability/node.ts):
+
+Runtime exports:
+
+- `getNodeObservabilityRuntime`
+- `initNodeObservability`
+- `resolveDeploymentEnvironmentName`
+- `resolveSampler`
+
+Type-only exports:
+
+- `NodeInstrumentProfile`
+- `NodeObservabilityOptions`
+- `NodeObservabilityRuntime`
+
+</details>
+
+<details>
+<summary>/observability/bullmq — 2 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/observability/bullmq`.
+
+From [src/observability/bullmq.ts](src/observability/bullmq.ts):
+
+Runtime exports:
+
+- `createBullMQTelemetry`
+
+Type-only exports:
+
+- `BullMQTelemetryOptions`
+
+</details>
+
+<details>
+<summary>/observability/genai — 7 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/observability/genai`.
+
+From [src/observability/genai.ts](src/observability/genai.ts):
+
+Runtime exports:
+
+- `observeAgentInvocation`
+- `observeAgentTool`
+- `observeConversationTurn`
+
+Type-only exports:
+
+- `AgentObservation`
+- `GenAIObservationOptions`
+
+From [src/observability/index.ts](src/observability/index.ts):
+
+Type-only exports:
+
+- `ObservedSpanOptions`
+- `SpanExceptionMapper`
+
+</details>
+
+<details>
+<summary>/commerce — 97 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/commerce`.
+
+From [src/commerce/canonical-json.ts](src/commerce/canonical-json.ts):
+
+Runtime exports:
+
+- `canonicalJson`
+- `jsonBytes`
+- `responseContractCanonicalJson`
+
+Type-only exports:
+
+- `Digest`
+
+From [src/commerce/definitions.ts](src/commerce/definitions.ts):
+
+Runtime exports:
+
+- `capabilityHashInput`
+- `CommerceExecutionSchema`
+- `CommerceToolDefinitionSchema`
+- `CommerceToolDraftDefinitionSchema`
+- `CommerceToolIdentitySchema`
+- `CommerceToolRevisionIdentitySchema`
+- `definitionToMcpDescriptor`
+- `GrantedToolSchema`
+- `GrantedToolsSchema`
+- `mapToolArguments`
+- `POLICY_OPERATION_DESCRIPTORS`
+- `POLICY_OPERATIONS`
+- `ResponseTemplateSchema`
+- `ToolBindingSchema`
+- `ToolBindingsSchema`
+- `ToolDescriptorSchema`
+- `toolHashInput`
+- `ToolNameSchema`
+- `validateDefinitionForPublication`
+- `validateDefinitionVersion`
+
+Type-only exports:
+
+- `CommerceDefinitionCompiler`
+- `CommerceToolDefinition`
+- `CommerceToolDraftDefinition`
+- `GrantedTool`
+- `ToolDescriptor`
+
+From [src/commerce/fixtures.ts](src/commerce/fixtures.ts):
+
+Runtime exports:
+
+- `exampleDefinition`
+- `exampleFinal`
+- `exampleGrant`
+- `exampleManifest`
+- `exampleTool`
+- `exampleTurn`
+
+From [src/commerce/primitives.ts](src/commerce/primitives.ts):
+
+Runtime exports:
+
+- `boundedJson`
+- `ContractVersionSchema`
+- `CurrencySchema`
+- `DateSchema`
+- `distinct`
+- `HashSchema`
+- `IdSchema`
+- `LanguageSchema`
+- `MoneySchema`
+- `SemverSchema`
+
+From [src/commerce/response.ts](src/commerce/response.ts):
+
+Runtime exports:
+
+- `CommerceFinalResponseSchema`
+- `CommerceResponseContractSchema`
+- `EMPTY_RESPONSE_CONTRACT`
+- `finalResponseSchema`
+- `finalResponseToolSchema`
+- `ReferralReasonSchema`
+- `verifyResponseContract`
+
+Type-only exports:
+
+- `CommerceFinalResponse`
+- `CommerceResponseContract`
+
+From [src/commerce/schemas.ts](src/commerce/schemas.ts):
+
+Runtime exports:
+
+- `CommerceAlternativeSchema`
+- `CommerceAssertionSchema`
+- `CommerceBasketSchema`
+- `CommerceConfigurationSchema`
+- `CommerceConversationGrantSchema`
+- `CommerceErrorCodeSchema`
+- `CommerceEvidenceSchema`
+- `CommerceExecuteAssertionSchema`
+- `CommerceManifestSchema`
+- `CommerceOfferSchema`
+- `CommerceProductSchema`
+- `CommerceProposalSchema`
+- `CommerceReleaseIdentitySchema`
+- `CommerceResolveAssertionSchema`
+- `CommerceToolInputs`
+- `CommerceToolOutputs`
+- `commerceToolResultSchema`
+- `CommerceToolResultSchema`
+- `CommerceTurnIdentitySchema`
+- `productBelongsToDomain`
+
+Type-only exports:
+
+- `CommerceConversationGrant`
+- `CommerceEvidence`
+- `CommerceManifest`
+- `CommerceToolResult`
+- `CommerceTurnIdentity`
+
+From [src/commerce/selection.ts](src/commerce/selection.ts):
+
+Runtime exports:
+
+- `CommerceCapabilityBindingSchema`
+- `currentlyGrantedTools`
+- `deduplicateTools`
+- `manifestMatchesGrant`
+- `parseCommerceManifest`
+- `selectCapabilities`
+
+Type-only exports:
+
+- `CommerceCapabilityBinding`
+- `FeatureFacts`
+
+From [src/commerce/subset.ts](src/commerce/subset.ts):
+
+Runtime exports:
+
+- `compileSubset`
+- `DetailsSchemaSchema`
+- `InputSchemaSchema`
+- `matchesSubset`
+- `MONEY_PATTERN`
+- `safeName`
+- `safePath`
+- `validateSubset`
+
+Type-only exports:
+
+- `Json`
+- `SubsetSchema`
+
+</details>
+
+<details>
+<summary>/commerce/runner — 10 exports</summary>
+
+Import: `@modainteract/moda-interact-shared/commerce/runner`.
+
+From [src/commerce/runner/index.ts](src/commerce/runner/index.ts):
+
+Runtime exports:
+
+- `PLATFORM_INSTRUCTIONS`
+- `runCommerceTurn`
+- `runnerVersion`
+
+Type-only exports:
+
+- `ModelCall`
+- `ModelRequest`
+- `ModelStep`
+- `RunCommerceTurnInput`
+- `RunCommerceTurnResult`
+- `RunnerErrorCode`
+- `RunnerTool`
+
+</details>
