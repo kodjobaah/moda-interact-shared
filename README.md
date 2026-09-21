@@ -35,6 +35,40 @@ including:
 
 The package deliberately keeps framework and runtime dependencies small.
 
+## Commerce contracts
+
+The browser-safe Commerce contract entrypoint is:
+
+```ts
+import {
+  CommerceToolDefinitionSchema,
+  ExternalHttpExecutionSchema,
+  ExternalHttpResultDataSchema,
+  ResponseProcessingSchema,
+  ConnectionViewSchema,
+} from "@modainteract/moda-interact-shared/commerce";
+```
+
+The public `/commerce` inventory includes the canonical JSON, subset, primitive,
+definition, schema, response, selection, fixture and external contract exports.
+External contracts include `ExternalQueryValueSchema`,
+`ExternalQueryMappingSchema`, `ExternalQueryMappingsSchema`,
+`ExternalPathSchema`, `ExternalResponseFormatSchema`,
+`FieldProjectionSchema`, `ResponseFilterSchema`,
+`VisualResponseProcessingSchema`, `ResponseProcessingSchema`,
+`TransformResponseSchema`, `TransformSampleSchema`,
+`ExternalHttpResultDataSchema`, `ConnectionRevisionViewSchema`,
+`ConnectionViewSchema`, `CredentialStatusSchema`, `ConnectionCommandSchema`,
+`RevisionInputSchema`, `ConnectionIssueSchema`, and `ConnectionResultSchema`,
+plus their corresponding TypeScript types and the external execution,
+publication, mapping and descriptor helpers from `definitions`.
+
+The Node-only `/commerce/runner` entrypoint exports the Commerce runner version,
+platform instructions, manifest/grant/result schemas, response-contract helpers,
+and runner request/step/result types. It owns protocol validation helpers only;
+provider transport, credentials, response processing and persistence remain in
+their service-owned repositories.
+
 ## Node observability runtime
 
 The package provides a browser-safe semantic observability entry and a

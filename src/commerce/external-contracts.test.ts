@@ -105,4 +105,11 @@ test("X13 validates mapped runtime values and visual output shapes before public
     responseTemplate: { kind: "items" as const, itemsPath: "values.items", item: "{{item.title}}", empty: "None.", unavailable: "Unavailable." },
   };
   assert.equal(validateDefinitionForPublication(list, compiler).name, definition.name);
+  for (const resultSchema of [
+    { ...list.execution.resultSchema, properties: { items: list.execution.resultSchema.properties.items, extra: { type: "string" } } },
+    { ...list.execution.resultSchema, properties: { items: { ...list.execution.resultSchema.properties.items, minItems: 1 } } },
+    { ...list.execution.resultSchema, properties: { items: { ...list.execution.resultSchema.properties.items, maxItems: 1 } } },
+  ]) {
+    assert.throws(() => validateDefinitionForPublication({ ...list, execution: { ...list.execution, resultSchema } }, compiler));
+  }
 });

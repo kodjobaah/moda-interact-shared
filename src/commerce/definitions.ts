@@ -259,7 +259,13 @@ function visualPublicationCompatible(execution: ExternalHttpExecution) {
   if (execution.responseProcessing.kind === "JAVASCRIPT") return true;
   const processing = execution.responseProcessing;
   const schema = execution.resultSchema;
-  if (processing.kind === "LIST" && (!schema.properties?.items || schema.properties.items.type !== "array" || !(schema.required ?? []).includes("items"))) return false;
+  if (processing.kind === "LIST") {
+    const items = schema.properties?.items;
+    if (!items || items.type !== "array" || !(schema.required ?? []).includes("items")) return false;
+    if (Object.keys(schema.properties ?? {}).some((name) => name !== "items")) return false;
+    if (items.minItems !== undefined && items.minItems > 0) return false;
+    if (items.maxItems !== undefined && items.maxItems < processing.limit) return false;
+  }
   const output = processing.kind === "OBJECT"
     ? schema
     : schema.properties?.items?.items;
