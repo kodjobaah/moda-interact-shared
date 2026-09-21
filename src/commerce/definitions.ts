@@ -24,6 +24,7 @@ import {
 import {
   ExternalPathSchema,
   ExternalQueryMappingsSchema,
+  ExternalQueryValueSchema,
   ExternalResponseFormatSchema,
   ResponseProcessingSchema,
 } from "./external";
@@ -168,6 +169,7 @@ const identity = {
 };
 const forbiddenInput =
   /^(shopid|customerid|checkoutrecoveryid|conversationid|grantid|releaseid|token|accesstoken|domain|headers|url|graphql|document|authorization)$/i;
+const forbiddenExternalInput = /^(authorization|cookie|set-cookie|host|x-api-key|api_key|apikey|access_token|token|secret|password)$/i;
 export const CommerceToolDefinitionSchema = z
   .strictObject({
     ...identity,
@@ -206,7 +208,7 @@ export const CommerceToolDefinitionSchema = z
         if ("input" in mapping) {
           const target = properties[mapping.input];
           const type = target && (Array.isArray(target.type) ? target.type[0] : target.type);
-          if (!["string", "integer", "boolean"].includes(type ?? ""))
+          if (forbiddenExternalInput.test(mapping.input) || !["string", "integer", "boolean"].includes(type ?? ""))
             ctx.addIssue({ code: "custom", path: ["execution", "query", name], message: "External mappings require a top-level scalar input" });
         }
   });
@@ -249,6 +251,24 @@ function externalOutputSchema(execution: ExternalHttpExecution): SubsetSchema {
     additionalProperties: false,
   };
 }
+function scalarSchema(schema: SubsetSchema | undefined) {
+  const type = schema && (Array.isArray(schema.type) ? schema.type[0] : schema.type);
+  return !!schema && ["string", "integer", "number", "boolean"].includes(type ?? "");
+}
+function visualPublicationCompatible(execution: ExternalHttpExecution) {
+  if (execution.responseProcessing.kind === "JAVASCRIPT") return true;
+  const processing = execution.responseProcessing;
+  const schema = execution.resultSchema;
+  if (processing.kind === "LIST" && (!schema.properties?.items || schema.properties.items.type !== "array" || !(schema.required ?? []).includes("items"))) return false;
+  const output = processing.kind === "OBJECT"
+    ? schema
+    : schema.properties?.items?.items;
+  if (!output || output.type !== "object" || !output.properties || output.additionalProperties !== false) return false;
+  const fields = processing.fields;
+  if (Object.keys(output.properties).some((name) => !Object.hasOwn(fields, name) || !scalarSchema(output.properties![name]))) return false;
+  if (Object.keys(fields).some((name) => !Object.hasOwn(output.properties!, name))) return false;
+  return (output.required ?? []).every((name) => !fields[name]?.omitIfMissing);
+}
 function at(schema: SubsetSchema, path: string) {
   let current: SubsetSchema | undefined = schema;
   for (const part of path.split(".")) current = current?.properties?.[part];
@@ -259,6 +279,8 @@ export function validateDefinitionForPublication(
   compiler: CommerceDefinitionCompiler,
 ) {
   const definition = CommerceToolDefinitionSchema.parse(raw);
+  if (definition.execution.kind === "EXTERNAL_HTTP" && !visualPublicationCompatible(definition.execution))
+    throw new TypeError("External visual projection is incompatible with resultSchema");
   const compiled =
     definition.execution.kind === "EXTERNAL_HTTP"
       ? { outputSchema: externalOutputSchema(definition.execution), validateMappedArguments: () => true }
@@ -303,7 +325,12 @@ export function mapToolArguments(
   const result: Record<string, unknown> = Object.create(null);
   for (const [key, m] of Object.entries(mapping)) {
     if ("literal" in m) result[key] = m.literal;
-    else if (Object.hasOwn(input, m.input)) result[key] = input[m.input];
+    else if (Object.hasOwn(input, m.input)) {
+      const value = input[m.input];
+      if (definition.execution.kind === "EXTERNAL_HTTP" && !ExternalQueryValueSchema.safeParse(value).success)
+        throw new TypeError("Invalid external mapped scalar");
+      result[key] = value;
+    }
     else if (!m.omitIfMissing) throw new TypeError("Missing mapped input");
   }
   return result;

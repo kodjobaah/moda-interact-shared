@@ -7,12 +7,17 @@ Existing WhatsApp, billing and recovery-policy exports are unchanged.
 ## External read-only HTTP contracts
 
 The commerce entry point also exports the strict C21 external-tool contracts:
-`ExternalHttpExecutionSchema`, `ExternalResponseFormatSchema`,
-`ResponseProcessingSchema`, `TransformResponseSchema`,
-`TransformSampleSchema`, the visual/code processor input and result types, and
+`ExternalHttpExecutionSchema`, `ExternalQueryMappingSchema`,
+`ExternalQueryMappingsSchema`, `ExternalResponseFormatSchema`,
+`FieldProjectionSchema`, `ResponseFilterSchema`,
+`VisualResponseProcessingSchema`, `ResponseProcessingSchema`,
+`TransformResponseSchema`, `TransformSampleSchema`,
+`ExternalHttpResultDataSchema`,
+
+the visual/code processor input and result types, and
 the connection DTO schemas/types (`ConnectionRevisionView`, `ConnectionView`,
 `CredentialStatus`, `ConnectionCommand`, `RevisionInput` and
-`ConnectionResult`). These are data contracts only. Transport, credentials,
+`ConnectionResultSchema` and `ConnectionResult`). These are data contracts only. Transport, credentials,
 encryption, visual processing and JavaScript execution remain Commerce-owned.
 
 External definitions support only fixed HTTPS-origin GET paths supplied by a pinned

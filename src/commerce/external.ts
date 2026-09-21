@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { IdSchema } from "./primitives";
+import { DateSchema, IdSchema } from "./primitives";
 import { safeName, safePath } from "./subset";
 import { jsonBytes } from "./canonical-json";
 
 const utf8 = (value: string, maximum: number) => new TextEncoder().encode(value).length <= maximum;
 const scalar = z.union([z.string().refine((value) => utf8(value, 2048)), z.number().finite(), z.boolean()]);
+export const ExternalQueryValueSchema = scalar;
 const scalarOrNull = z.union([scalar, z.null()]);
 const record = <T extends z.ZodTypeAny>(item: T, max: number) => z.record(z.string().refine(safeName), item).refine((value) => Object.keys(value).length <= max);
 
@@ -19,10 +20,13 @@ export const ExternalQueryMappingsSchema = record(ExternalQueryMappingSchema, 32
 export const ExternalPathSchema = z.string().max(1024).refine((value) =>
   utf8(value, 1024) && /^\/(?:[A-Za-z0-9._~-]+\/)*[A-Za-z0-9._~-]*\/?$/.test(value) &&
   !value.includes("//") && !value.includes("%") && !value.includes("\\") &&
-  !value.includes("?") && !value.includes("#") && !value.includes("{") && !value.includes("}"),
+  !value.includes("?") && !value.includes("#") && !value.includes("{") && !value.includes("}") &&
+  value.split("/").every((segment) => segment !== "." && segment !== ".."),
 );
 const mediaType = z.string().min(1).max(128).refine((value) => value === value.toLowerCase() && /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(value));
-export const ExternalResponseFormatSchema = z.strictObject({ mode: z.enum(["JSON", "TEXT"]), mediaTypes: z.array(mediaType).min(1).max(8).refine((values) => new Set(values).size === values.length) });
+const jsonMime = (value: string) => value === "application/json" || /^application\/[a-z0-9!#$&^_.+-]+\+json$/.test(value);
+const textMime = (value: string) => /^text\/[a-z0-9!#$&^_.+-]+$/.test(value) || value === "application/xml" || /^application\/[a-z0-9!#$&^_.+-]+\+xml$/.test(value) || jsonMime(value);
+export const ExternalResponseFormatSchema = z.strictObject({ mode: z.enum(["JSON", "TEXT"]), mediaTypes: z.array(mediaType).min(1).max(8).refine((values) => new Set(values).size === values.length) }).refine((value) => value.mediaTypes.every(value.mode === "JSON" ? jsonMime : textMime));
 export const FieldProjectionSchema = record(z.strictObject({ path: z.string().refine(safePath), omitIfMissing: z.literal(true).optional() }), 32).refine((value) => Object.keys(value).length >= 1);
 export const ResponseFilterSchema = z.discriminatedUnion("op", [
   z.strictObject({ path: z.string().refine(safePath), op: z.enum(["EQ", "NE", "GT", "GTE", "LT", "LTE", "CONTAINS", "STARTS_WITH"]), value: scalarOrNull }),
@@ -34,6 +38,14 @@ export const VisualResponseProcessingSchema = z.union([visualObject, visualList]
 export const ResponseProcessingSchema = z.union([VisualResponseProcessingSchema, z.strictObject({ kind: z.literal("JAVASCRIPT"), runtimeVersion: z.literal("quickjs-sync.v1"), source: z.string().min(1).refine((value) => utf8(value, 16384)) })]);
 export const TransformResponseSchema = z.strictObject({ status: z.int().min(200).max(299), contentType: z.string().min(1).max(128), bodyText: z.string().refine((value) => utf8(value, 262144)), json: z.union([z.null(), z.json()]) });
 export const TransformSampleSchema = z.strictObject({ status: z.int().min(200).max(299), contentType: z.string().min(1).max(128), bodyText: z.string().refine((value) => utf8(value, 262144)) }).refine((value) => jsonBytes(value) <= 524288);
+const boundedValues = z.custom<Record<string, unknown>>((value) => {
+  const visit = (node: unknown, depth: number): boolean =>
+    depth <= 20 && (node === null || typeof node === "string" || typeof node === "boolean" || (typeof node === "number" && Number.isFinite(node)) ||
+      (Array.isArray(node) && node.every((child) => visit(child, depth + 1))) ||
+      (!!node && typeof node === "object" && !Array.isArray(node) && Object.getPrototypeOf(node) === Object.prototype && Object.entries(node).every(([key, child]) => !["__proto__", "prototype", "constructor"].includes(key) && visit(child, depth + 1))));
+  try { return !!value && typeof value === "object" && !Array.isArray(value) && visit(value, 1) && jsonBytes(value) <= 49152; } catch { return false; }
+});
+export const ExternalHttpResultDataSchema = z.strictObject({ source: z.literal("EXTERNAL_HTTP"), connectionRevisionId: IdSchema, observedAt: DateSchema, values: boundedValues });
 export const ConnectionRevisionViewSchema = z.strictObject({ id: IdSchema, connectionId: IdSchema, revisionNumber: z.int().positive(), origin: z.string().min(1).max(2048), scope: z.enum(["PLATFORM", "PER_SHOP"]), authMode: z.enum(["NONE", "BEARER", "API_KEY"]), authHeader: z.string().min(1).max(128).nullable(), documentation: z.string().max(16000), createdAt: z.iso.datetime({ offset: false }) });
 export const ConnectionViewSchema = z.strictObject({ id: IdSchema, key: z.string().regex(/^[a-z][a-z0-9_]{0,127}$/), displayName: z.string().min(1).max(255), description: z.string().max(4096), enabled: z.boolean(), editVersion: z.int().positive(), revisions: z.array(ConnectionRevisionViewSchema) });
 export const CredentialStatusSchema = z.strictObject({ connectionRevisionId: IdSchema, shopId: IdSchema.nullable(), configured: z.boolean(), editVersion: z.int().positive().nullable(), updatedAt: z.iso.datetime({ offset: false }).nullable() });
@@ -55,6 +67,7 @@ export type VisualResponseProcessing = z.infer<typeof VisualResponseProcessingSc
 export type ResponseProcessing = z.infer<typeof ResponseProcessingSchema>;
 export type TransformResponse = z.infer<typeof TransformResponseSchema>;
 export type TransformSample = z.infer<typeof TransformSampleSchema>;
+export type ExternalHttpResultData = z.infer<typeof ExternalHttpResultDataSchema>;
 export type ConnectionRevisionView = z.infer<typeof ConnectionRevisionViewSchema>;
 export type ConnectionView = z.infer<typeof ConnectionViewSchema>;
 export type CredentialStatus = z.infer<typeof CredentialStatusSchema>;
