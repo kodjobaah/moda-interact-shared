@@ -10,6 +10,7 @@ import {
 } from "./primitives";
 import {
   InputSchemaSchema,
+  DetailsSchemaSchema,
   safeName,
   safePath,
   type SubsetSchema,
@@ -20,6 +21,13 @@ import {
   definitionFitsStorage,
   DEFINITION_SIZE_MESSAGE,
 } from "./definition-size";
+import {
+  ExternalPathSchema,
+  ExternalQueryMappingsSchema,
+  ExternalQueryValueSchema,
+  ExternalResponseFormatSchema,
+  ResponseProcessingSchema,
+} from "./external";
 export const ToolNameSchema = z
   .string()
   .regex(/^[a-z][a-z0-9_]{0,127}$/)
@@ -76,6 +84,25 @@ export const POLICY_OPERATIONS = [
   "products.findQualifying",
   "products.findSimilar",
 ] as const;
+export const ExternalHttpExecutionSchema = z
+  .strictObject({
+    kind: z.literal("EXTERNAL_HTTP"),
+    executorVersion: z.literal("1.0.0"),
+    connectionRevisionId: IdSchema,
+    method: z.literal("GET"),
+    path: ExternalPathSchema,
+    query: ExternalQueryMappingsSchema,
+    responseFormat: ExternalResponseFormatSchema,
+    resultPath: z.string().refine((value) => value === "" || safePath(value)),
+    responseProcessing: ResponseProcessingSchema,
+    resultSchema: DetailsSchemaSchema,
+  })
+  .superRefine((value, ctx) => {
+    if (value.responseProcessing.kind === "JAVASCRIPT" && value.resultPath !== "")
+      ctx.addIssue({ code: "custom", path: ["resultPath"], message: "JAVASCRIPT processing requires an empty resultPath" });
+    if (value.responseProcessing.kind !== "JAVASCRIPT" && value.responseFormat.mode !== "JSON")
+      ctx.addIssue({ code: "custom", path: ["responseFormat", "mode"], message: "Visual processing requires JSON" });
+  });
 export const CommerceExecutionSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     kind: z.literal("SHOPIFY_STOREFRONT_QUERY"),
@@ -96,7 +123,12 @@ export const CommerceExecutionSchema = z.discriminatedUnion("kind", [
     operationVersion: z.literal("1.0.0"),
     arguments: MappingsSchema,
   }),
+  ExternalHttpExecutionSchema,
 ]);
+export type ExternalHttpExecution = Extract<
+  z.infer<typeof CommerceExecutionSchema>,
+  { kind: "EXTERNAL_HTTP" }
+>;
 function tokensValid(text: string, root: "result" | "item") {
   if (/[<>]/.test(text)) return false;
   const residue = text.replace(/\{\{([^{}]+)\}\}/g, (_all, path: string) =>
@@ -137,6 +169,7 @@ const identity = {
 };
 const forbiddenInput =
   /^(shopid|customerid|checkoutrecoveryid|conversationid|grantid|releaseid|token|accesstoken|domain|headers|url|graphql|document|authorization)$/i;
+const forbiddenExternalInput = /^(authorization|cookie|set-cookie|host|x-api-key|api_key|apikey|access_token|token|secret|password)$/i;
 export const CommerceToolDefinitionSchema = z
   .strictObject({
     ...identity,
@@ -160,7 +193,9 @@ export const CommerceToolDefinitionSchema = z
     const mapping =
       d.execution.kind === "POLICY_OPERATION"
         ? d.execution.arguments
-        : d.execution.variables;
+        : d.execution.kind === "SHOPIFY_STOREFRONT_QUERY"
+          ? d.execution.variables
+          : d.execution.query;
     for (const [name, m] of Object.entries(mapping))
       if ("input" in m && !Object.hasOwn(properties, m.input))
         ctx.addIssue({
@@ -168,6 +203,14 @@ export const CommerceToolDefinitionSchema = z
           path: ["execution", name],
           message: "Unknown mapped input",
         });
+    if (d.execution.kind === "EXTERNAL_HTTP")
+      for (const [name, mapping] of Object.entries(d.execution.query))
+        if ("input" in mapping) {
+          const target = properties[mapping.input];
+          const type = target && (Array.isArray(target.type) ? target.type[0] : target.type);
+          if (forbiddenExternalInput.test(mapping.input) || !["string", "integer", "boolean"].includes(type ?? ""))
+            ctx.addIssue({ code: "custom", path: ["execution", "query", name], message: "External mappings require a top-level scalar input" });
+        }
   });
 const draftObject = boundedJson(65536).refine(
   (v) => !!v && typeof v === "object" && !Array.isArray(v),
@@ -200,6 +243,38 @@ export interface CommerceDefinitionCompiler {
     ) => boolean;
   };
 }
+function externalOutputSchema(execution: ExternalHttpExecution): SubsetSchema {
+  return {
+    type: "object",
+    properties: { values: execution.resultSchema },
+    required: ["values"],
+    additionalProperties: false,
+  };
+}
+function scalarSchema(schema: SubsetSchema | undefined) {
+  const type = schema && (Array.isArray(schema.type) ? schema.type[0] : schema.type);
+  return !!schema && ["string", "integer", "number", "boolean"].includes(type ?? "");
+}
+function visualPublicationCompatible(execution: ExternalHttpExecution) {
+  if (execution.responseProcessing.kind === "JAVASCRIPT") return true;
+  const processing = execution.responseProcessing;
+  const schema = execution.resultSchema;
+  if (processing.kind === "LIST") {
+    const items = schema.properties?.items;
+    if (!items || items.type !== "array" || !(schema.required ?? []).includes("items")) return false;
+    if (Object.keys(schema.properties ?? {}).some((name) => name !== "items")) return false;
+    if (items.minItems !== undefined && items.minItems > 0) return false;
+    if (items.maxItems !== undefined && items.maxItems < processing.limit) return false;
+  }
+  const output = processing.kind === "OBJECT"
+    ? schema
+    : schema.properties?.items?.items;
+  if (!output || output.type !== "object" || !output.properties || output.additionalProperties !== false) return false;
+  const fields = processing.fields;
+  if (Object.keys(output.properties).some((name) => !Object.hasOwn(fields, name) || !scalarSchema(output.properties![name]))) return false;
+  if (Object.keys(fields).some((name) => !Object.hasOwn(output.properties!, name))) return false;
+  return (output.required ?? []).every((name) => !fields[name]?.omitIfMissing);
+}
 function at(schema: SubsetSchema, path: string) {
   let current: SubsetSchema | undefined = schema;
   for (const part of path.split(".")) current = current?.properties?.[part];
@@ -210,10 +285,12 @@ export function validateDefinitionForPublication(
   compiler: CommerceDefinitionCompiler,
 ) {
   const definition = CommerceToolDefinitionSchema.parse(raw);
-  const compiled = compiler.compile(
-    definition.execution,
-    definition.inputSchema,
-  );
+  if (definition.execution.kind === "EXTERNAL_HTTP" && !visualPublicationCompatible(definition.execution))
+    throw new TypeError("External visual projection is incompatible with resultSchema");
+  const compiled =
+    definition.execution.kind === "EXTERNAL_HTTP"
+      ? { outputSchema: externalOutputSchema(definition.execution), validateMappedArguments: () => true }
+      : compiler.compile(definition.execution, definition.inputSchema);
   if (!compiled.validateMappedArguments(definition.execution))
     throw new TypeError("Invalid variable/operation mapping");
   const template = definition.responseTemplate;
@@ -248,11 +325,18 @@ export function mapToolArguments(
   const mapping =
     definition.execution.kind === "POLICY_OPERATION"
       ? definition.execution.arguments
-      : definition.execution.variables;
+      : definition.execution.kind === "SHOPIFY_STOREFRONT_QUERY"
+        ? definition.execution.variables
+        : definition.execution.query;
   const result: Record<string, unknown> = Object.create(null);
   for (const [key, m] of Object.entries(mapping)) {
     if ("literal" in m) result[key] = m.literal;
-    else if (Object.hasOwn(input, m.input)) result[key] = input[m.input];
+    else if (Object.hasOwn(input, m.input)) {
+      const value = input[m.input];
+      if (definition.execution.kind === "EXTERNAL_HTTP" && !ExternalQueryValueSchema.safeParse(value).success)
+        throw new TypeError("Invalid external mapped scalar");
+      result[key] = value;
+    }
     else if (!m.omitIfMissing) throw new TypeError("Missing mapped input");
   }
   return result;
