@@ -57,22 +57,24 @@ export function exampleManifest(
   digest: Digest,
   withTool = false,
 ): CommerceManifest {
-  const capabilities = [
-    {
-      key: "conversation_core",
-      revisionId: "core-revision",
-      position: 0,
-      promptName: "commerce/release-fixture/conversation_core/core-revision",
-      configuration: {},
-      toolDescriptors: withTool ? [structuredClone(exampleTool)] : [],
-    },
-  ];
+  const capabilities = withTool
+    ? [{
+        capabilityId: "capability-fixture",
+        key: "feature_product_read",
+        featureId: "feature-fixture",
+        position: 0,
+        toolDescriptor: structuredClone(exampleTool),
+      }]
+    : [];
   return {
     contractVersion: "commerce.v1",
     releaseId: "release-fixture",
     runnerCompatibility: "^1.0.0",
     capabilities,
-    selectedCapabilityKeys: ["conversation_core"],
+    featureBehaviours: withTool
+      ? [{ featureId: "feature-fixture", behaviourPrompt: "Synthetic Feature behavior." }]
+      : [],
+    selectedCapabilityKeys: capabilities.map((capability) => capability.key),
     grantedTools: withTool
       ? [
           {
@@ -80,7 +82,7 @@ export function exampleManifest(
             toolRevisionId: exampleTool.toolRevisionId,
             toolName: exampleTool.name,
             definitionVersion: "1.0.0",
-            capabilityKeys: ["conversation_core"],
+            capabilityKeys: ["feature_product_read"],
           },
         ]
       : [],

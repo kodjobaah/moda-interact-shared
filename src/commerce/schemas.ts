@@ -31,9 +31,8 @@ export const CommerceConversationGrantSchema = z
     releaseId: ID,
     selectedCapabilityKeys: z
       .array(ID)
-      .min(1)
       .max(32)
-      .refine((v) => distinct(v) && v.includes("conversation_core")),
+      .refine(distinct),
     grantedTools: GrantedToolsSchema,
     runnerVersion: SemverSchema,
     createdAt: DateSchema,
@@ -54,10 +53,6 @@ export const CommerceConversationGrantSchema = z
 export type CommerceConversationGrant = z.infer<
   typeof CommerceConversationGrantSchema
 >;
-export const CommerceConfigurationSchema = z.strictObject({
-  maxRecommendations: z.number().int().min(1).max(3).optional(),
-  maxSearchResults: z.number().int().min(1).max(20).optional(),
-});
 export const CommerceManifestSchema = z
   .strictObject({
     contractVersion: V,
@@ -70,17 +65,23 @@ export const CommerceManifestSchema = z
     capabilities: z
       .array(
         z.strictObject({
+          capabilityId: ID,
           key: ID,
-          revisionId: ID,
+          featureId: ID,
           position: z.number().int().nonnegative(),
-          promptName: z.string().min(1).max(512),
-          configuration: CommerceConfigurationSchema,
-          toolDescriptors: z.array(ToolDescriptorSchema).max(32),
+          toolDescriptor: ToolDescriptorSchema,
         }),
       )
-      .min(1)
       .max(32),
-    selectedCapabilityKeys: z.array(ID).min(1).max(32).refine(distinct),
+    featureBehaviours: z
+      .array(
+        z.strictObject({
+          featureId: ID,
+          behaviourPrompt: z.string().max(32000),
+        }),
+      )
+      .max(32),
+    selectedCapabilityKeys: z.array(ID).max(32).refine(distinct),
     grantedTools: GrantedToolsSchema,
     responseContract: CommerceResponseContractSchema,
     responseContractHash: HashSchema,
@@ -89,13 +90,18 @@ export const CommerceManifestSchema = z
     if (jsonBytes(v) > 262144)
       c.addIssue({ code: "custom", message: "Manifest exceeds output limit" });
     const keys = v.capabilities.map((x) => x.key);
+    const capabilityIds = v.capabilities.map((x) => x.capabilityId);
+    const representedFeatures = [...new Set(v.capabilities.map((x) => x.featureId))];
+    const behaviourFeatureIds = v.featureBehaviours.map((x) => x.featureId);
     if (
       !distinct(keys) ||
-      !keys.includes("conversation_core") ||
+      !distinct(capabilityIds) ||
       JSON.stringify(keys) !== JSON.stringify(v.selectedCapabilityKeys) ||
       v.capabilities.some(
         (x, i) => i > 0 && x.position <= v.capabilities[i - 1].position,
-      )
+      ) ||
+      !distinct(behaviourFeatureIds) ||
+      JSON.stringify(representedFeatures) !== JSON.stringify(behaviourFeatureIds)
     )
       c.addIssue({
         code: "custom",
@@ -106,33 +112,27 @@ export const CommerceManifestSchema = z
       { tool: (typeof v.grantedTools)[number]; descriptor: string }
     >();
     for (const cap of v.capabilities) {
-      if (
-        cap.promptName !==
-        `commerce/${v.releaseId}/${cap.key}/${cap.revisionId}`
-      )
-        c.addIssue({ code: "custom", message: "Prompt identity mismatch" });
-      for (const d of cap.toolDescriptors) {
-        const old = union.get(d.toolId);
-        const descriptor = canonicalJson(d);
-        if (old) {
-          if (old.descriptor !== descriptor)
-            c.addIssue({
-              code: "custom",
-              message: "Conflicting tool revisions/descriptors",
-            });
-          old.tool.capabilityKeys.push(cap.key);
-        } else
-          union.set(d.toolId, {
-            descriptor,
-            tool: {
-              toolId: d.toolId,
-              toolRevisionId: d.toolRevisionId,
-              toolName: d.name,
-              definitionVersion: d.definitionVersion,
-              capabilityKeys: [cap.key],
-            },
+      const d = cap.toolDescriptor;
+      const old = union.get(d.toolId);
+      const descriptor = canonicalJson(d);
+      if (old) {
+        if (old.descriptor !== descriptor)
+          c.addIssue({
+            code: "custom",
+            message: "Conflicting tool revisions/descriptors",
           });
-      }
+        old.tool.capabilityKeys.push(cap.key);
+      } else
+        union.set(d.toolId, {
+          descriptor,
+          tool: {
+            toolId: d.toolId,
+            toolRevisionId: d.toolRevisionId,
+            toolName: d.name,
+            definitionVersion: d.definitionVersion,
+            capabilityKeys: [cap.key],
+          },
+        });
     }
     if (
       union.size !== v.grantedTools.length ||
@@ -150,7 +150,7 @@ export const CommerceManifestSchema = z
     )
       c.addIssue({
         code: "custom",
-        message: "Grant must equal selected binding union",
+        message: "Grant must equal selected capability set",
       });
   });
 export type CommerceManifest = z.infer<typeof CommerceManifestSchema>;

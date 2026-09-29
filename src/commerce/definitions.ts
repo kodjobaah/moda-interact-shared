@@ -32,14 +32,6 @@ export const ToolNameSchema = z
   .string()
   .regex(/^[a-z][a-z0-9_]{0,127}$/)
   .refine((n) => n !== "finalResponse");
-export const ToolBindingSchema = z.strictObject({
-  toolId: IdSchema,
-  toolRevisionId: IdSchema,
-});
-export const ToolBindingsSchema = z
-  .array(ToolBindingSchema)
-  .max(32)
-  .refine((v) => distinct(v.map((x) => x.toolId)));
 export const GrantedToolSchema = z.strictObject({
   toolId: IdSchema,
   toolRevisionId: IdSchema,
@@ -345,23 +337,6 @@ export const toolHashInput = (definition: CommerceToolDefinition) => ({
   contractVersion: ContractVersionSchema.value,
   definition: CommerceToolDefinitionSchema.parse(definition),
 });
-export function capabilityHashInput(
-  promptTemplate: string,
-  configuration: unknown,
-  toolBindings: unknown,
-) {
-  if (!promptTemplate.trim() || promptTemplate.length > 32000)
-    throw new TypeError("Invalid capability prompt");
-  return {
-    contractVersion: ContractVersionSchema.value,
-    promptTemplate,
-    configuration,
-    toolBindings: ToolBindingsSchema.parse(toolBindings).sort((a, b) =>
-      a.toolId < b.toolId ? -1 : 1,
-    ),
-  };
-}
-
 /** Publication adapters supply the actual highest published version from persistence. */
 export function validateDefinitionVersion(
   proposed: string,

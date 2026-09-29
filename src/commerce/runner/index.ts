@@ -53,7 +53,6 @@ export type RunCommerceTurnInput = {
   turn: CommerceTurnIdentity;
   grant: CommerceConversationGrant;
   manifest: CommerceManifest;
-  prompts: Array<{ name: string; text: string }>;
   hostInstructions: readonly string[];
   context: unknown;
   history: readonly unknown[];
@@ -165,19 +164,15 @@ export async function runCommerceTurn(
         throw new Failure("INVALID_INPUT");
     }
     if (
-      input.prompts.length !== m.capabilities.length ||
       input.hostInstructions.some((s) => typeof s !== "string") ||
       input.history.length > 20 ||
       Array.from(canonicalJson(input.history)).length > 32000 ||
       jsonBytes(input.context) + jsonBytes(input.history) > 131072
     )
       throw new Failure("INVALID_INPUT");
-    const texts = m.capabilities.map((cap) => {
-      const p = input.prompts.filter((p) => p.name === cap.promptName);
-      if (p.length !== 1 || !p[0].text.trim() || p[0].text.length > 32000)
-        throw new Failure("INVALID_INPUT");
-      return p[0].text;
-    });
+    const texts = m.featureBehaviours
+      .map((feature) => feature.behaviourPrompt)
+      .filter((text) => text.trim().length > 0);
     const instructions = [
       ...PLATFORM_INSTRUCTIONS,
       ...input.hostInstructions,
@@ -253,7 +248,7 @@ export async function runCommerceTurn(
       for (const g of grant.grantedTools) {
         const tool = registered.get(g.toolName);
         const d = m.capabilities
-          .flatMap((c) => c.toolDescriptors)
+          .map((c) => c.toolDescriptor)
           .find((d) => d.toolId === g.toolId);
         if (!tool || !d) continue;
         if (canonicalJson(tool.descriptor) !== canonicalJson(d))
