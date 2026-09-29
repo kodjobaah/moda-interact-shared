@@ -88,10 +88,11 @@ Commerce is exposed through two explicit imports:
 
 ```ts
 import {
-  ToolBindingsSchema,
   CommerceToolDefinitionSchema,
   CommerceManifestSchema,
   CommerceConversationGrantSchema,
+  selectCapabilities,
+  deduplicateTools,
 } from "@modainteract/moda-interact-shared/commerce";
 import { runCommerceTurn, type RunnerTool } from
   "@modainteract/moda-interact-shared/commerce/runner";
@@ -101,51 +102,108 @@ import { runCommerceTurn, type RunnerTool } from
 
 | Structure / API | Meaning and owner |
 |---|---|
-| `ToolBindingSchema`, `ToolBindingsSchema` | Saved `{toolId, toolRevisionId}` associations from a behaviour to exact tool revisions. Studio/Commerce authors these; Background does not populate capability drafts. |
-| `CommerceToolDraftDefinitionSchema` | Allows structurally bounded incomplete authoring data. Passing it does not make a draft publishable. |
-| `CommerceToolDefinitionSchema` | Full tool name, version, description, input schema, execution definition and response template. Stored/executed by Commerce. |
+| `CommerceToolDraftDefinitionSchema` | Allows structurally bounded incomplete Tool-authoring data. Passing it does not make a Tool draft publishable. |
+| `CommerceToolDefinitionSchema` | Full Tool name, version, description, input schema, execution definition and response template. Stored/executed by Commerce. |
 | `validateDefinitionForPublication` | Uses a supplied `CommerceDefinitionCompiler` to check the full definition, mapped arguments and response-template paths. Commerce supplies schema-backed compilation. |
-| `ToolDescriptorSchema`, `definitionToMcpDescriptor` | Full versioned descriptor versus the MCP-facing name/description/inputSchema projection. The server-only execution definition is not exposed as model instructions. |
-| `GrantedToolSchema`, `GrantedToolsSchema` | Pinned tool identity, exact revision, name/version and originating capability keys selected for a conversation. |
-| `CommerceManifestSchema` | Resolved release, selected capabilities, descriptors, granted tools and response contract. Commerce provides it; callers validate it. |
-| `CommerceConversationGrantSchema` | Persisted conversation permission snapshot. Background stores the resolved selection and reuses it on later turns. |
+| `ToolDescriptorSchema`, `definitionToMcpDescriptor` | Full versioned Tool descriptor versus the MCP-facing name/description/inputSchema projection. The server-only execution definition is not exposed as model instructions. |
+| `CommerceManifestSchema` | Resolved immutable release contract. Each selected Capability identifies one Feature and one exact Tool descriptor; `featureBehaviours` contains one behaviour prompt for each represented Feature. Commerce provides the manifest; callers validate it. |
+| `GrantedToolSchema`, `GrantedToolsSchema` | Pinned Tool identity, exact Tool revision, name/version and sorted originating Capability keys selected for a conversation. One Tool reused by several Capabilities is emitted once with all Capability provenance. |
+| `CommerceConversationGrantSchema` | Persisted conversation permission snapshot. Background stores the resolved release, selected Capability keys and granted Tools and reuses them on later turns. Empty Capability/Tool selections are valid. |
 | `CommerceTurnIdentitySchema`, `CommerceAssertionSchema` | Turn identity and resolve/execute assertion shapes. These do not sign or verify JWT signatures; transport/authentication belongs to the services. |
-| `selectCapabilities`, `deduplicateTools` | Pure selection and tool-combination helpers over caller-supplied facts. No database or Shopify lookup. |
+| `selectCapabilities` | Pure selection over ordinary Feature Capabilities plus caller-supplied Feature eligibility facts. There is no BASE/RECOVERY_POLICY Capability kind or mandatory `conversation_core`. |
+| `deduplicateTools` | Builds the granted-Tool union from one Tool descriptor per selected Capability while retaining deterministic Capability provenance. |
 | `manifestMatchesGrant`, `currentlyGrantedTools` | Compare pinned selection and current availability. Do not replace signature, tenant, lease or persistence checks. |
-| `CommerceToolInputs`, `CommerceToolOutputs` | Named supported operation contracts; custom authored inputs still use the validated definition's schema. |
+| `CommerceToolInputs`, `CommerceToolOutputs` | Named supported operation contracts; custom authored inputs still use the validated Tool definition's schema. |
 | `CommerceBasketSchema`, `CommerceProductSchema`, `CommerceOfferSchema`, `CommerceEvidenceSchema`, `CommerceAlternativeSchema` | Bounded commerce facts/evidence exchanged between services. Parsing does not prove external facts are true or current. |
 | `CommerceToolResultSchema`, `commerceToolResultSchema` | Standard result envelope; the factory accepts a specific data schema. |
 
-A stored binding contains references, not code or model arguments:
+The direct release contract is Feature/Capability/Tool based. A selected Capability
+contains exactly one `featureId` and one exact `toolDescriptor`; Feature behaviour
+is carried separately and exactly once for each represented Feature. For example:
 
 ```ts
-const bindings = ToolBindingsSchema.parse([
-  { toolId: "tool_basket", toolRevisionId: "revision_basket_v1" },
-  { toolId: "tool_offers", toolRevisionId: "revision_offers_v2" },
-]);
+const manifest = CommerceManifestSchema.parse({
+  contractVersion: "commerce.v1",
+  releaseId: "release_123",
+  runnerCompatibility: "^1.0.0",
+  capabilities: [
+    {
+      capabilityId: "capability_product_read",
+      key: "product_read",
+      featureId: "feature_product_information",
+      position: 0,
+      toolDescriptor: {
+        toolId: "tool_product_read",
+        toolRevisionId: "tool_revision_7",
+        name: "read_product",
+        definitionVersion: "1.0.0",
+        description: "Read verified product information.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+          required: [],
+          additionalProperties: false,
+        },
+      },
+    },
+  ],
+  featureBehaviours: [
+    {
+      featureId: "feature_product_information",
+      behaviourPrompt: "Use verified product information when answering.",
+    },
+  ],
+  selectedCapabilityKeys: ["product_read"],
+  grantedTools: [
+    {
+      toolId: "tool_product_read",
+      toolRevisionId: "tool_revision_7",
+      toolName: "read_product",
+      definitionVersion: "1.0.0",
+      capabilityKeys: ["product_read"],
+    },
+  ],
+  responseContract: {
+    version: "response.v1",
+    instructions: "Write a concise reply supported by verified facts.",
+    detailsSchema: {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+  },
+  responseContractHash: "0".repeat(64),
+});
 ```
 
-These identifiers are illustrative. The list allows at most 32 entries with
-unique tool IDs; each entry is strict. Publication must additionally verify that
-the referenced revision exists, belongs to its tool and is published. Shared
-schema parsing cannot check those database relationships.
+The identifiers and hash above are illustrative. Publication/manifest assembly must
+prove that the Capability belongs to the Feature, the pinned Tool revision belongs
+to the Tool and is published, and the Feature behaviour snapshot belongs to the
+same immutable release. Shared schema parsing cannot prove those database
+relationships.
 
 The normal flow is:
 
-1. Studio saves exact bindings into a behaviour draft; Commerce publishes a fixed
-   revision and includes it in a release.
-2. Commerce resolves eligible release members using authoritative merchant facts.
-3. Background receives the manifest and persists its `grantedTools`, release and
-   selected capability keys in a conversation grant.
-4. Background checks MCP descriptors against that manifest/grant and constructs
-   runtime `RunnerTool` adapters. The model chooses a tool and supplies arguments;
+1. Commerce Studio associates an ordinary Feature Capability with one Tool; release
+   creation pins the exact published Tool revision and snapshots Feature behaviour.
+2. Commerce resolves eligible Feature Capabilities using authoritative merchant
+   facts and builds a manifest whose Capability entries are position ordered.
+3. `featureBehaviours` contains exactly one entry per represented Feature, ordered
+   by that Feature's first Capability position. Blank behaviour text is valid.
+4. Background receives the manifest and persists its `grantedTools`, release and
+   selected Capability keys in a conversation grant. Zero selected Capabilities
+   and zero granted Tools are valid.
+5. Background checks MCP descriptors against that manifest/grant and constructs
+   runtime `RunnerTool` adapters. The model chooses a Tool and supplies arguments;
    the adapter forwards execution to Commerce.
-5. Later turns reuse the original grant. A new release cannot add tools to that
+6. Later turns reuse the original grant. A new release cannot add Tools to that
    conversation; current revocation may remove execution permission.
 
 ### Turn runner integration
 
-`RunnerTool` is an in-memory adapter, distinct from the stored tool-binding schema:
+`RunnerTool` is an in-memory adapter, distinct from durable Capability/Tool
+associations:
 
 ```ts
 import type { ToolDescriptor, GrantedTool, CommerceToolResult } from
@@ -164,12 +222,13 @@ type RunnerToolShape = {
 ```
 
 Import `RunnerTool` rather than copying this explanatory shape. `runCommerceTurn`
-takes `RunCommerceTurnInput`: turn, grant, manifest, prompts, host instructions,
-trusted context, history, resolved language, abort signal and dependencies. The
-host provides `model.invoke`, `tools`, `now` and a canonical-string `digest`
-function. Optional budgets bound model steps, remote calls, deadline and output
-tokens. The model adapter returns `ModelStep` tool calls and output-token usage;
-it does not send a WhatsApp message itself.
+takes `RunCommerceTurnInput`: turn, grant, manifest, host instructions, trusted
+context, history, resolved language, abort signal and dependencies. Feature
+behaviour is consumed from `manifest.featureBehaviours`; callers do not pass a
+parallel Capability-prompt array. The host provides `model.invoke`, `tools`, `now`
+and a canonical-string `digest` function. Optional budgets bound model steps,
+remote calls, deadline and output tokens. The model adapter returns `ModelStep`
+Tool calls and output-token usage; it does not send a WhatsApp message itself.
 
 The return type is discriminated:
 
@@ -194,8 +253,8 @@ production adapter with `example*` data.
 
 `runnerVersion` describes runner compatibility independently of the npm package
 version. `PLATFORM_INSTRUCTIONS` is the runner's fixed grounding, authorization,
-language and finalization guidance. Authored capability/release text cannot expand
-permissions or override those rules.
+language and finalization guidance. Feature behaviour, response guidance and other
+authored release text cannot expand permissions or override those rules.
 
 ### Response contracts and final responses
 
@@ -211,7 +270,7 @@ JSON Schema keywords are accepted; `validateSubset`, `matchesSubset` and
 `detectedLanguageConfidence`, `evidenceIds` and `details`.
 `finalResponseSchema(definition)` additionally validates the selected release's
 details schema. `finalResponseToolSchema(definition)` produces the host-local
-finalization tool's input schema. `verifyResponseContract` checks the definition
+finalization Tool's input schema. `verifyResponseContract` checks the definition
 against its hash using the caller's digest implementation.
 
 An ANSWER requires null referral reason; a REFER_TO_STORE response requires the
@@ -219,17 +278,16 @@ appropriate reason, empty evidence IDs and empty details. Language detection
 fields are either both null or a valid pair. Only reply text is customer-facing;
 structured details never authorize actions or replace delivery/routing decisions.
 
-Use `canonicalJson`, `responseContractCanonicalJson`, `toolHashInput` and
-`capabilityHashInput` for their specific canonicalization/hashing boundaries.
-Do not hash arbitrary object serialization in place of these helpers.
-`mapToolArguments` maps validated authored inputs/fixed values; it does not call
-Shopify. `POLICY_OPERATIONS` and `POLICY_OPERATION_DESCRIPTORS` describe supported
-operation identities; actual provider implementations remain in Commerce.
+Use `canonicalJson`, `responseContractCanonicalJson` and `toolHashInput` for their
+specific canonicalization/hashing boundaries. Do not hash arbitrary object
+serialization in place of these helpers. `mapToolArguments` maps validated authored
+inputs/fixed values; it does not call Shopify. `POLICY_OPERATIONS` and
+`POLICY_OPERATION_DESCRIPTORS` describe supported operation identities; actual
+provider implementations remain in Commerce.
 
 `exampleTool`, `exampleDefinition`, `exampleTurn`, `exampleManifest`,
 `exampleGrant` and `exampleFinal` are synthetic fixtures for examples and tests,
 not seeds for a merchant's production configuration.
-
 
 ## What this package owns
 
@@ -2036,7 +2094,7 @@ Type-only exports:
 </details>
 
 <details>
-<summary>/commerce — 97 exports</summary>
+<summary>/commerce — 130 exports</summary>
 
 Import: `@modainteract/moda-interact-shared/commerce`.
 
@@ -2052,143 +2110,192 @@ Type-only exports:
 
 - `Digest`
 
+
 From [src/commerce/definitions.ts](src/commerce/definitions.ts):
 
 Runtime exports:
 
-- `capabilityHashInput`
-- `CommerceExecutionSchema`
-- `CommerceToolDefinitionSchema`
-- `CommerceToolDraftDefinitionSchema`
-- `CommerceToolIdentitySchema`
-- `CommerceToolRevisionIdentitySchema`
-- `definitionToMcpDescriptor`
+- `ToolNameSchema`
 - `GrantedToolSchema`
 - `GrantedToolsSchema`
-- `mapToolArguments`
-- `POLICY_OPERATION_DESCRIPTORS`
-- `POLICY_OPERATIONS`
-- `ResponseTemplateSchema`
-- `ToolBindingSchema`
-- `ToolBindingsSchema`
 - `ToolDescriptorSchema`
-- `toolHashInput`
-- `ToolNameSchema`
+- `POLICY_OPERATIONS`
+- `ExternalHttpExecutionSchema`
+- `CommerceExecutionSchema`
+- `ResponseTemplateSchema`
+- `CommerceToolDefinitionSchema`
+- `CommerceToolDraftDefinitionSchema`
 - `validateDefinitionForPublication`
+- `definitionToMcpDescriptor`
+- `mapToolArguments`
+- `toolHashInput`
 - `validateDefinitionVersion`
+- `CommerceToolIdentitySchema`
+- `CommerceToolRevisionIdentitySchema`
+- `POLICY_OPERATION_DESCRIPTORS`
 
 Type-only exports:
 
-- `CommerceDefinitionCompiler`
+- `ExternalHttpExecution`
 - `CommerceToolDefinition`
 - `CommerceToolDraftDefinition`
 - `GrantedTool`
 - `ToolDescriptor`
+- `CommerceDefinitionCompiler`
+
+
+From [src/commerce/external.ts](src/commerce/external.ts):
+
+Runtime exports:
+
+- `ExternalQueryValueSchema`
+- `ExternalQueryMappingSchema`
+- `ExternalQueryMappingsSchema`
+- `ExternalPathSchema`
+- `ExternalResponseFormatSchema`
+- `FieldProjectionSchema`
+- `ResponseFilterSchema`
+- `VisualResponseProcessingSchema`
+- `ResponseProcessingSchema`
+- `TransformResponseSchema`
+- `TransformSampleSchema`
+- `ExternalHttpResultDataSchema`
+- `ConnectionRevisionViewSchema`
+- `ConnectionViewSchema`
+- `CredentialStatusSchema`
+- `ConnectionCommandSchema`
+- `RevisionInputSchema`
+- `ConnectionIssueSchema`
+- `ConnectionResultSchema`
+
+Type-only exports:
+
+- `ExternalResponseFormat`
+- `FieldProjection`
+- `ResponseFilter`
+- `VisualResponseProcessing`
+- `ResponseProcessing`
+- `TransformResponse`
+- `TransformSample`
+- `ExternalHttpResultData`
+- `ConnectionRevisionView`
+- `ConnectionView`
+- `CredentialStatus`
+- `ConnectionCommand`
+- `RevisionInput`
+- `ConnectionResult`
+- `VisualResponseProcessorInput`
+- `VisualResponseProcessorResult`
+- `CodeResponseProcessorInput`
+- `CodeResponseProcessorResult`
+
 
 From [src/commerce/fixtures.ts](src/commerce/fixtures.ts):
 
 Runtime exports:
 
-- `exampleDefinition`
-- `exampleFinal`
-- `exampleGrant`
-- `exampleManifest`
 - `exampleTool`
+- `exampleDefinition`
 - `exampleTurn`
+- `exampleManifest`
+- `exampleGrant`
+- `exampleFinal`
+
 
 From [src/commerce/primitives.ts](src/commerce/primitives.ts):
 
 Runtime exports:
 
-- `boundedJson`
 - `ContractVersionSchema`
-- `CurrencySchema`
-- `DateSchema`
-- `distinct`
-- `HashSchema`
 - `IdSchema`
-- `LanguageSchema`
-- `MoneySchema`
 - `SemverSchema`
+- `HashSchema`
+- `DateSchema`
+- `MoneySchema`
+- `CurrencySchema`
+- `LanguageSchema`
+- `distinct`
+- `boundedJson`
+
 
 From [src/commerce/response.ts](src/commerce/response.ts):
 
 Runtime exports:
 
-- `CommerceFinalResponseSchema`
 - `CommerceResponseContractSchema`
 - `EMPTY_RESPONSE_CONTRACT`
-- `finalResponseSchema`
-- `finalResponseToolSchema`
 - `ReferralReasonSchema`
+- `CommerceFinalResponseSchema`
+- `finalResponseSchema`
 - `verifyResponseContract`
+- `finalResponseToolSchema`
 
 Type-only exports:
 
-- `CommerceFinalResponse`
 - `CommerceResponseContract`
+- `CommerceFinalResponse`
+
 
 From [src/commerce/schemas.ts](src/commerce/schemas.ts):
 
 Runtime exports:
 
-- `CommerceAlternativeSchema`
-- `CommerceAssertionSchema`
-- `CommerceBasketSchema`
-- `CommerceConfigurationSchema`
+- `CommerceTurnIdentitySchema`
 - `CommerceConversationGrantSchema`
-- `CommerceErrorCodeSchema`
-- `CommerceEvidenceSchema`
-- `CommerceExecuteAssertionSchema`
 - `CommerceManifestSchema`
-- `CommerceOfferSchema`
-- `CommerceProductSchema`
-- `CommerceProposalSchema`
 - `CommerceReleaseIdentitySchema`
 - `CommerceResolveAssertionSchema`
-- `CommerceToolInputs`
-- `CommerceToolOutputs`
+- `CommerceExecuteAssertionSchema`
+- `CommerceAssertionSchema`
+- `CommerceProposalSchema`
+- `CommerceBasketSchema`
+- `CommerceProductSchema`
+- `CommerceOfferSchema`
+- `CommerceEvidenceSchema`
+- `CommerceAlternativeSchema`
+- `CommerceErrorCodeSchema`
 - `commerceToolResultSchema`
 - `CommerceToolResultSchema`
-- `CommerceTurnIdentitySchema`
+- `CommerceToolInputs`
+- `CommerceToolOutputs`
 - `productBelongsToDomain`
 
 Type-only exports:
 
-- `CommerceConversationGrant`
-- `CommerceEvidence`
-- `CommerceManifest`
-- `CommerceToolResult`
 - `CommerceTurnIdentity`
+- `CommerceConversationGrant`
+- `CommerceManifest`
+- `CommerceEvidence`
+- `CommerceToolResult`
+
 
 From [src/commerce/selection.ts](src/commerce/selection.ts):
 
 Runtime exports:
 
-- `CommerceCapabilityBindingSchema`
-- `currentlyGrantedTools`
+- `selectCapabilities`
 - `deduplicateTools`
 - `manifestMatchesGrant`
 - `parseCommerceManifest`
-- `selectCapabilities`
+- `currentlyGrantedTools`
 
 Type-only exports:
 
-- `CommerceCapabilityBinding`
 - `FeatureFacts`
+
 
 From [src/commerce/subset.ts](src/commerce/subset.ts):
 
 Runtime exports:
 
-- `compileSubset`
-- `DetailsSchemaSchema`
-- `InputSchemaSchema`
-- `matchesSubset`
 - `MONEY_PATTERN`
 - `safeName`
 - `safePath`
 - `validateSubset`
+- `InputSchemaSchema`
+- `DetailsSchemaSchema`
+- `matchesSubset`
+- `compileSubset`
 
 Type-only exports:
 

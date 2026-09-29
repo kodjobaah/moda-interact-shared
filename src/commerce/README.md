@@ -64,15 +64,20 @@ C4 hashes use `canonicalJson` (Unicode code-point key order). C16 specifically
 requires RFC8785: use `responseContractCanonicalJson` (UTF-16 key order). Both
 reject undefined/nonfinite/cyclic/non-JSON values and invalid Unicode. Server
 adapters inject SHA-256 via `Digest`; there is no hashing provider or Node-only
-crypto import in the contract entry point. Capability and tool hash-input helpers
-select the exact canonical fields. Schema-backed basket/rule adapters must include
-all semantic fields/currency and exclude observation timestamps before hashing.
+crypto import in the contract entry point. The Tool hash-input helper selects the
+exact canonical Tool fields. Feature behaviour and Capability-to-Tool release
+composition are represented directly in
+the immutable manifest rather than by a Capability hash helper. Schema-backed
+basket/rule adapters must include all semantic fields/currency and exclude
+observation timestamps before hashing.
 
 ## Runner adapter contract
 
-`runCommerceTurn` receives validated original turn/grant/manifest, pinned prompts,
-trusted host instructions/context, bounded history, language metadata, AbortSignal,
-clock, digest and injected model/tool adapters. Model output is `{calls,outputTokens}`;
+`runCommerceTurn` receives validated original turn/grant/manifest, trusted host
+instructions/context, bounded history, language metadata, AbortSignal, clock,
+digest and injected model/tool adapters. Feature behaviour is read from the
+manifest and applied once per represented Feature; there is no parallel
+Capability-prompt input. Model output is `{calls,outputTokens}`;
 report the actual provider output-token count. The model receives maxOutputTokens
 and the runner checks the reported count. Adapters must honor cancellation, propagate
 signals to provider I/O and must not hide retries. Late results cannot complete a turn.
@@ -88,7 +93,8 @@ Background owns actual pre-delivery revalidation and must include those reserved
 calls in the same ten-call budget. A recomputed hash alone grants no authority.
 
 The runner passes platform instructions first, then host recovery instructions,
-then pinned response guidance, then pinned capability prompts in membership order.
+then pinned response guidance, then non-blank Feature behaviour prompts in manifest
+Feature order.
 Context/history/tool results remain separate data. Host recovery-state and fallback
 language policy remain in Background. Explicit language preferences mechanically
 require null detection metadata; other natural-language grounding/language choices
