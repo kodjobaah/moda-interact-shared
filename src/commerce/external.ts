@@ -78,7 +78,7 @@ export type ConnectionResult<T> =
   | { kind: "not-found" | "forbidden" | "unavailable" }
   | { kind: "invalid"; issues: Array<z.infer<typeof ConnectionIssueSchema>> }
   | { kind: "conflict"; code: "STALE_CAS" | "CONFLICTING_REPLAY" };
-export type VisualResponseProcessorInput = { source: unknown; processing: VisualResponseProcessing; limits: { maxSearchResults: number; deadlineAt: number }; signal: AbortSignal };
+export type VisualResponseProcessorInput = { source: unknown; processing: VisualResponseProcessing; limits: { maxResults: number; deadlineAt: number }; signal: AbortSignal };
 export type VisualResponseProcessorResult = { ok: true; values: Record<string, unknown> } | { ok: false; code: "INVALID_RESPONSE" | "DEADLINE" | "CANCELLED" };
-export type CodeResponseProcessorInput = { response: TransformResponse; processing: Extract<ResponseProcessing, { kind: "JAVASCRIPT" }>; limits: { maxSearchResults: number; deadlineAt: number }; signal: AbortSignal };
+export type CodeResponseProcessorInput = { response: TransformResponse; processing: Extract<ResponseProcessing, { kind: "JAVASCRIPT" }>; limits: { maxResults: number; deadlineAt: number }; signal: AbortSignal };
 export type CodeResponseProcessorResult = { ok: true; values: Record<string, unknown> } | { ok: false; code: "INVALID_RESPONSE" | "DEADLINE" | "CANCELLED" | "THROTTLED"; diagnostic?: { code: "SYNTAX_ERROR" | "EXECUTION_ERROR" | "INVALID_OUTPUT" | "RESOURCE_LIMIT" | "RUNTIME_UNAVAILABLE"; line: number | null; column: number | null } };

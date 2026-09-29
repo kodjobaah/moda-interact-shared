@@ -21,6 +21,7 @@ import {
 import { canonicalJson, responseContractCanonicalJson } from "./canonical-json";
 import {
   CommerceManifestSchema,
+  CommerceConversationGrantSchema,
   CommerceTurnIdentitySchema,
   CommerceAssertionSchema,
   CommerceToolInputs,
@@ -266,109 +267,87 @@ test("template publication binds result paths to the injected compiler output; n
       responseTemplate: { kind: "text", text, unavailable: "" },
     });
 });
-test("dynamic feature selection preserves plan/opt-in policy and offers without paid gating", () => {
-  const base = {
-    binding: { kind: "BASE" as const, key: "conversation_core" as const },
+test("direct Feature selection preserves plan/opt-in policy and permits no selected capabilities", () => {
+  const fresh = {
+    key: "feature_product_read",
+    featureId: "new-feature",
     enabled: true,
     position: 0,
   };
-  const fresh = {
-    binding: {
-      kind: "FEATURE" as const,
-      key: "never_created_before",
-      featureId: "new-feature",
-    },
-    enabled: true,
-    position: 1,
+  const featureFacts = {
+    features: [{
+      id: "new-feature",
+      active: true,
+      planMappingEnabled: true,
+      mode: "MERCHANT_OPT_IN" as const,
+      preferenceEnabled: true,
+    }],
   };
-  const discount = {
-    binding: {
-      kind: "RECOVERY_POLICY" as const,
-      key: "discount_assistance" as const,
-    },
-    enabled: true,
-    position: 2,
-  };
-  for (const offerMode of ["NONE", "FIXED", "AI_BEST_APPLICABLE"] as const) {
-    const selected = selectCapabilities([discount, fresh, base], {
-      features: [
-        {
-          id: "new-feature",
-          active: true,
-          planMappingEnabled: true,
-          mode: "MERCHANT_OPT_IN",
-          preferenceEnabled: true,
-        },
-      ],
-      offerMode,
-    });
-    assert.deepEqual(
-      selected,
-      offerMode === "NONE"
-        ? ["conversation_core", "never_created_before"]
-        : ["conversation_core", "never_created_before", "discount_assistance"],
-    );
-  }
+  assert.deepEqual(selectCapabilities([fresh], featureFacts), ["feature_product_read"]);
+  assert.deepEqual(selectCapabilities([{ ...fresh, enabled: false }], { features: [] }), []);
+  assert.deepEqual(selectCapabilities([], { features: [] }), []);
   assert.deepEqual(
-    selectCapabilities([base, fresh], {
-      features: [
-        {
-          id: "new-feature",
-          active: true,
-          planMappingEnabled: false,
-          mode: "ALWAYS_ENABLED",
-          preferenceEnabled: true,
-        },
-      ],
-      offerMode: null,
+    selectCapabilities([fresh], {
+      features: [{ ...featureFacts.features[0], active: false }],
     }),
-    ["conversation_core"],
+    [],
   );
   assert.deepEqual(
-    selectCapabilities([base, fresh], {
-      features: [
-        {
-          id: "new-feature",
-          active: true,
-          planMappingEnabled: true,
-          mode: "MERCHANT_OPT_IN",
-          preferenceEnabled: null,
-        },
-      ],
-      offerMode: null,
+    selectCapabilities([fresh], {
+      features: [{ ...featureFacts.features[0], planMappingEnabled: false }],
     }),
-    ["conversation_core"],
+    [],
   );
-  assert.throws(() =>
-    selectCapabilities([{ ...base, enabled: false }], {
-      features: [],
-      offerMode: null,
+  assert.deepEqual(
+    selectCapabilities([fresh], {
+      features: [{ ...featureFacts.features[0], preferenceEnabled: null }],
     }),
+    [],
   );
+  assert.throws(() => selectCapabilities([fresh, fresh], featureFacts));
 });
-test("shared revision deduplicates provenance and conflicting associations reject; grants never widen", () => {
+test("direct Tool descriptors deduplicate provenance and conflicting associations reject; grants never widen", () => {
   const tools = deduplicateTools([
-    { key: "z_feature", toolDescriptors: [exampleTool] },
-    { key: "a_feature", toolDescriptors: [exampleTool] },
+    { key: "z_feature", toolDescriptor: exampleTool },
+    { key: "a_feature", toolDescriptor: exampleTool },
   ]);
   assert.equal(tools.length, 1);
   assert.deepEqual(tools[0].capabilityKeys, ["a_feature", "z_feature"]);
   assert.throws(() =>
     deduplicateTools([
-      { key: "a", toolDescriptors: [exampleTool] },
+      { key: "a", toolDescriptor: exampleTool },
       {
         key: "b",
-        toolDescriptors: [{ ...exampleTool, toolRevisionId: "different" }],
+        toolDescriptor: { ...exampleTool, toolRevisionId: "different" },
       },
     ]),
   );
   const m = exampleManifest(digest, true);
   ok(CommerceManifestSchema, m);
+  const emptyManifest = {
+    ...m,
+    capabilities: [],
+    featureBehaviours: [],
+    selectedCapabilityKeys: [],
+    grantedTools: [],
+  };
+  ok(CommerceManifestSchema, emptyManifest);
   const g = exampleGrant(m);
+  const emptyGrant = {
+    ...exampleGrant(emptyManifest),
+    selectedCapabilityKeys: [],
+    grantedTools: [],
+  };
+  ok(CommerceConversationGrantSchema, emptyGrant);
+  bad(CommerceManifestSchema, { ...m, featureBehaviours: [] });
+  bad(CommerceManifestSchema, {
+    ...m,
+    featureBehaviours: [{ featureId: "unrepresented", behaviourPrompt: "" }],
+  });
   assert.equal(
     currentlyGrantedTools(
       g,
-      new Set(["new_feature"]),
+      new Set(["another_capability"]),
       new Set([exampleTool.toolId]),
     ).length,
     0,
@@ -376,7 +355,7 @@ test("shared revision deduplicates provenance and conflicting associations rejec
   assert.equal(
     currentlyGrantedTools(
       g,
-      new Set(["conversation_core"]),
+      new Set(["feature_product_read"]),
       new Set([exampleTool.toolId]),
     ).length,
     1,
