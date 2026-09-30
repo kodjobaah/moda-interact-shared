@@ -11,6 +11,9 @@ import {
   normalizeCurrencyCode,
   normalizeTimeZone,
   createInternationalizationRuntime,
+  MODA_SUPPORTED_LANGUAGE_TAGS,
+  ModaSupportedLanguageTagSchema,
+  resolveModaConfigurationLocale,
   resolveLocaleDirection,
   validateIcuCatalogue,
   TimeZoneIdSchema,
@@ -21,6 +24,45 @@ test("canonicalises valid BCP-47 language tags without an application allowlist"
   assert.equal(canonicaliseLanguageTag("ar"), "ar");
   assert.equal(canonicaliseLanguageTag("zh-Hant-TW"), "zh-Hant-TW");
   assert.throws(() => canonicaliseLanguageTag("not a language"));
+});
+
+test("resolves only supported Moda configuration locales", () => {
+  assert.deepEqual(
+    MODA_SUPPORTED_LANGUAGE_TAGS.map((tag) => resolveModaConfigurationLocale(tag)),
+    [...MODA_SUPPORTED_LANGUAGE_TAGS],
+  );
+  for (const tag of MODA_SUPPORTED_LANGUAGE_TAGS) {
+    assert.equal(ModaSupportedLanguageTagSchema.parse(tag), tag);
+  }
+
+  const cases: Array<[string | null | undefined, string]> = [
+    ["PT-br", "pt-BR"],
+    ["en-GB", "en"],
+    ["fr-CA", "fr"],
+    ["de-CH", "de"],
+    ["pt-BR", "pt-BR"],
+    ["pt-PT", "pt-PT"],
+    ["pt", "en"],
+    ["pt-AO", "en"],
+    ["zh-Hans", "zh-Hans"],
+    ["zh-Hant", "zh-Hant"],
+    ["zh-CN", "zh-Hans"],
+    ["zh-SG", "zh-Hans"],
+    ["zh-TW", "zh-Hant"],
+    ["zh-HK", "zh-Hant"],
+    ["zh-MO", "zh-Hant"],
+    ["zh", "en"],
+    [null, "en"],
+    [undefined, "en"],
+    ["", "en"],
+    ["   ", "en"],
+    ["not a language", "en"],
+    ["ar", "en"],
+  ];
+
+  for (const [input, expected] of cases) {
+    assert.equal(resolveModaConfigurationLocale(input), expected, String(input));
+  }
 });
 
 test("normalises independent country and currency standards", () => {
