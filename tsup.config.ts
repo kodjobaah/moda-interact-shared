@@ -6,6 +6,8 @@ export default defineConfig({
     "commerce/index": "src/commerce/index.ts",
     "commerce/runner/index": "src/commerce/runner/index.ts",
     internationalization: "src/internationalization.ts",
+    "merchant-knowledge": "src/merchant-knowledge.ts",
+    "merchant-knowledge/node": "src/merchant-knowledge.node.ts",
     billing: "src/billing.ts",
     "recovery-policy": "src/recovery-policy.ts",
     whatsapp: "src/whatsapp.ts",

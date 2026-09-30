@@ -79,6 +79,14 @@
     "./commerce/runner": {
       "types": "./dist/commerce/runner/index.d.ts",
       "import": "./dist/commerce/runner/index.js"
+    },
+    "./merchant-knowledge": {
+      "types": "./dist/merchant-knowledge.d.ts",
+      "import": "./dist/merchant-knowledge.js"
+    },
+    "./merchant-knowledge/node": {
+      "types": "./dist/merchant-knowledge/node.d.ts",
+      "import": "./dist/merchant-knowledge/node.js"
     }
   },
   "files": [
@@ -96,7 +104,8 @@
     "validate:testing-node": "npm run build && node scripts/validate-testing-node.mjs",
     "validate:testing-node-live": "npm run build && node scripts/validate-testing-node-live.mjs",
     "prepack": "npm run build",
-    "validate:commerce-entrypoints": "node scripts/validate-commerce-entrypoints.mjs"
+    "validate:commerce-entrypoints": "node scripts/validate-commerce-entrypoints.mjs",
+    "validate:arch023-shared-entrypoints": "npm run build && node scripts/validate-arch023-shared-entrypoints.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",

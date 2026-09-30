@@ -35,6 +35,75 @@ export function canonicaliseLanguageTag(value: string): string {
   }
 }
 
+export const MODA_SUPPORTED_LANGUAGE_TAGS = [
+  "zh-Hans",
+  "zh-Hant",
+  "cs",
+  "da",
+  "nl",
+  "en",
+  "fi",
+  "fr",
+  "de",
+  "it",
+  "ja",
+  "ko",
+  "nb",
+  "pl",
+  "pt-BR",
+  "pt-PT",
+  "es",
+  "sv",
+  "th",
+  "tr",
+] as const;
+
+export const ModaSupportedLanguageTagSchema = z.enum(
+  MODA_SUPPORTED_LANGUAGE_TAGS,
+);
+
+export type ModaSupportedLanguageTag =
+  z.infer<typeof ModaSupportedLanguageTagSchema>;
+
+export function resolveModaConfigurationLocale(
+  input: string | null | undefined,
+): ModaSupportedLanguageTag {
+  if (input == null || !input.trim()) return "en";
+
+  let canonicalTag: string;
+  try {
+    canonicalTag = canonicaliseLanguageTag(input);
+  } catch {
+    return "en";
+  }
+
+  if (ModaSupportedLanguageTagSchema.safeParse(canonicalTag).success) {
+    return canonicalTag as ModaSupportedLanguageTag;
+  }
+
+  const locale = new Intl.Locale(canonicalTag);
+  if (locale.language === "pt") {
+    if (locale.region === "BR") return "pt-BR";
+    if (locale.region === "PT") return "pt-PT";
+    return "en";
+  }
+
+  if (locale.language === "zh") {
+    if (locale.script === "Hans") return "zh-Hans";
+    if (locale.script === "Hant") return "zh-Hant";
+    if (locale.region === "CN" || locale.region === "SG") return "zh-Hans";
+    if (["TW", "HK", "MO"].includes(locale.region ?? "")) return "zh-Hant";
+    return "en";
+  }
+
+  const primaryLanguageMatches = MODA_SUPPORTED_LANGUAGE_TAGS.filter(
+    (tag) => tag.split("-")[0] === locale.language,
+  );
+  return primaryLanguageMatches.length === 1
+    ? primaryLanguageMatches[0]
+    : "en";
+}
+
 export function normalizeCountryCode(value: string): string {
   if (typeof value !== "string") throw invalidValue("ISO 3166-1 alpha-2 country code", value);
   const code = value.trim().toUpperCase();
