@@ -48,7 +48,7 @@ export async function executeToolCalls(input: {
       });
       runtimeMessages.push({
         tool: call.name,
-        result: { status: "ERROR", code: "DENIED", retryable: false },
+        result: { contractVersion: "commerce.v1", status: "ERROR", code: "DENIED", retryable: false },
       });
       continue;
     }
@@ -62,7 +62,7 @@ export async function executeToolCalls(input: {
       });
       runtimeMessages.push({
         tool: call.name,
-        result: { status: "ERROR", code: "DENIED", retryable: false },
+        result: { contractVersion: "commerce.v1", status: "ERROR", code: "DENIED", retryable: false },
       });
       continue;
     }

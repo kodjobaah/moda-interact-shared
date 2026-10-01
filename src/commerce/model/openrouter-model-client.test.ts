@@ -131,6 +131,11 @@ test("caller AbortSignal reaches LangChain and a pre-aborted call does not invok
 
 test("invalid history, malformed outputs and provider errors fail with bounded text", async () => {
   const invalid = { ...request, history: [{ role: "user", content: "x".repeat(16001) }] };
+  const malformedToolResult = {
+    ...request,
+    messages: [{ tool: "refundOrder", result: { status: "ERROR", code: "DENIED", retryable: false } }],
+  };
+  await assert.rejects(harness().invoke(malformedToolResult, new AbortController().signal), { message: "Commerce model unavailable" });
   const malformed = harness({ tool_calls: [{ name: "bad", args: [] }], usage_metadata: { output_tokens: 1 } });
   await assert.rejects(malformed.invoke(invalid, new AbortController().signal), { message: "Commerce model unavailable" });
   await assert.rejects(malformed.invoke(request, new AbortController().signal), { message: "Commerce model unavailable" });
