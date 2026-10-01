@@ -44,6 +44,8 @@ necessarily a supported package subpath. Type-only exports require `import type`
 | `/testing/node` | Node-only disposable PostgreSQL/Redis test infrastructure and command helpers; not application startup or production provisioning. |
 | `/commerce` | Commerce schemas, definitions, selection helpers, response validation, canonical hashing inputs and synthetic examples. |
 | `/commerce/runner` | Dependency-injected Commerce turn runner and model/tool adapter types. |
+| `/commerce/model` | Runtime-safe model catalogue, selection, OpenRouter configuration and credential AAD contracts. |
+| `/commerce/model/node` | Node-only OpenRouter chat-model adapter for the Commerce runner. |
 
 The root entry does **not** re-export WhatsApp, Commerce, the runner, logging,
 observability or Node helpers. Do not replace a documented subpath import with a
@@ -255,6 +257,22 @@ production adapter with `example*` data.
 version. `PLATFORM_INSTRUCTIONS` is the runner's fixed grounding, authorization,
 language and finalization guidance. Feature behaviour, response guidance and other
 authored release text cannot expand permissions or override those rules.
+
+### Model catalogue and OpenRouter adapter
+
+Use `/commerce/model` for the environment, availability, catalogue, selection,
+extensible OpenRouter configuration, resolved-model and credential AAD contracts.
+The configuration schema bounds ordinary JSON and blocks runtime-owned fields;
+unknown non-reserved OpenRouter options remain available for forward-compatible
+provider features. `createCommerceOpenRouterCredentialAad` returns the canonical
+string that each service UTF-8 encodes for its own encrypted-credential handling.
+
+Server-side Commerce and Background adapters may use `/commerce/model/node` to
+bridge a resolved model and runtime credential to the existing
+`CommerceModelInvoker`. This adapter does not resolve model assignments, store or
+decrypt credentials, execute remote Tools, or own the Commerce turn loop. The
+runner remains the authority for Tool visibility, authorization, retries and
+final-response validation.
 
 ### Response contracts and final responses
 

@@ -5,6 +5,8 @@ export default defineConfig({
     index: "src/index.ts",
     "commerce/index": "src/commerce/index.ts",
     "commerce/runner/index": "src/commerce/runner/index.ts",
+    "commerce/model/index": "src/commerce/model/index.ts",
+    "commerce/model/node": "src/commerce/model/node.ts",
     internationalization: "src/internationalization.ts",
     "merchant-knowledge": "src/merchant-knowledge.ts",
     "merchant-knowledge/node": "src/merchant-knowledge.node.ts",
