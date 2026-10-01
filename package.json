@@ -80,6 +80,14 @@
       "types": "./dist/commerce/runner/index.d.ts",
       "import": "./dist/commerce/runner/index.js"
     },
+    "./commerce/model": {
+      "types": "./dist/commerce/model/index.d.ts",
+      "import": "./dist/commerce/model/index.js"
+    },
+    "./commerce/model/node": {
+      "types": "./dist/commerce/model/node.d.ts",
+      "import": "./dist/commerce/model/node.js"
+    },
     "./merchant-knowledge": {
       "types": "./dist/merchant-knowledge.d.ts",
       "import": "./dist/merchant-knowledge.js"
@@ -105,7 +113,8 @@
     "validate:testing-node-live": "npm run build && node scripts/validate-testing-node-live.mjs",
     "prepack": "npm run build",
     "validate:commerce-entrypoints": "node scripts/validate-commerce-entrypoints.mjs",
-    "validate:arch023-shared-entrypoints": "npm run build && node scripts/validate-arch023-shared-entrypoints.mjs"
+    "validate:arch023-shared-entrypoints": "npm run build && node scripts/validate-arch023-shared-entrypoints.mjs",
+    "validate:arch024-model-entrypoints": "npm run build && node scripts/validate-arch024-model-entrypoints.mjs"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
@@ -127,7 +136,10 @@
     "semver": "7.8.5",
     "winston": "3.19.0",
     "winston-loki": "6.1.7",
-    "zod": "^4.0.0"
+    "zod": "^4.0.0",
+    "@langchain/openrouter": "0.4.15",
+    "@langchain/core": "1.2.13",
+    "@langchain/langgraph": "1.4.15"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
@@ -137,5 +149,8 @@
     "tsup": "^8.0.0",
     "tsx": "^4.23.12",
     "typescript": "^5.0.0"
+  },
+  "overrides": {
+    "@langchain/core": "1.2.13"
   }
 }
