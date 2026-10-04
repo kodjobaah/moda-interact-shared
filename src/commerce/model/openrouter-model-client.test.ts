@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { OpenRouterError } from "@langchain/openrouter";
+
 import type { ModelRequest } from "../runner/index.js";
 import { createOpenRouterInvoker } from "./openrouter-model-client.internal.js";
 
@@ -150,4 +152,45 @@ test("invalid history, malformed outputs and provider errors fail with bounded t
     configuration: {}, credential: "credential-secret",
   }, () => ({ bindTools: () => ({ invoke: async () => { throw new Error("credential-secret full provider body"); } }) }));
   await assert.rejects(throws.invoke(request, new AbortController().signal), { message: "Commerce model unavailable" });
+});
+
+test("diagnostics distinguish request, provider HTTP and provider response failures without exposing bodies", async () => {
+  const diagnostics: unknown[] = [];
+  const invalidRequest = createOpenRouterInvoker({
+    provider: "openai", providerModelId: "gpt-test", configurationSchemaVersion: 1,
+    configuration: {}, credential: "credential-secret", onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+  }, () => ({ bindTools: () => ({ invoke: async () => ({ tool_calls: [], usage_metadata: { output_tokens: 1 } }) }) }));
+  await assert.rejects(
+    invalidRequest.invoke({ ...request, history: [{ role: "user", content: "x".repeat(16001) }] }, new AbortController().signal),
+    { message: "Commerce model unavailable" },
+  );
+  assert.deepEqual(diagnostics.shift(), { stage: "request", reason: "REQUEST_INVALID" });
+
+  const authError = await OpenRouterError.fromResponse(new Response(
+    JSON.stringify({ error: { message: "secret provider body", code: 401 } }),
+    { status: 401, headers: { "content-type": "application/json" } },
+  ));
+  const providerFailure = createOpenRouterInvoker({
+    provider: "openai", providerModelId: "gpt-test", configurationSchemaVersion: 1,
+    configuration: {}, credential: "credential-secret", onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+  }, () => ({ bindTools: () => ({ invoke: async () => { throw authError; } }) }));
+  await assert.rejects(providerFailure.invoke(request, new AbortController().signal), { message: "Commerce model unavailable" });
+  assert.deepEqual(diagnostics.shift(), {
+    stage: "provider", reason: "PROVIDER_AUTH_FAILED", statusCode: 401, providerCode: 401,
+  });
+
+  const badResponse = createOpenRouterInvoker({
+    provider: "openai", providerModelId: "gpt-test", configurationSchemaVersion: 1,
+    configuration: {}, credential: "credential-secret", onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+  }, () => ({ bindTools: () => ({ invoke: async () => ({ tool_calls: [], usage_metadata: {} }) }) }));
+  await assert.rejects(badResponse.invoke(request, new AbortController().signal), { message: "Commerce model unavailable" });
+  assert.deepEqual(diagnostics.shift(), { stage: "response", reason: "PROVIDER_RESPONSE_INVALID" });
+});
+
+test("diagnostic callback failure never changes bounded model failure semantics", async () => {
+  const invoker = createOpenRouterInvoker({
+    provider: "openai", providerModelId: "gpt-test", configurationSchemaVersion: 1,
+    configuration: {}, credential: "credential-secret", onDiagnostic: () => { throw new Error("diagnostic sink failed"); },
+  }, () => ({ bindTools: () => ({ invoke: async () => { throw new Error("provider details"); } }) }));
+  await assert.rejects(invoker.invoke(request, new AbortController().signal), { message: "Commerce model unavailable" });
 });

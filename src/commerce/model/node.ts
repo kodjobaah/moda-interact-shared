@@ -4,7 +4,12 @@ import {
   type OpenRouterModelClientOptions,
 } from "./openrouter-model-client.internal.js";
 
-export type { OpenRouterModelClientOptions } from "./openrouter-model-client.internal.js";
+export type {
+  OpenRouterModelClientOptions,
+  OpenRouterModelDiagnostic,
+  OpenRouterModelDiagnosticReason,
+  OpenRouterModelDiagnosticStage,
+} from "./openrouter-model-client.internal.js";
 
 export class OpenRouterModelClient implements CommerceModelInvoker {
   private readonly invoker: ReturnType<typeof createOpenRouterInvoker>;

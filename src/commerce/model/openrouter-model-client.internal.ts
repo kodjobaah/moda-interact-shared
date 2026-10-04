@@ -1,5 +1,5 @@
 import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { ChatOpenRouter } from "@langchain/openrouter";
+import { ChatOpenRouter, OpenRouterError } from "@langchain/openrouter";
 
 import { canonicalJson } from "../canonical-json.js";
 import { CommerceToolResultSchema } from "../schemas.js";
@@ -15,12 +15,31 @@ import {
 } from "./index.js";
 import type { ModelRequest, ModelStep } from "../runner/index.js";
 
+export type OpenRouterModelDiagnosticStage = "request" | "binding" | "provider" | "response";
+
+export type OpenRouterModelDiagnosticReason =
+  | "REQUEST_INVALID"
+  | "TOOL_BIND_FAILED"
+  | "PROVIDER_AUTH_FAILED"
+  | "PROVIDER_RATE_LIMITED"
+  | "PROVIDER_HTTP_ERROR"
+  | "PROVIDER_REQUEST_FAILED"
+  | "PROVIDER_RESPONSE_INVALID";
+
+export type OpenRouterModelDiagnostic = {
+  stage: OpenRouterModelDiagnosticStage;
+  reason: OpenRouterModelDiagnosticReason;
+  statusCode?: number;
+  providerCode?: number;
+};
+
 export type OpenRouterModelClientOptions = {
   provider: CommerceModelProvider;
   providerModelId: CommerceProviderModelId;
   configurationSchemaVersion: number;
   configuration: unknown;
   credential: string;
+  onDiagnostic?: (diagnostic: OpenRouterModelDiagnostic) => void;
 };
 
 type BoundChatModel = {
@@ -53,6 +72,42 @@ const mappedFields: Readonly<Record<string, string>> = {
 
 function unavailable(): Error {
   return new Error("Commerce model unavailable");
+}
+
+function safeDiagnostic(
+  callback: OpenRouterModelClientOptions["onDiagnostic"],
+  diagnostic: OpenRouterModelDiagnostic,
+) {
+  try {
+    callback?.(diagnostic);
+  } catch {
+    // Diagnostics are best effort and must never affect model execution semantics.
+  }
+}
+
+function boundedInteger(value: unknown, minimum: number, maximum: number): number | undefined {
+  return Number.isSafeInteger(value) && (value as number) >= minimum && (value as number) <= maximum
+    ? value as number
+    : undefined;
+}
+
+function providerDiagnostic(error: unknown): OpenRouterModelDiagnostic {
+  if (!OpenRouterError.isInstance(error)) {
+    return { stage: "provider", reason: "PROVIDER_REQUEST_FAILED" };
+  }
+  const statusCode = boundedInteger(error.statusCode, 100, 599);
+  const providerCode = boundedInteger(error.code, 0, 999999);
+  const reason = statusCode === 401 || statusCode === 403
+    ? "PROVIDER_AUTH_FAILED"
+    : statusCode === 429
+      ? "PROVIDER_RATE_LIMITED"
+      : "PROVIDER_HTTP_ERROR";
+  return {
+    stage: "provider",
+    reason,
+    ...(statusCode === undefined ? {} : { statusCode }),
+    ...(providerCode === undefined ? {} : { providerCode }),
+  };
 }
 
 function configurationToChatFields(configuration: CommerceModelConfiguration) {
@@ -151,22 +206,48 @@ export function createOpenRouterInvoker(
     });
     return {
       async invoke(request, signal) {
+        if (signal.aborted) throw unavailable();
+        if (!request || !Array.isArray(request.tools) || !Array.isArray(request.instructions)) {
+          safeDiagnostic(options.onDiagnostic, { stage: "request", reason: "REQUEST_INVALID" });
+          throw unavailable();
+        }
+
+        let messages: ReturnType<typeof requestMessages>;
         try {
-          if (signal.aborted) throw unavailable();
-          if (!request || !Array.isArray(request.tools) || !Array.isArray(request.instructions)) throw unavailable();
-          const tools = request.tools.map((tool) => ({
-            type: "function",
-            function: { name: tool.name, description: tool.description, parameters: tool.inputSchema },
-          }));
-          const bound = model.bindTools(tools, {
-            tool_choice: "required",
-          });
-          const response = await bound.invoke(requestMessages(request), {
+          messages = requestMessages(request);
+        } catch {
+          safeDiagnostic(options.onDiagnostic, { stage: "request", reason: "REQUEST_INVALID" });
+          throw unavailable();
+        }
+
+        const tools = request.tools.map((tool) => ({
+          type: "function",
+          function: { name: tool.name, description: tool.description, parameters: tool.inputSchema },
+        }));
+
+        let bound: BoundChatModel;
+        try {
+          bound = model.bindTools(tools, { tool_choice: "required" });
+        } catch {
+          safeDiagnostic(options.onDiagnostic, { stage: "binding", reason: "TOOL_BIND_FAILED" });
+          throw unavailable();
+        }
+
+        let response: unknown;
+        try {
+          response = await bound.invoke(messages, {
             signal,
             maxTokens: request.maxOutputTokens,
           });
+        } catch (error) {
+          if (!signal.aborted) safeDiagnostic(options.onDiagnostic, providerDiagnostic(error));
+          throw unavailable();
+        }
+
+        try {
           return modelStepFromResponse(response);
         } catch {
+          safeDiagnostic(options.onDiagnostic, { stage: "response", reason: "PROVIDER_RESPONSE_INVALID" });
           throw unavailable();
         }
       },
