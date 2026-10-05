@@ -16,7 +16,7 @@ assert.doesNotMatch(
 
 const cleanEnv = { PATH: "/usr/bin:/bin" };
 for (const source of [
-  `import * as model from "@modainteract/moda-interact-shared/commerce/model"; if (!model.CommerceModelConfigurationSchema) process.exit(2);`,
+  `import * as model from "@modainteract/moda-interact-shared/commerce/model"; if (!model.CommerceModelConfigurationSchema || !model.createCommerceTranslationProviderCredentialAad) process.exit(2);`,
   `import * as model from "@modainteract/moda-interact-shared/commerce/model/node"; if (!model.OpenRouterModelClient) process.exit(2);`,
 ]) {
   execFileSync(process.execPath, ["--input-type=module", "-e", source], {

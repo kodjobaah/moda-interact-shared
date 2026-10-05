@@ -147,3 +147,25 @@ export function createCommerceOpenRouterCredentialAad(input: CommerceOpenRouterC
     keyId: parsed.keyId,
   });
 }
+
+export const COMMERCE_TRANSLATION_PROVIDER_CREDENTIAL_TYPE = "TRANSLATION_PROVIDER" as const;
+export const CommerceTranslationProviderCredentialAadInputSchema = z.strictObject({
+  environment: CommerceEnvironmentSchema,
+  provider: CommerceModelProviderSchema,
+  keyId: z.string().trim().min(1).max(64),
+});
+export type CommerceTranslationProviderCredentialAadInput = z.infer<
+  typeof CommerceTranslationProviderCredentialAadInputSchema
+>;
+
+export function createCommerceTranslationProviderCredentialAad(
+  input: CommerceTranslationProviderCredentialAadInput,
+): string {
+  const parsed = CommerceTranslationProviderCredentialAadInputSchema.parse(input);
+  return canonicalJson({
+    credentialType: COMMERCE_TRANSLATION_PROVIDER_CREDENTIAL_TYPE,
+    environment: parsed.environment,
+    provider: parsed.provider,
+    keyId: parsed.keyId,
+  });
+}

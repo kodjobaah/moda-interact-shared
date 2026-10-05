@@ -8,7 +8,9 @@ import {
   CommerceModelSelectionSourceSchema,
   CommerceOpenRouterCredentialAadInputSchema,
   CommercePricingPlanModelAssignmentSchema,
+  CommerceTranslationProviderCredentialAadInputSchema,
   createCommerceOpenRouterCredentialAad,
+  createCommerceTranslationProviderCredentialAad,
   createOpenRouterModelId,
 } from "./index.js";
 
@@ -89,4 +91,46 @@ test("pricing plan assignment is strict and credential AAD is canonical", () => 
   assert.notEqual(createCommerceOpenRouterCredentialAad(input), createCommerceOpenRouterCredentialAad({ ...input, environment: "STAGING" }));
   assert.equal(CommerceOpenRouterCredentialAadInputSchema.safeParse({ environment: "PRODUCTION", keyId: " " }).success, false);
   assert.equal(CommerceOpenRouterCredentialAadInputSchema.safeParse({ environment: "PRODUCTION", keyId: "x".repeat(65) }).success, false);
+});
+
+test("translation-provider credential AAD is canonical and provider-scoped", () => {
+  const input = { environment: "DEVELOPMENT" as const, provider: "openai", keyId: "key-1" };
+  assert.equal(
+    createCommerceTranslationProviderCredentialAad(input),
+    '{"credentialType":"TRANSLATION_PROVIDER","environment":"DEVELOPMENT","keyId":"key-1","provider":"openai"}',
+  );
+  assert.equal(
+    createCommerceTranslationProviderCredentialAad(input),
+    createCommerceTranslationProviderCredentialAad(input),
+  );
+  assert.notEqual(
+    createCommerceTranslationProviderCredentialAad(input),
+    createCommerceTranslationProviderCredentialAad({ ...input, provider: "deepl" }),
+  );
+  assert.notEqual(
+    createCommerceTranslationProviderCredentialAad(input),
+    createCommerceTranslationProviderCredentialAad({ ...input, keyId: "key-2" }),
+  );
+  assert.notEqual(
+    createCommerceTranslationProviderCredentialAad(input),
+    createCommerceTranslationProviderCredentialAad({ ...input, environment: "PRODUCTION" }),
+  );
+  assert.equal(
+    CommerceTranslationProviderCredentialAadInputSchema.safeParse({
+      environment: "DEVELOPMENT", provider: "OpenAI", keyId: "key-1",
+    }).success,
+    false,
+  );
+  assert.equal(
+    CommerceTranslationProviderCredentialAadInputSchema.safeParse({
+      environment: "DEVELOPMENT", provider: "openai", keyId: " ",
+    }).success,
+    false,
+  );
+  assert.equal(
+    CommerceTranslationProviderCredentialAadInputSchema.safeParse({
+      environment: "DEVELOPMENT", provider: "openai", keyId: "x".repeat(65),
+    }).success,
+    false,
+  );
 });
