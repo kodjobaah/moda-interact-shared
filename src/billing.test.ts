@@ -13,7 +13,11 @@ import {
   BillingUsageMetricSchema,
   type BillingSystemMessageCode,
   NormalizedWhatsAppStatusSchema,
+  NormalizedWhatsAppStatusV2Schema,
+  NormalizedWhatsAppStatusV3Schema,
+  WHATSAPP_PROVIDER_STATUS_V2_SCHEMA_VERSION,
   WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION,
+  WhatsAppProviderFailureEvidenceSchema,
   availablePurchasedRecoveryCredits,
   createMerchantBillingSystemSourceKey,
   createBillingSubscriptionReconcileJobId,
@@ -287,6 +291,67 @@ test("calculates available purchased recovery credits and rejects invalid counte
 
 test("parses a normalized provider status with bounded pricing metadata", () => {
   assert.deepEqual(parseNormalizedWhatsAppStatus(validStatus()), validStatus());
+});
+
+test("keeps v2 statuses strict and accepts them through the canonical parser", () => {
+  const legacyStatus = {
+    ...validStatus(),
+    schemaVersion: WHATSAPP_PROVIDER_STATUS_V2_SCHEMA_VERSION,
+  };
+
+  assert.equal(WHATSAPP_PROVIDER_STATUS_V2_SCHEMA_VERSION, 2);
+  assert.equal(WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION, 3);
+  assert.deepEqual(NormalizedWhatsAppStatusV2Schema.parse(legacyStatus), legacyStatus);
+  assert.deepEqual(parseNormalizedWhatsAppStatus(legacyStatus), legacyStatus);
+  assert.equal(NormalizedWhatsAppStatusV2Schema.safeParse({
+    ...legacyStatus,
+    failure: { providerCode: "131026" },
+  }).success, false);
+  assert.equal(NormalizedWhatsAppStatusV2Schema.safeParse(validStatus()).success, false);
+});
+
+test("validates strict v3 status and failure-evidence semantics", () => {
+  for (const status of ["SENT", "DELIVERED", "READ"] as const) {
+    assert.equal(NormalizedWhatsAppStatusV3Schema.safeParse({
+      ...validStatus(),
+      status,
+    }).success, true);
+    assert.equal(NormalizedWhatsAppStatusV3Schema.safeParse({
+      ...validStatus(),
+      status,
+      failure: { providerCode: "131026" },
+    }).success, false);
+  }
+
+  const failedWithoutEvidence = { ...validStatus(), status: "FAILED" as const };
+  const failedWithEvidence = {
+    ...failedWithoutEvidence,
+    failure: { providerCode: "131026" },
+  };
+  assert.deepEqual(parseNormalizedWhatsAppStatus(failedWithoutEvidence), failedWithoutEvidence);
+  assert.deepEqual(parseNormalizedWhatsAppStatus(failedWithEvidence), failedWithEvidence);
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({
+    ...failedWithEvidence,
+    unexpected: true,
+  }).success, false);
+  assert.equal(NormalizedWhatsAppStatusSchema.safeParse({
+    ...failedWithEvidence,
+    failure: { providerCode: "131026", message: "not allowed" },
+  }).success, false);
+});
+
+test("bounds provider failure evidence and rejects empty or extra data", () => {
+  assert.deepEqual(WhatsAppProviderFailureEvidenceSchema.parse({ providerCode: "  131026  " }), {
+    providerCode: "131026",
+  });
+  assert.equal(WhatsAppProviderFailureEvidenceSchema.safeParse({ providerCode: "" }).success, false);
+  assert.equal(WhatsAppProviderFailureEvidenceSchema.safeParse({ providerCode: "   " }).success, false);
+  assert.equal(WhatsAppProviderFailureEvidenceSchema.safeParse({ providerCode: "x".repeat(65) }).success, false);
+  assert.equal(WhatsAppProviderFailureEvidenceSchema.safeParse({ providerCode: "x".repeat(64) }).success, true);
+  assert.equal(WhatsAppProviderFailureEvidenceSchema.safeParse({
+    providerCode: "131026",
+    details: "raw provider error",
+  }).success, false);
 });
 
 test("rejects malformed provider status identity, timestamp, status, metadata, and extra fields", () => {
