@@ -24,8 +24,14 @@ for (const exportName of [
   "BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME",
   "BILLING_SUBSCRIPTION_RECONCILE_JOB_NAME",
   "APP_PRICING_BILLING_PERIOD_DRAIN_WINDOW_MS",
+  "WHATSAPP_PROVIDER_STATUS_V2_SCHEMA_VERSION",
+  "WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION",
   "BILLING_SYSTEM_MESSAGE_CODES",
   "BillingSubscriptionReconcileJobSchema",
+  "WhatsAppProviderFailureEvidenceSchema",
+  "NormalizedWhatsAppStatusV2Schema",
+  "NormalizedWhatsAppStatusV3Schema",
+  "NormalizedWhatsAppStatusSchema",
   "parseBillingSubscriptionReconcileJob",
   "safeParseBillingSubscriptionReconcileJob",
   "createBillingSubscriptionReconcileJobId",
@@ -52,6 +58,18 @@ assert.match(
   /export \{[\s\S]*\btype BillingSubscriptionReconcileJob\b/,
   "billing declaration does not export BillingSubscriptionReconcileJob",
 );
+for (const typeName of [
+  "WhatsAppProviderFailureEvidence",
+  "NormalizedWhatsAppStatusV2",
+  "NormalizedWhatsAppStatusV3",
+  "NormalizedWhatsAppStatus",
+]) {
+  assert.match(
+    declaration,
+    new RegExp(`export \\{[\\s\\S]*\\btype ${typeName}\\b`),
+    `billing declaration does not export ${typeName}`,
+  );
+}
 
 const packed = JSON.parse(
   execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {

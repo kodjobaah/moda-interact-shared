@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 export const ARCH007_BILLING_CONTRACT_SCHEMA_VERSION = 1 as const;
-export const WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION = 2 as const;
+export const WHATSAPP_PROVIDER_STATUS_V2_SCHEMA_VERSION = 2 as const;
+export const WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION = 3 as const;
 export const BILLING_SUBSCRIPTION_RECONCILE_SCHEMA_VERSION = 1 as const;
 export const BILLING_SUBSCRIPTION_RECONCILE_QUEUE_NAME = "billing-subscription-reconcile";
 export const BILLING_SUBSCRIPTION_RECONCILE_JOB_NAME = "reconcile-subscription";
@@ -198,17 +199,52 @@ export type WhatsAppProviderPricingMetadata = z.infer<
   typeof WhatsAppProviderPricingMetadataSchema
 >;
 
-export const NormalizedWhatsAppStatusSchema = z
+export const WhatsAppProviderFailureEvidenceSchema = z
   .object({
-    schemaVersion: z.literal(WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION),
-    providerAccountId: z.string().trim().min(1).max(MAX_ID_LENGTH),
-    providerPhoneNumberId: z.string().trim().min(1).max(MAX_ID_LENGTH),
-    providerMessageId: z.string().trim().min(1).max(MAX_ID_LENGTH),
-    status: WhatsAppProviderStatusSchema,
-    occurredAt: z.iso.datetime({ offset: true }),
-    pricing: WhatsAppProviderPricingMetadataSchema.optional(),
+    providerCode: z.string().trim().min(1).max(64),
   })
   .strict();
+
+export type WhatsAppProviderFailureEvidence = z.infer<
+  typeof WhatsAppProviderFailureEvidenceSchema
+>;
+
+const NORMALIZED_WHATSAPP_STATUS_FIELDS = {
+  providerAccountId: z.string().trim().min(1).max(MAX_ID_LENGTH),
+  providerPhoneNumberId: z.string().trim().min(1).max(MAX_ID_LENGTH),
+  providerMessageId: z.string().trim().min(1).max(MAX_ID_LENGTH),
+  status: WhatsAppProviderStatusSchema,
+  occurredAt: z.iso.datetime({ offset: true }),
+  pricing: WhatsAppProviderPricingMetadataSchema.optional(),
+};
+
+export const NormalizedWhatsAppStatusV2Schema = z
+  .object({
+    schemaVersion: z.literal(WHATSAPP_PROVIDER_STATUS_V2_SCHEMA_VERSION),
+    ...NORMALIZED_WHATSAPP_STATUS_FIELDS,
+  })
+  .strict();
+
+export type NormalizedWhatsAppStatusV2 = z.infer<typeof NormalizedWhatsAppStatusV2Schema>;
+
+export const NormalizedWhatsAppStatusV3Schema = z
+  .object({
+    schemaVersion: z.literal(WHATSAPP_PROVIDER_STATUS_SCHEMA_VERSION),
+    ...NORMALIZED_WHATSAPP_STATUS_FIELDS,
+    failure: WhatsAppProviderFailureEvidenceSchema.optional(),
+  })
+  .strict()
+  .refine((value) => value.status === "FAILED" || value.failure === undefined, {
+    message: "failure evidence is only valid for FAILED statuses",
+    path: ["failure"],
+  });
+
+export type NormalizedWhatsAppStatusV3 = z.infer<typeof NormalizedWhatsAppStatusV3Schema>;
+
+export const NormalizedWhatsAppStatusSchema = z.union([
+  NormalizedWhatsAppStatusV2Schema,
+  NormalizedWhatsAppStatusV3Schema,
+]);
 
 export type NormalizedWhatsAppStatus = z.infer<typeof NormalizedWhatsAppStatusSchema>;
 
