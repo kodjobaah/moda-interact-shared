@@ -222,7 +222,7 @@ export function createOpenRouterInvoker(
 
         const tools = request.tools.map((tool) => ({
           type: "function",
-          function: { name: tool.name, description: tool.description, parameters: tool.inputSchema },
+          function: { name: tool.name, description: tool.description, parameters: tool.inputSchema, strict: true },
         }));
 
         let bound: BoundChatModel;

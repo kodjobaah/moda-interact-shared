@@ -94,7 +94,7 @@ test("runtime request controls Tools, token limit, required tool choice and seri
   assert.deepEqual(captured.tools, [{
     type: "function",
     function: {
-      name: "read_product", description: "Read product facts.", parameters: request.tools[0].inputSchema,
+      name: "read_product", description: "Read product facts.", parameters: request.tools[0].inputSchema, strict: true
     },
   }]);
   assert.deepEqual(captured.bindOptions, { tool_choice: "required" });
