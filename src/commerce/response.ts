@@ -6,6 +6,7 @@ import {
   responseContractCanonicalJson,
   type Digest,
 } from "./canonical-json";
+import { canonicaliseLanguageTag } from "../internationalization";
 export const CommerceResponseContractSchema = z
   .strictObject({
     version: z.literal("response.v1"),
@@ -33,12 +34,31 @@ export const ReferralReasonSchema = z.enum([
   "TOOL_UNAVAILABLE",
   "TOOL_REVOKED",
 ]);
+
+const DetectedLanguageTagSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .transform((value, ctx) => {
+    const canonical = canonicaliseLanguageTag(value);
+
+    if (!canonical) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Invalid detected language tag",
+      });
+      return z.NEVER;
+    }
+
+    return canonical;
+  });
+
 export const CommerceFinalResponseSchema = z
   .strictObject({
     answerKind: z.enum(["ANSWER", "REFER_TO_STORE"]),
     replyText: z.string().min(1).max(4096),
-    referralReason: ReferralReasonSchema.nullable().optional( ),
-    detectedLanguageTag: LanguageSchema.nullable(),
+    referralReason: ReferralReasonSchema.nullable(),
+    detectedLanguageTag: DetectedLanguageTagSchema.nullable(),
     detectedLanguageConfidence: z.number().min(0).max(1).nullable(),
     evidenceIds: z
       .array(IdSchema)
@@ -51,8 +71,55 @@ export const CommerceFinalResponseSchema = z
         return false;
       }
     }),
+  })
+  .superRefine((value, ctx) => {
+    const hasLanguage = value.detectedLanguageTag !== null;
+    const hasConfidence = value.detectedLanguageConfidence !== null;
+
+    if (hasLanguage !== hasConfidence) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "detectedLanguageTag and detectedLanguageConfidence must appear together",
+      });
+    }
+
+    if (value.answerKind === "ANSWER") {
+      if (value.referralReason !== null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["referralReason"],
+          message: "ANSWER must not include a referral reason",
+        });
+      }
+    }
+
+    if (value.answerKind === "REFER_TO_STORE") {
+      if (value.referralReason === null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["referralReason"],
+          message: "REFER_TO_STORE requires a referral reason",
+        });
+      }
+
+      if (value.evidenceIds.length !== 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["evidenceIds"],
+          message: "REFER_TO_STORE must not include evidence",
+        });
+      }
+
+      if (Object.keys(value.details).length !== 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["details"],
+          message: "REFER_TO_STORE must not include details",
+        });
+      }
+    }
   });
-  
 export type CommerceFinalResponse = z.infer<typeof CommerceFinalResponseSchema>;
 export function finalResponseSchema(definition: CommerceResponseContract) {
   const contract = CommerceResponseContractSchema.parse(definition);
@@ -60,7 +127,10 @@ export function finalResponseSchema(definition: CommerceResponseContract) {
   return CommerceFinalResponseSchema.refine(
     (v) =>
       v.answerKind === "REFER_TO_STORE" || details.safeParse(v.details).success,
-    { message: "Details do not match pinned contract" },
+    {
+      path: ["details"],
+      message: "Details do not match pinned contract",
+    },
   );
 }
 export function verifyResponseContract(
