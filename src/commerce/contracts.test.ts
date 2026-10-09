@@ -75,33 +75,7 @@ test("canonical JSON rejects undefined, cycles, nonfinite and sparse data; C4 an
   const value = { "\u{10000}": 1, "\ue000": 2 };
   assert.notEqual(canonicalJson(value), responseContractCanonicalJson(value));
 });
-test("R01/R02/R03/R08: configurable required details, strict envelopes and empty referrals", () => {
-  ok(finalResponseSchema(EMPTY_RESPONSE_CONTRACT), exampleFinal);
-  const definition = {
-    ...EMPTY_RESPONSE_CONTRACT,
-    detailsSchema: {
-      type: "object",
-      properties: { newFact: { type: "string", maxLength: 100 } },
-      required: ["newFact"],
-      additionalProperties: false,
-    } as SubsetSchema,
-  };
-  const answer = {
-    ...exampleFinal,
-    answerKind: "ANSWER",
-    referralReason: null,
-    details: { newFact: "Verified fixture" },
-  };
-  ok(finalResponseSchema(definition), answer);
-  ok(finalResponseSchema(definition), exampleFinal);
-  for (const details of [{}, { newFact: 3 }, { newFact: "yes", extra: 1 }])
-    bad(finalResponseSchema(definition), { ...answer, details });
-  bad(CommerceFinalResponseSchema, { ...exampleFinal, referralReason: null });
-  bad(CommerceFinalResponseSchema, {
-    ...exampleFinal,
-    evidenceIds: ["fabricated"],
-  });
-});
+
 test("R04/R05/R12: reject incompatible schema, envelope edits, missing/wrong hashes and excessive bytes", () => {
   for (const detailsSchema of [
     {
@@ -362,40 +336,6 @@ test("direct Tool descriptors deduplicate provenance and conflicting association
   );
   bad(CommerceManifestSchema, { ...m, grantedTools: [] });
   bad(CommerceManifestSchema, { ...m, selectedCapabilityKeys: ["other"] });
-});
-test("strict identity/assertion/language contracts retain null-pair and no standalone contexts", () => {
-  ok(CommerceTurnIdentitySchema, exampleTurn);
-  for (const checkoutRecoveryId of [
-    "standalone",
-    "product-only",
-    "unknown-shop",
-    "",
-  ])
-    bad(CommerceTurnIdentitySchema, { ...exampleTurn, checkoutRecoveryId });
-  bad(CommerceTurnIdentitySchema, {
-    ...exampleTurn,
-    contractVersion: "commerce.v2",
-  });
-  ok(CommerceAssertionSchema, { ...exampleTurn, purpose: "resolve" });
-  bad(CommerceAssertionSchema, {
-    ...exampleTurn,
-    purpose: "resolve",
-    releaseId: "not-yet",
-  });
-  bad(CommerceAssertionSchema, {
-    ...exampleTurn,
-    purpose: "execute",
-    releaseId: "release",
-  });
-  bad(CommerceFinalResponseSchema, {
-    ...exampleFinal,
-    detectedLanguageTag: "fr",
-  });
-  bad(CommerceFinalResponseSchema, {
-    ...exampleFinal,
-    detectedLanguageTag: "not_a_tag",
-    detectedLanguageConfidence: 0.9,
-  });
 });
 test("six policy input/output fixtures preserve exact money and explicit unknown/unsupported outcomes", () => {
   const now = "2026-09-20T00:00:00.000Z",

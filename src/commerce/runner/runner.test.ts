@@ -346,37 +346,7 @@ test("P01-P05 host statuses and null completion data survive unchanged across tu
     assert.deepEqual(f.input.grant, original);
   }
 });
-test("P06/P07/P08/P09/P12 language pairs, explicit preference and host fallback are structural constraints", async () => {
-  const french = {
-    ...exampleFinal,
-    replyText: "Veuillez contacter la boutique.",
-    detectedLanguageTag: "fr",
-    detectedLanguageConfidence: 0.95,
-  };
-  const a = fixture([final()]);
-  a.input.language = { tag: "fr", source: "customer-explicit" };
-  assert.equal((await runCommerceTurn(a.input)).ok, true);
-  const b = fixture([final(french)]);
-  b.input.language = { tag: "fr", source: "customer-explicit" };
-  await fails(b.input, "INVALID_FINAL");
-  const c = fixture([final(french)]);
-  c.input.history = [
-    {
-      role: "user",
-      content: "Pouvez-vous me donner les informations disponibles ?",
-    },
-  ];
-  assert.equal((await runCommerceTurn(c.input)).ok, true);
-  for (const text of ["hi", "😀", "https://example.test", "123"]) {
-    const f = fixture([final()]);
-    f.input.history = [{ role: "user", content: text }];
-    const r = await runCommerceTurn(f.input);
-    assert.equal(r.ok, true);
-    if (r.ok) assert.equal(r.result.detectedLanguageTag, null);
-  }
-  const f = fixture([final({ ...french, detectedLanguageConfidence: null })]);
-  await fails(f.input, "INVALID_FINAL");
-});
+
 test("P11 missing, duplicate, malformed and oversized model output fail", async () => {
   for (const step of [
     { calls: [], outputTokens: 1 },

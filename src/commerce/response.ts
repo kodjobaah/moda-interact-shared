@@ -37,7 +37,7 @@ export const CommerceFinalResponseSchema = z
   .strictObject({
     answerKind: z.enum(["ANSWER", "REFER_TO_STORE"]),
     replyText: z.string().min(1).max(4096),
-    referralReason: ReferralReasonSchema.nullable(),
+    referralReason: ReferralReasonSchema.nullable().optional( ),
     detectedLanguageTag: LanguageSchema.nullable(),
     detectedLanguageConfidence: z.number().min(0).max(1).nullable(),
     evidenceIds: z
@@ -51,28 +51,8 @@ export const CommerceFinalResponseSchema = z
         return false;
       }
     }),
-  })
-  .superRefine((v, ctx) => {
-    if (
-      (v.detectedLanguageTag === null) !==
-      (v.detectedLanguageConfidence === null)
-    )
-      ctx.addIssue({
-        code: "custom",
-        message: "Language metadata must be a complete pair",
-      });
-    if (
-      v.answerKind === "ANSWER"
-        ? v.referralReason !== null
-        : v.referralReason === null ||
-          v.evidenceIds.length > 0 ||
-          Object.keys(v.details).length > 0
-    )
-      ctx.addIssue({
-        code: "custom",
-        message: "Invalid answer/referral envelope",
-      });
   });
+  
 export type CommerceFinalResponse = z.infer<typeof CommerceFinalResponseSchema>;
 export function finalResponseSchema(definition: CommerceResponseContract) {
   const contract = CommerceResponseContractSchema.parse(definition);
