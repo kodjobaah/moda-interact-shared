@@ -73,16 +73,6 @@ export const CommerceFinalResponseSchema = z
     }),
   })
   .superRefine((value, ctx) => {
-    const hasLanguage = value.detectedLanguageTag !== null;
-    const hasConfidence = value.detectedLanguageConfidence !== null;
-
-    if (hasLanguage !== hasConfidence) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "detectedLanguageTag and detectedLanguageConfidence must appear together",
-      });
-    }
 
     if (value.answerKind === "ANSWER") {
       if (value.referralReason !== null) {

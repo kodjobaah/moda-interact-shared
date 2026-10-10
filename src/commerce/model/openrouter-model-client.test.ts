@@ -164,7 +164,7 @@ test("diagnostics distinguish request, provider HTTP and provider response failu
     invalidRequest.invoke({ ...request, history: [{ role: "user", content: "x".repeat(16001) }] }, new AbortController().signal),
     { message: "Commerce model unavailable" },
   );
-  assert.deepEqual(diagnostics.shift(), { stage: "request", reason: "REQUEST_INVALID" });
+  assert.deepEqual(diagnostics.shift(), { stage: "request", reason: "MODEL_REQUEST_HISTORY_INVALID" });
 
   const authError = await OpenRouterError.fromResponse(new Response(
     JSON.stringify({ error: { message: "secret provider body", code: 401 } }),
@@ -184,7 +184,7 @@ test("diagnostics distinguish request, provider HTTP and provider response failu
     configuration: {}, credential: "credential-secret", onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
   }, () => ({ bindTools: () => ({ invoke: async () => ({ tool_calls: [], usage_metadata: {} }) }) }));
   await assert.rejects(badResponse.invoke(request, new AbortController().signal), { message: "Commerce model unavailable" });
-  assert.deepEqual(diagnostics.shift(), { stage: "response", reason: "PROVIDER_RESPONSE_INVALID" });
+  assert.deepEqual(diagnostics.shift(), { stage: "response", reason: "PROVIDER_RESPONSE_USAGE_INVALID" });
 });
 
 test("diagnostic callback failure never changes bounded model failure semantics", async () => {
@@ -193,4 +193,72 @@ test("diagnostic callback failure never changes bounded model failure semantics"
     configuration: {}, credential: "credential-secret", onDiagnostic: () => { throw new Error("diagnostic sink failed"); },
   }, () => ({ bindTools: () => ({ invoke: async () => { throw new Error("provider details"); } }) }));
   await assert.rejects(invoker.invoke(request, new AbortController().signal), { message: "Commerce model unavailable" });
+});
+
+test("ARCH-029 OpenRouter provider diagnostics survive as safe typed invocation failures", async () => {
+  const providerError = await OpenRouterError.fromResponse(new Response(
+    JSON.stringify({ error: { message: "customer-secret and credential-secret", code: 429 } }),
+    { status: 429, headers: { "content-type": "application/json" } },
+  ));
+  const observed: unknown[] = [];
+  const invoker = createOpenRouterInvoker({
+    provider: "openai", providerModelId: "gpt-test", configurationSchemaVersion: 1,
+    configuration: {}, credential: "credential-secret",
+    onDiagnostic: (diagnostic) => observed.push(diagnostic),
+  }, () => ({ bindTools: () => ({ invoke: async () => { throw providerError; } }) }));
+
+  let failure: unknown;
+  try { await invoker.invoke(request, new AbortController().signal); }
+  catch (error) { failure = error; }
+  assert.ok(failure instanceof Error);
+  assert.equal(failure.message, "Commerce model unavailable");
+  const safe = (failure as { diagnostic?: { reasonCode: string; reasonMessage: string; operatorAction: string; statusCode: number } }).diagnostic;
+  assert.equal(safe?.reasonCode, "PROVIDER_RATE_LIMITED");
+  assert.equal(safe?.statusCode, 429);
+  assert.match(safe?.reasonMessage ?? "", /HTTP 429.*rate-limit/i);
+  assert.match(safe?.operatorAction ?? "", /provider usage/i);
+  assert.deepEqual(observed, [{ stage: "provider", reason: "PROVIDER_RATE_LIMITED", statusCode: 429, providerCode: 429 }]);
+  assert.doesNotMatch(JSON.stringify((failure as { diagnostic?: unknown }).diagnostic), /secret|credential|customer/);
+});
+
+
+test("ARCH-029 operator diagnostics distinguish network, model setup, and response shape failures", async () => {
+  const client = (credential: string, invoke: () => Promise<unknown>, observed: unknown[]) =>
+    createOpenRouterInvoker({
+      provider: "openai", providerModelId: "gpt-test", configurationSchemaVersion: 1,
+      configuration: {}, credential,
+      onDiagnostic: (diagnostic) => observed.push(diagnostic),
+    }, () => ({ bindTools: () => ({ invoke }) }));
+
+  assert.throws(() => client("", async () => ({}), []), (error: unknown) => {
+    const diagnostic = (error as { diagnostic?: { reasonCode?: string; reasonMessage?: string } }).diagnostic;
+    assert.equal(diagnostic?.reasonCode, "MODEL_CREDENTIAL_INVALID");
+    assert.match(diagnostic?.reasonMessage ?? "", /credential/i);
+    return true;
+  });
+
+  const network = new Error("credential-secret customer-secret hostname");
+  Object.assign(network, { code: "ENOTFOUND" });
+  const observed: unknown[] = [];
+  await assert.rejects(client("secret", async () => { throw network; }, observed).invoke(request, new AbortController().signal),
+    (error: unknown) => {
+      const diagnostic = (error as { diagnostic?: { reasonCode?: string; transportCode?: string; reasonMessage?: string } }).diagnostic;
+      assert.equal(diagnostic?.reasonCode, "PROVIDER_REQUEST_FAILED");
+      assert.equal(diagnostic?.transportCode, "ENOTFOUND");
+      assert.match(diagnostic?.reasonMessage ?? "", /DNS/i);
+      assert.doesNotMatch(JSON.stringify(diagnostic), /credential-secret|customer-secret/);
+      return true;
+    });
+  assert.deepEqual(observed, [{ stage: "provider", reason: "PROVIDER_REQUEST_FAILED", transportCode: "ENOTFOUND" }]);
+
+  for (const [response, reasonCode] of [
+    [{ tool_calls: [], usage_metadata: {} }, "PROVIDER_RESPONSE_USAGE_INVALID"],
+    [{ tool_calls: [{ name: "bad", args: [] }], usage_metadata: { output_tokens: 1 } }, "PROVIDER_RESPONSE_TOOL_CALL_INVALID"],
+  ] as const) {
+    await assert.rejects(client("secret", async () => response, []).invoke(request, new AbortController().signal),
+      (error: unknown) => {
+        assert.equal((error as { diagnostic?: { reasonCode?: string } }).diagnostic?.reasonCode, reasonCode);
+        return true;
+      });
+  }
 });

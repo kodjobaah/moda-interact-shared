@@ -33,7 +33,7 @@ export function createCommerceTurnGraph(execution: CommerceTurnGraphExecution) {
     .addEdge(START, "resolveAvailableTools")
     .addEdge("resolveAvailableTools", "invokeModel")
     .addConditionalEdges("invokeModel", (state: CommerceTurnGraphStateValue) => {
-      if (!state.pendingStep) throw new RunnerFailure("INVALID_FINAL");
+      if (!state.pendingStep) throw new RunnerFailure("INVALID_FINAL", { stage: "graph.execute", reasonCode: "MODEL_RESULT_MISSING" });
       return routeModelStep(state.pendingStep);
     }, {
       toolCalls: "executeToolCalls",

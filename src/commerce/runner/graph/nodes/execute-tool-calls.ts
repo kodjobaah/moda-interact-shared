@@ -5,7 +5,7 @@ import type { CommerceTurnGraphStateValue } from "../state.js";
 
 export function executeToolCallsNode(execution: CommerceTurnGraphExecution) {
   return async (state: CommerceTurnGraphStateValue) => {
-    if (!state.pendingStep) throw new RunnerFailure("INVALID_FINAL");
+    if (!state.pendingStep) throw new RunnerFailure("INVALID_FINAL", { stage: "graph.execute", reasonCode: "MODEL_RESULT_MISSING" });
     const result = await executeToolCalls({
       source: execution.input,
       prepared: execution.prepared,

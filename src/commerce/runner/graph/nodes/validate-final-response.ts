@@ -7,7 +7,7 @@ import type { CommerceTurnGraphStateValue } from "../state.js";
 export function validateFinalResponseNode(execution: CommerceTurnGraphExecution) {
   return async (state: CommerceTurnGraphStateValue) => {
     if (!state.pendingStep || state.pendingStep.calls.length !== 1)
-      throw new RunnerFailure("INVALID_FINAL");
+      throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "MODEL_RESULT_MISSING" });
     try {
       const final = validateFinalResponse({
         raw: state.pendingStep.calls[0].arguments,
@@ -21,7 +21,7 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
       });
       return { finalResult: final };
     } catch (error) {
-      logModelInvalid(execution.logger, state.modelSteps, error instanceof RunnerFailure ? error.code : "INVALID_FINAL");
+      logModelInvalid(execution.logger, state.modelSteps, error instanceof RunnerFailure ? error.diagnostic.reasonCode : "UNEXPECTED_EXCEPTION");
       throw error;
     }
   };

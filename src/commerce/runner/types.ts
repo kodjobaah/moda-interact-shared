@@ -1,3 +1,4 @@
+import type { RunnerDiagnostic } from "./diagnostics.js";
 import type { Digest } from "../canonical-json.js";
 import type { CommerceFinalResponse } from "../response.js";
 import type {
@@ -56,4 +57,4 @@ export type RunnerErrorCode =
   | "DEADLINE" | "UNAVAILABLE" | "DENIED" | "STALE_TURN" | "INCOMPATIBLE_VERSION";
 export type RunCommerceTurnResult =
   | { ok: true; result: CommerceFinalResponse; usage: { modelSteps: number; remoteCalls: number } }
-  | { ok: false; error: { code: RunnerErrorCode; retryable: boolean } };
+  | { ok: false; error: { code: RunnerErrorCode; retryable: boolean; diagnostic?: RunnerDiagnostic } };

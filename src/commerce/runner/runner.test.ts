@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
   runCommerceTurn,
+  CommerceModelInvocationFailure,
   PLATFORM_INSTRUCTIONS,
   RUNTIME_DATA_AUTHORITY_INSTRUCTION,
   type RunCommerceTurnInput,
@@ -91,6 +92,16 @@ function fixture(sequence: ModelStep[], withTool = false) {
   };
   return { input, requests, counts: () => ({ model, tools }) };
 }
+function expectFailure(result: Awaited<ReturnType<typeof runCommerceTurn>>, code: string, reasonCode?: string) {
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.error.code, code);
+  assert.equal(result.error.retryable, code === "UNAVAILABLE" || code === "DEADLINE");
+  assert.ok(result.error.diagnostic?.stage);
+  assert.ok(result.error.diagnostic?.reasonCode);
+  if (reasonCode) assert.equal(result.error.diagnostic?.reasonCode, reasonCode);
+}
+
 async function fails(input: RunCommerceTurnInput, code: string) {
   const result = await runCommerceTurn(input);
   assert.equal(result.ok, false);
@@ -422,10 +433,7 @@ test("call/step budgets, deadline and cancellation stop adapters; exception secr
   };
   const result = await runCommerceTurn(error.input);
   assert.equal(JSON.stringify(result).includes("secret-password"), false);
-  assert.deepEqual(result, {
-    ok: false,
-    error: { code: "UNAVAILABLE", retryable: true },
-  });
+  expectFailure(result, "UNAVAILABLE", "MODEL_INVOCATION_FAILED");
 });
 test("trusted evidence must match turn/grant/hash, stay fresh and reserve final revalidation calls", async () => {
   const makeEvidence = (): CommerceEvidence => {
@@ -595,10 +603,7 @@ test("graph denies a tool that becomes authorized only after it was not advertis
 test("maximum model-step budget returns BUDGET_EXHAUSTED, not LangGraph recursion", async () => {
   const f = fixture(Array.from({ length: 12 }, () => call("hallucinated_tool")));
   const result = await runCommerceTurn(f.input);
-  assert.deepEqual(result, {
-    ok: false,
-    error: { code: "BUDGET_EXHAUSTED", retryable: false },
-  });
+  expectFailure(result, "BUDGET_EXHAUSTED", "MODEL_STEP_BUDGET_EXHAUSTED");
   assert.equal(f.counts().model, 12);
 });
 
@@ -829,9 +834,27 @@ test("invalid model output emits model.invalid and turn.failed with bounded fiel
   const f = fixture([{ calls: [], outputTokens: 1 }]);
   f.input.dependencies.logger = createLogger({ serviceName: "test-host", environment: "test", sink: (record) => records.push(record) });
   const result = await runCommerceTurn(f.input);
-  assert.deepEqual(result, { ok: false, error: { code: "INVALID_FINAL", retryable: false } });
-  assert.ok(records.some((record) => record.event === "commerce.turn.model.invalid" && record.data?.reasonCode === "INVALID_FINAL"));
+  expectFailure(result, "INVALID_FINAL", "MODEL_CALL_ROUTE_INVALID");
+  assert.ok(records.some((record) => record.event === "commerce.turn.model.invalid" && record.data?.reasonCode === "MODEL_CALL_ROUTE_INVALID"));
   assert.ok(records.some((record) => record.event === "commerce.turn.failed" && record.data?.errorCode === "INVALID_FINAL"));
+});
+
+test("ARCH-029 null model tool call identifies its index and cause in terminal logs", async () => {
+  const records: LogRecord[] = [];
+  const f = fixture([{ calls: [null], outputTokens: 1 } as unknown as ModelStep]);
+  f.input.dependencies.logger = createLogger({
+    serviceName: "test-host", environment: "test", sink: (record) => records.push(record),
+  });
+  const result = await runCommerceTurn(f.input);
+  expectFailure(result, "INVALID_FINAL", "MODEL_TOOL_CALL_NULL");
+  if (result.ok) return;
+  assert.equal(result.error.diagnostic?.callIndex, 0);
+  assert.match(result.error.diagnostic?.reasonMessage ?? "", /null tool-call entry at index 0/i);
+  const terminal = records.filter((record) => record.event === "commerce.turn.failed");
+  assert.equal(terminal.length, 1);
+  assert.equal(terminal[0].data?.reasonCode, "MODEL_TOOL_CALL_NULL");
+  assert.equal(terminal[0].data?.callIndex, 0);
+  assert.match(String(terminal[0].data?.reasonMessage), /null tool-call entry at index 0/i);
 });
 
 test("throwing logger methods or failing canonical sink cannot alter turn result", async () => {
@@ -900,17 +923,127 @@ test("R2 malformed adapter calls are INVALID_FINAL with no remote side effects",
       [{ calls: [malformed], outputTokens: 1 } as ModelStep],
       true,
     );
-    assert.deepEqual(await runCommerceTurn(f.input), {
-      ok: false,
-      error: { code: "INVALID_FINAL", retryable: false },
-    });
+    expectFailure(await runCommerceTurn(f.input), "INVALID_FINAL");
     assert.deepEqual(f.counts(), { model: 1, tools: 0 });
   }
   const host = fixture([final()]);
   host.input.turn.inboundVersion = 0;
-  assert.deepEqual(await runCommerceTurn(host.input), {
-    ok: false,
-    error: { code: "INVALID_INPUT", retryable: false },
-  });
+  expectFailure(await runCommerceTurn(host.input), "INVALID_INPUT", "TURN_INVALID");
   assert.deepEqual(host.counts(), { model: 0, tools: 0 });
+});
+
+
+test("ARCH-029 preflight failures emit one safe terminal event without unvalidated tenant identity", async () => {
+  const records: LogRecord[] = [];
+  const f = fixture([final()]);
+  f.input.turn.inboundVersion = 0;
+  f.input.turn.shopId = "untrusted-customer-secret";
+  f.input.dependencies.logger = createLogger({ serviceName: "test-host", environment: "test", sink: (record) => records.push(record) });
+  const result = await runCommerceTurn(f.input);
+  expectFailure(result, "INVALID_INPUT", "TURN_INVALID");
+  const terminal = records.filter((record) => record.event === "commerce.turn.failed");
+  assert.equal(terminal.length, 1);
+  assert.equal(terminal[0].data?.stage, "preflight.validate");
+  assert.equal(terminal[0].data?.reasonCode, "TURN_INVALID");
+  assert.match(String(terminal[0].data?.reasonMessage), /turn identity failed schema validation/i);
+  assert.match(String(terminal[0].data?.operatorAction), /schema issue paths/i);
+  assert.equal(terminal[0].data?.modelSteps, 0);
+  assert.equal(records.some((record) => record.event === "commerce.turn.started"), false);
+  assert.doesNotMatch(JSON.stringify(terminal), /untrusted-customer-secret|shopId|conversationId|grantId/);
+});
+
+test("ARCH-029 model invocation distinguishes provider auth, throttle and invalid response", async () => {
+  for (const diagnostic of [
+    { stage: "model.invoke" as const, reasonCode: "PROVIDER_AUTH_FAILED" as const, statusCode: 401 },
+    { stage: "model.invoke" as const, reasonCode: "PROVIDER_RATE_LIMITED" as const, statusCode: 429 },
+    { stage: "model.invoke" as const, reasonCode: "PROVIDER_RESPONSE_INVALID" as const },
+  ]) {
+    const records: LogRecord[] = [];
+    const f = fixture([final()]);
+    f.input.dependencies.logger = createLogger({ serviceName: "test-host", environment: "test", sink: (record) => records.push(record) });
+    f.input.dependencies.model.invoke = async () => {
+      throw new CommerceModelInvocationFailure(diagnostic, new Error("customer-secret provider raw payload"));
+    };
+    const result = await runCommerceTurn(f.input);
+    expectFailure(result, "UNAVAILABLE", diagnostic.reasonCode);
+    if (!result.ok) {
+      assert.equal(result.error.diagnostic?.stage, "model.invoke");
+      assert.equal(result.error.diagnostic?.modelStep, 1);
+      assert.equal(result.error.diagnostic?.statusCode, diagnostic.statusCode);
+      assert.doesNotMatch(JSON.stringify(result), /customer-secret|payload/);
+    }
+    const terminal = records.filter((record) => record.event === "commerce.turn.failed");
+    assert.equal(terminal.length, 1);
+    assert.equal(terminal[0].data?.reasonCode, diagnostic.reasonCode);
+    assert.equal(typeof terminal[0].data?.reasonMessage, "string");
+    assert.equal(typeof terminal[0].data?.operatorAction, "string");
+    assert.doesNotMatch(JSON.stringify(records), /customer-secret|provider raw payload/);
+  }
+});
+
+test("ARCH-029 tool authorization and execution exceptions identify different causes", async () => {
+  const authorization = fixture([call(), final()], true);
+  authorization.input.dependencies.tools[0].isAuthorized = async () => {
+    throw new Error("authorization customer-secret");
+  };
+  const deniedResult = await runCommerceTurn(authorization.input);
+  expectFailure(deniedResult, "UNAVAILABLE", "TOOL_AUTHORIZATION_FAILED");
+  assert.equal(authorization.counts().tools, 0);
+
+  const execution = fixture([call(), final()], true);
+  execution.input.dependencies.tools[0].execute = async () => {
+    throw new Error("execution customer-secret");
+  };
+  const executionResult = await runCommerceTurn(execution.input);
+  expectFailure(executionResult, "UNAVAILABLE", "TOOL_EXECUTION_FAILED");
+  assert.equal(execution.counts().model, 1);
+  assert.doesNotMatch(JSON.stringify(executionResult), /customer-secret/);
+});
+
+test("ARCH-029 invalid schema never returns or logs malicious issue values", async () => {
+  const records: LogRecord[] = [];
+  const f = fixture([final({ ...exampleFinal, replyText: 42, "customer-secret-field": "customer-secret-value" })]);
+  f.input.dependencies.logger = createLogger({ serviceName: "test-host", environment: "test", sink: (record) => records.push(record) });
+  const result = await runCommerceTurn(f.input);
+  expectFailure(result, "INVALID_FINAL", "FINAL_SCHEMA_INVALID");
+  if (!result.ok) {
+    assert.ok((result.error.diagnostic?.issueCount ?? 0) >= 1);
+    assert.ok(result.error.diagnostic?.issuePaths?.every((path) => path.split(".").every((part) => !part.includes("secret"))));
+  }
+  assert.doesNotMatch(JSON.stringify({ result, records }), /customer-secret-value|customer-secret-field|received|stack/);
+});
+
+test("ARCH-029 logger failures cannot alter preflight or provider error results", async () => {
+  const throwingLogger = {
+    debug() { throw new Error("diagnostic failure"); },
+    info() { throw new Error("diagnostic failure"); },
+    warn() { throw new Error("diagnostic failure"); },
+    error() { throw new Error("diagnostic failure"); },
+    child() { throw new Error("diagnostic failure"); },
+  } as unknown as StructuredLogger;
+  const preflight = fixture([final()]);
+  preflight.input.turn.inboundVersion = 0;
+  preflight.input.dependencies.logger = throwingLogger;
+  expectFailure(await runCommerceTurn(preflight.input), "INVALID_INPUT", "TURN_INVALID");
+  const provider = fixture([final()]);
+  provider.input.dependencies.logger = throwingLogger;
+  provider.input.dependencies.model.invoke = async () => {
+    throw new CommerceModelInvocationFailure({ stage: "model.invoke", reasonCode: "PROVIDER_RATE_LIMITED", statusCode: 429 });
+  };
+  expectFailure(await runCommerceTurn(provider.input), "UNAVAILABLE", "PROVIDER_RATE_LIMITED");
+});
+
+test("ARCH-029 operation timeout differs from whole-turn expiry", async () => {
+  const f = fixture([final()]);
+  const runtime = createCommerceTurnRuntime({ callerSignal: f.input.signal, now: Date.now, deadlineMs: 200 });
+  try {
+    await assert.rejects(runtime.bounded(async () => new Promise<never>(() => {}), 1, {
+      stage: "tool.execute", reasonCode: "TOOL_EXECUTION_FAILED",
+    }), (error: unknown) => {
+      assert.equal(error instanceof Error ? error.message : "", "DEADLINE");
+      assert.equal(error instanceof Object && "diagnostic" in error &&
+        (error as { diagnostic?: { reasonCode: string } }).diagnostic?.reasonCode, "OPERATION_TIMEOUT");
+      return true;
+    });
+  } finally { runtime.dispose(); }
 });

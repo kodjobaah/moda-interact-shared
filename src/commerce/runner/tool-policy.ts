@@ -19,8 +19,12 @@ export async function resolveAvailableTools(
       .find((candidate) => candidate.toolId === granted.toolId);
     if (!tool || !descriptor) continue;
     if (canonicalJson(tool.descriptor) !== canonicalJson(descriptor))
-      throw new RunnerFailure("INCOMPATIBLE_VERSION");
-    if (await runtime.bounded((signal) => tool.isAuthorized(granted, signal), 10000))
+      throw new RunnerFailure("INCOMPATIBLE_VERSION", {
+        stage: "tools.resolve", reasonCode: "TOOL_DESCRIPTOR_MISMATCH", toolName: granted.toolName,
+      });
+    if (await runtime.bounded((signal) => tool.isAuthorized(granted, signal), 10000, {
+      stage: "tool.authorize", reasonCode: "TOOL_AUTHORIZATION_FAILED", toolName: granted.toolName,
+    }))
       available.push(descriptor);
   }
   return available;

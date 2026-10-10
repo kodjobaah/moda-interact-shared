@@ -33,17 +33,19 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
           },
         ],
         maxOutputTokens: execution.prepared.budgets.outputTokens,
-      }, signal), execution.prepared.budgets.deadlineMs);
+      }, signal), execution.prepared.budgets.deadlineMs, {
+        stage: "model.invoke", reasonCode: "MODEL_INVOCATION_FAILED", modelStep,
+      });
     } catch (error) {
       if (error instanceof RunnerFailure) throw error;
-      throw new RunnerFailure("UNAVAILABLE");
+      throw new RunnerFailure("UNAVAILABLE", { stage: "model.invoke", reasonCode: "MODEL_INVOCATION_FAILED", modelStep }, error);
     }
     let step: ModelStep;
     try {
       step = validateModelStep(raw, execution.prepared.budgets.outputTokens);
       routeModelStep(step);
     } catch (error) {
-      logModelInvalid(execution.logger, modelStep, error instanceof RunnerFailure ? error.code : "INVALID_FINAL");
+      logModelInvalid(execution.logger, modelStep, error instanceof RunnerFailure ? error.diagnostic.reasonCode : "UNEXPECTED_EXCEPTION");
       throw error;
     }
     logModelCompleted(execution.logger, {

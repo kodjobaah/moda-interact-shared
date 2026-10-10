@@ -17,6 +17,10 @@ export function safeLog(
   }
 }
 
+export function createRootTurnLogger(input: RunCommerceTurnInput): CommerceTurnLogger {
+  try { return input.dependencies.logger; } catch { return undefined; }
+}
+
 export function createTurnLogger(
   input: RunCommerceTurnInput,
   prepared: PreparedCommerceTurn,
@@ -33,9 +37,9 @@ export function createTurnLogger(
     };
     if (prepared.turn.checkoutRecoveryId !== undefined)
       fields.checkoutRecoveryId = prepared.turn.checkoutRecoveryId;
-    return input.dependencies.logger?.child(fields);
+    return input.dependencies.logger?.child(fields) ?? createRootTurnLogger(input);
   } catch {
-    return undefined;
+    return createRootTurnLogger(input);
   }
 }
 
