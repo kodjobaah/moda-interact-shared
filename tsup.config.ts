@@ -3,6 +3,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: {
     index: "src/index.ts",
+    "incidents/index": "src/incidents/index.ts",
     "commerce/index": "src/commerce/index.ts",
     "commerce/runner/index": "src/commerce/runner/index.ts",
     "commerce/model/index": "src/commerce/model/index.ts",

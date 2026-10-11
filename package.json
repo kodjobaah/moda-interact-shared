@@ -95,6 +95,10 @@
     "./merchant-knowledge/node": {
       "types": "./dist/merchant-knowledge/node.d.ts",
       "import": "./dist/merchant-knowledge/node.js"
+    },
+    "./incidents": {
+      "types": "./dist/incidents/index.d.ts",
+      "import": "./dist/incidents/index.js"
     }
   },
   "files": [
