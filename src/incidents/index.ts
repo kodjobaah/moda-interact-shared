@@ -34,3 +34,12 @@ export function createOperationalIncidentKey(input: Pick<OperationalIncidentOccu
     parsed.reasonCode, parsed.shopId, parsed.resourceKey,
   ])).digest("hex");
 }
+
+export { createOperationalIncidentReporter } from "./reporter.js";
+export type {
+  IncidentPersistence, IncidentTransaction, IncidentSnapshot, IncidentReportResult,
+  IncidentReporterLogger,
+} from "./reporter.js";
+
+export { createPrismaOperationalIncidentPersistence } from "./postgres.js";
+export type { OperationalIncidentPrismaClient, OperationalIncidentSqlClient, OperationalIncidentSupportWriter } from "./postgres.js";
