@@ -17,7 +17,16 @@ assert(result.ok);assert.equal(runnerVersion,'1.0.0');
 const oversized={name:'oversize_tool',definitionVersion:'1.0.0',description:'Fixture',inputSchema:{},execution:{x:'x'.repeat(40000)},responseTemplate:{x:'x'.repeat(40000)}};
 assert.equal(c.CommerceToolDraftDefinitionSchema.safeParse(oversized).success,false);
 const malformed=await runCommerceTurn({turn:c.exampleTurn,grant:c.exampleGrant(manifest),manifest,hostInstructions:[],context:{},history:[],language:{tag:null,source:null},signal:new AbortController().signal,dependencies:{digest,now:()=>Date.now(),tools:[],model:{invoke:async()=>({calls:[null],outputTokens:1})}}});
-assert.deepEqual(malformed,{ok:false,error:{code:'INVALID_FINAL',retryable:false}});
+assert.equal(malformed.ok, false);
+assert.deepEqual(
+  { code: malformed.error.code, retryable: malformed.error.retryable },
+  { code: 'INVALID_FINAL', retryable: false },
+);
+assert.equal(malformed.error.diagnostic?.stage, 'model.validate');
+assert.equal(malformed.error.diagnostic?.reasonCode, 'MODEL_TOOL_CALL_NULL');
+assert.equal(malformed.error.diagnostic?.callIndex, 0);
+assert.match(malformed.error.diagnostic?.reasonMessage ?? '', /null tool-call entry at index 0/i);
+assert.match(malformed.error.diagnostic?.operatorAction ?? '', /tool-call conversion/i);
 console.log('PASS commerce and commerce/runner clean-process imports, schema, scripted finalResponse and R1/R2 regressions');
 `;
 // Deliberately pass only basic runtime variables, never provider/database credentials.
