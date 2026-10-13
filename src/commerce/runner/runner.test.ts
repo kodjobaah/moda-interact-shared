@@ -1001,6 +1001,44 @@ test("invalid model output emits model.invalid and turn.failed with bounded fiel
   assert.ok(records.some((record) => record.event === "commerce.turn.failed" && record.data?.errorCode === "INVALID_FINAL"));
 });
 
+test("model completion logs bounded provider finish and reasoning metadata", async () => {
+  const records: LogRecord[] = [];
+  const f = fixture([{ calls: [], text: "Available information", outputTokens: 800,
+    providerSummary: {
+      finishReason: "stop", reasoningTokens: 120,
+      hasVisibleText: true, hasReasoningBlocks: false, contentKind: "plain_text",
+    },
+  }]);
+  f.input.budgets = { outputTokens: 800 };
+  f.input.dependencies.logger = createLogger({ serviceName: "test-host", environment: "test", sink: (record) => records.push(record) });
+  const result = await runCommerceTurn(f.input);
+  assert.equal(result.ok, true);
+  const completed = records.find((record) => record.event === "commerce.turn.model.completed");
+  assert.equal(completed?.data?.providerFinishReason, "stop");
+  assert.equal(completed?.data?.providerReasoningTokens, 120);
+  assert.equal(completed?.data?.providerHasVisibleText, true);
+});
+
+test("invalid empty route includes safe provider diagnostics without raw reasoning", async () => {
+  const records: LogRecord[] = [];
+  const secret = "CUSTOMER_SECRET_REASONING";
+  const f = fixture([{ calls: [], outputTokens: 800, providerSummary: {
+    finishReason: "length", reasoningTokens: 798,
+    hasVisibleText: false, hasReasoningBlocks: true,
+    contentKind: "non_text_blocks",
+    secret,
+  } as ModelStep["providerSummary"] }]);
+  f.input.budgets = { outputTokens: 800 };
+  f.input.dependencies.logger = createLogger({ serviceName: "test-host", environment: "test", sink: (record) => records.push(record) });
+  const result = await runCommerceTurn(f.input);
+  expectFailure(result, "INVALID_FINAL", "MODEL_CALL_ROUTE_INVALID");
+  const invalid = records.find((record) => record.event === "commerce.turn.model.invalid");
+  assert.equal(invalid?.data?.providerFinishReason, "length");
+  assert.equal(invalid?.data?.providerReasoningTokens, 798);
+  assert.equal(invalid?.data?.providerHasVisibleText, false);
+  assert.doesNotMatch(JSON.stringify(records), /CUSTOMER_SECRET_REASONING/);
+});
+
 test("ARCH-029 null model tool call identifies its index and cause in terminal logs", async () => {
   const records: LogRecord[] = [];
   const f = fixture([{ calls: [null], outputTokens: 1 } as unknown as ModelStep]);

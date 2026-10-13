@@ -41,11 +41,17 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
       throw new RunnerFailure("UNAVAILABLE", { stage: "model.invoke", reasonCode: "MODEL_INVOCATION_FAILED", modelStep }, error);
     }
     let step: ModelStep;
+    let observedStep: ModelStep | undefined;
     try {
       step = validateModelStep(raw, execution.prepared.budgets.outputTokens);
+      observedStep = step;
       routeModelStep(step);
     } catch (error) {
-      logModelInvalid(execution.logger, modelStep, error instanceof RunnerFailure ? error.diagnostic.reasonCode : "UNEXPECTED_EXCEPTION");
+      logModelInvalid(
+        execution.logger, modelStep,
+        error instanceof RunnerFailure ? error.diagnostic.reasonCode : "UNEXPECTED_EXCEPTION",
+        observedStep?.providerSummary,
+      );
       throw error;
     }
     logModelCompleted(execution.logger, {
@@ -54,6 +60,7 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
       finalResponseRequested: step.calls.some((call) => call.name === "finalResponse"),
       outputTokens: step.outputTokens,
       durationMs: elapsedDuration(execution.input, startedAt),
+      providerSummary: step.providerSummary,
     });
     return { modelSteps: modelStep, pendingStep: step };
   };

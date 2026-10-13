@@ -99,7 +99,11 @@ test("runtime request controls Tools, token limit, automatic tool choice and ser
   }]);
   assert.deepEqual(captured.bindOptions, { tool_choice: "auto" });
   assert.equal(captured.invokeOptions.maxTokens, request.maxOutputTokens);
-  assert.deepEqual(result, { calls: [{ name: "read_product", arguments: { handle: "coat" } }], outputTokens: 17 });
+  assert.deepEqual(result, {
+    calls: [{ name: "read_product", arguments: { handle: "coat" } }],
+    outputTokens: 17,
+    providerSummary: { hasVisibleText: false, hasReasoningBlocks: false, contentKind: "missing" },
+  });
 });
 
 test("OpenRouter adapter preserves natural response text and typed text blocks", async () => {
@@ -108,7 +112,14 @@ test("OpenRouter adapter preserves natural response text and typed text blocks",
     [[{ type: "reasoning", reasoning: "private" }, { type: "text", text: "Hello " }, { type: "text", text: "there" }], "Hello there"],
   ] as const) {
     const { invoke } = harness({ content, tool_calls: [], usage_metadata: { output_tokens: 9 } });
-    assert.deepEqual(await invoke(request, new AbortController().signal), { calls: [], text: expected, outputTokens: 9 });
+    assert.deepEqual(await invoke(request, new AbortController().signal), {
+      calls: [], text: expected, outputTokens: 9,
+      providerSummary: {
+        hasVisibleText: true,
+        hasReasoningBlocks: Array.isArray(content),
+        contentKind: Array.isArray(content) ? "typed_blocks" : "plain_text",
+      },
+    });
   }
 });
 
@@ -121,7 +132,42 @@ test("OpenRouter adapter preserves tools alongside interim text without treating
   assert.deepEqual(await invoke(request, new AbortController().signal), {
     calls: [{ name: "read_product", arguments: { handle: "coat" } }],
     text: "Let me check that.", outputTokens: 9,
+    providerSummary: { hasVisibleText: true, hasReasoningBlocks: false, contentKind: "plain_text" },
   });
+});
+
+test("OpenRouter response diagnostics retain only allowlisted finish and reasoning counts", async () => {
+  const secret = "PRIVATE_REASONING_AND_CUSTOMER_PAYLOAD";
+  const { invoke } = harness({
+    content: [{ type: "reasoning", reasoning: secret }],
+    tool_calls: [],
+    usage_metadata: { output_tokens: 800, output_token_details: { reasoning: 798, prompt: secret } },
+    response_metadata: { finish_reason: "length", confidential: secret },
+  });
+  const step = await invoke(request, new AbortController().signal);
+  assert.deepEqual(step, {
+    calls: [], outputTokens: 800,
+    providerSummary: {
+      finishReason: "length", reasoningTokens: 798,
+      hasVisibleText: false, hasReasoningBlocks: true, contentKind: "non_text_blocks",
+    },
+  });
+  assert.doesNotMatch(JSON.stringify(step), /PRIVATE_REASONING_AND_CUSTOMER_PAYLOAD/);
+});
+
+test("OpenRouter response diagnostics do not forward arbitrary provider fields", async () => {
+  const secret = "PRIVATE_METADATA_TEXT";
+  const { invoke } = harness({
+    content: "Safe reply", tool_calls: [],
+    usage_metadata: { output_tokens: 6, output_token_details: { reasoning: -1 } },
+    response_metadata: { finish_reason: secret, token_usage: { prompt: secret } },
+  });
+  const step = await invoke(request, new AbortController().signal);
+  assert.deepEqual(step.providerSummary, {
+    finishReason: "other", hasVisibleText: true,
+    hasReasoningBlocks: false, contentKind: "plain_text",
+  });
+  assert.doesNotMatch(JSON.stringify(step), /PRIVATE_METADATA_TEXT/);
 });
 
 test("request messages preserve order and frame Tool results as data", async () => {

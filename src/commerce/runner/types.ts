@@ -12,7 +12,15 @@ import type { StructuredLogger } from "../../logging/index.js";
 
 export type ModelCall = { name: string; arguments: unknown };
 /** `text` is optional so existing structured-tool invokers remain compatible. */
-export type ModelStep = { calls: ModelCall[]; outputTokens: number; text?: string };
+/** Only bounded provider metadata is carried into the runner. Never include response bodies or reasoning. */
+export type ModelResponseSummary = {
+  finishReason?: "stop" | "length" | "tool_calls" | "content_filter" | "other";
+  reasoningTokens?: number;
+  hasVisibleText: boolean;
+  hasReasoningBlocks: boolean;
+  contentKind: "missing" | "plain_text" | "typed_blocks" | "non_text_blocks";
+};
+export type ModelStep = { calls: ModelCall[]; outputTokens: number; text?: string; providerSummary?: ModelResponseSummary };
 export type ModelRequest = {
   instructions: readonly string[];
   context: unknown;

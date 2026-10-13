@@ -1,6 +1,6 @@
 import type { LogFields, StructuredLogger } from "../../logging/index.js";
 import type { PreparedCommerceTurn } from "./preflight.js";
-import type { RunCommerceTurnInput } from "./types.js";
+import type { RunCommerceTurnInput, ModelResponseSummary } from "./types.js";
 
 export type CommerceTurnLogger = StructuredLogger | undefined;
 
@@ -56,6 +56,21 @@ export function logModelStarted(
   safeLog(logger, "debug", "commerce.turn.model.started", fields);
 }
 
+/** Defense in depth: log only finite, allowlisted telemetry even for custom invokers. */
+function safeProviderSummary(summary: ModelResponseSummary | undefined): LogFields {
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) return {};
+  const allowedReasons = ["stop", "length", "tool_calls", "content_filter", "other"];
+  const allowedKinds = ["missing", "plain_text", "typed_blocks", "non_text_blocks"];
+  return {
+    ...(allowedReasons.includes(summary.finishReason ?? "") ? { providerFinishReason: summary.finishReason } : {}),
+    ...(Number.isSafeInteger(summary.reasoningTokens) && summary.reasoningTokens! >= 0 && summary.reasoningTokens! <= 1_000_000_000
+      ? { providerReasoningTokens: summary.reasoningTokens } : {}),
+    ...(typeof summary.hasVisibleText === "boolean" ? { providerHasVisibleText: summary.hasVisibleText } : {}),
+    ...(typeof summary.hasReasoningBlocks === "boolean" ? { providerHasReasoningBlocks: summary.hasReasoningBlocks } : {}),
+    ...(allowedKinds.includes(summary.contentKind) ? { providerContentKind: summary.contentKind } : {}),
+  };
+}
+
 export function logModelCompleted(
   logger: CommerceTurnLogger,
   fields: {
@@ -64,11 +79,22 @@ export function logModelCompleted(
     finalResponseRequested: boolean;
     outputTokens: number;
     durationMs: number;
+    providerSummary?: ModelResponseSummary;
   },
 ) {
-  safeLog(logger, "debug", "commerce.turn.model.completed", fields);
+  const { providerSummary, ...ordinaryFields } = fields;
+  safeLog(logger, "debug", "commerce.turn.model.completed", {
+    ...ordinaryFields, ...safeProviderSummary(providerSummary),
+  });
 }
 
-export function logModelInvalid(logger: CommerceTurnLogger, modelStep: number, reasonCode: string) {
-  safeLog(logger, "warn", "commerce.turn.model.invalid", { modelStep, reasonCode });
+export function logModelInvalid(
+  logger: CommerceTurnLogger,
+  modelStep: number,
+  reasonCode: string,
+  providerSummary?: ModelResponseSummary,
+) {
+  safeLog(logger, "warn", "commerce.turn.model.invalid", {
+    modelStep, reasonCode, ...safeProviderSummary(providerSummary),
+  });
 }

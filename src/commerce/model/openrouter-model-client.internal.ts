@@ -14,6 +14,7 @@ import {
   type CommerceProviderModelId,
 } from "./index.js";
 import type { ModelRequest, ModelStep } from "../runner/index.js";
+import type { ModelResponseSummary } from "../runner/types.js";
 import { CommerceModelInvocationFailure } from "../runner/failure.js";
 import { safeRunnerCauseMetadata, type RunnerTransportCode } from "../runner/diagnostics.js";
 
@@ -178,6 +179,26 @@ function requestMessages(request: ModelRequest) {
   return messages;
 }
 
+/** Never forward provider-supplied free-form strings, reasoning text or response bodies. */
+function safeFinishReason(response: Record<string, unknown>): ModelResponseSummary["finishReason"] {
+  const metadata = response.response_metadata;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return undefined;
+  const fields = metadata as Record<string, unknown>;
+  const reason = fields.finish_reason ?? fields.finishReason;
+  if (reason === undefined || reason === null) return undefined;
+  if (reason === "stop" || reason === "length" || reason === "tool_calls" || reason === "content_filter")
+    return reason;
+  return "other";
+}
+
+function safeReasoningTokenCount(response: Record<string, unknown>): number | undefined {
+  const usage = response.usage_metadata;
+  if (!usage || typeof usage !== "object" || Array.isArray(usage)) return undefined;
+  const details = (usage as Record<string, unknown>).output_token_details;
+  if (!details || typeof details !== "object" || Array.isArray(details)) return undefined;
+  return boundedInteger((details as Record<string, unknown>).reasoning, 0, 1_000_000_000);
+}
+
 function modelStepFromResponse(response: unknown): ModelStep {
   if (!response || typeof response !== "object" || Array.isArray(response))
     throw unavailable({ stage: "response", reason: "PROVIDER_RESPONSE_INVALID" });
@@ -215,7 +236,24 @@ function modelStepFromResponse(response: unknown): ModelStep {
   } else if (content !== undefined) {
     throw unavailable({ stage: "response", reason: "PROVIDER_RESPONSE_INVALID" });
   }
-  return { calls, outputTokens: outputTokens as number, ...(text ? { text } : {}) };
+  const hasReasoningBlocks = Array.isArray(content) && content.some((block) =>
+    !!block && typeof block === "object" && !Array.isArray(block) &&
+    (block as { type?: unknown }).type === "reasoning");
+  const contentKind: ModelResponseSummary["contentKind"] = typeof content === "string"
+    ? "plain_text"
+    : Array.isArray(content)
+      ? (text ? "typed_blocks" : "non_text_blocks")
+      : "missing";
+  const finishReason = safeFinishReason(value);
+  const reasoningTokens = safeReasoningTokenCount(value);
+  const providerSummary: ModelResponseSummary = {
+    hasVisibleText: Boolean(text?.trim()),
+    hasReasoningBlocks,
+    contentKind,
+    ...(finishReason === undefined ? {} : { finishReason }),
+    ...(reasoningTokens === undefined ? {} : { reasoningTokens }),
+  };
+  return { calls, outputTokens: outputTokens as number, ...(text ? { text } : {}), providerSummary };
 }
 
 const defaultFactory: ChatModelFactory = (options) =>
