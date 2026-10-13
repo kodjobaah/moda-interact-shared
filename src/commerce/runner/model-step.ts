@@ -24,6 +24,11 @@ export function validateModelStep(step: unknown, outputTokenBudget: number): Mod
     if (outputTokens < 0) invalidStep("MODEL_OUTPUT_TOKENS_NEGATIVE");
     if (outputTokens > outputTokenBudget) invalidStep("MODEL_OUTPUT_TOKENS_OVER_BUDGET");
 
+    if (Object.hasOwn(value, "text")) {
+      if (typeof value.text !== "string") invalidStep("MODEL_TEXT_NOT_STRING");
+      if (value.text.length > 4096) invalidStep("MODEL_TEXT_TOO_LONG");
+    }
+
     const calls = value.calls as unknown[];
     if (calls.length > 32) invalidStep("MODEL_TOOL_CALL_LIMIT_EXCEEDED");
     for (let index = 0; index < calls.length; index += 1) {
@@ -55,14 +60,16 @@ export function validateModelStep(step: unknown, outputTokenBudget: number): Mod
   }
 }
 
-export function routeModelStep(step: ModelStep): "toolCalls" | "finalResponse" {
+export function routeModelStep(step: ModelStep): "toolCalls" | "finalResponse" | "textResponse" {
   const finalCalls = step.calls.filter((call) => call.name === "finalResponse");
   if (finalCalls.length > 0) {
     if (finalCalls.length !== 1 || step.calls.length !== 1)
       throw new RunnerFailure("INVALID_FINAL", { stage: "model.route", reasonCode: "MODEL_CALL_ROUTE_INVALID" });
     return "finalResponse";
   }
-  if (step.calls.length === 0)
+  if (step.calls.length === 0) {
+    if (step.text?.trim()) return "textResponse";
     throw new RunnerFailure("INVALID_FINAL", { stage: "model.route", reasonCode: "MODEL_CALL_ROUTE_INVALID" });
+  }
   return "toolCalls";
 }

@@ -28,7 +28,7 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
           })),
           {
             name: "finalResponse",
-            description: "Return the only final structured reply.",
+            description: "Return a structured reply when metadata, evidence, details or referral is required; otherwise plain text is allowed.",
             inputSchema: finalResponseToolSchema(execution.prepared.response),
           },
         ],

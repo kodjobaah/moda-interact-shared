@@ -88,7 +88,7 @@ test("OpenRouter config maps named fields and preserves unknown snake_case optio
   });
 });
 
-test("runtime request controls Tools, token limit, required tool choice and serial calls", async () => {
+test("runtime request controls Tools, token limit, automatic tool choice and serial calls", async () => {
   const { invoke, captured } = harness();
   const result = await invoke(request, new AbortController().signal);
   assert.deepEqual(captured.tools, [{
@@ -97,9 +97,31 @@ test("runtime request controls Tools, token limit, required tool choice and seri
       name: "read_product", description: "Read product facts.", parameters: request.tools[0].inputSchema, strict: true
     },
   }]);
-  assert.deepEqual(captured.bindOptions, { tool_choice: "required" });
+  assert.deepEqual(captured.bindOptions, { tool_choice: "auto" });
   assert.equal(captured.invokeOptions.maxTokens, request.maxOutputTokens);
   assert.deepEqual(result, { calls: [{ name: "read_product", arguments: { handle: "coat" } }], outputTokens: 17 });
+});
+
+test("OpenRouter adapter preserves natural response text and typed text blocks", async () => {
+  for (const [content, expected] of [
+    ["Hello!", "Hello!"],
+    [[{ type: "reasoning", reasoning: "private" }, { type: "text", text: "Hello " }, { type: "text", text: "there" }], "Hello there"],
+  ] as const) {
+    const { invoke } = harness({ content, tool_calls: [], usage_metadata: { output_tokens: 9 } });
+    assert.deepEqual(await invoke(request, new AbortController().signal), { calls: [], text: expected, outputTokens: 9 });
+  }
+});
+
+test("OpenRouter adapter preserves tools alongside interim text without treating it as final", async () => {
+  const { invoke } = harness({
+    content: "Let me check that.",
+    tool_calls: [{ name: "read_product", args: { handle: "coat" } }],
+    usage_metadata: { output_tokens: 9 },
+  });
+  assert.deepEqual(await invoke(request, new AbortController().signal), {
+    calls: [{ name: "read_product", arguments: { handle: "coat" } }],
+    text: "Let me check that.", outputTokens: 9,
+  });
 });
 
 test("request messages preserve order and frame Tool results as data", async () => {

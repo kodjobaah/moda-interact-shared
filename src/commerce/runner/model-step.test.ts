@@ -18,6 +18,8 @@ const invalidCases: ReadonlyArray<{
   { name: "fractional outputTokens", step: { ...valid(), outputTokens: 1.5 }, reasonCode: "MODEL_OUTPUT_TOKENS_NOT_SAFE_INTEGER" },
   { name: "negative outputTokens", step: { ...valid(), outputTokens: -1 }, reasonCode: "MODEL_OUTPUT_TOKENS_NEGATIVE" },
   { name: "over-budget outputTokens", step: { ...valid(), outputTokens: 11 }, reasonCode: "MODEL_OUTPUT_TOKENS_OVER_BUDGET" },
+  { name: "non-string natural text", step: { ...valid(), text: { unsafe: true } }, reasonCode: "MODEL_TEXT_NOT_STRING" },
+  { name: "oversized natural text", step: { ...valid(), text: "x".repeat(4097) }, reasonCode: "MODEL_TEXT_TOO_LONG" },
   { name: "too many calls", step: { ...valid(), calls: Array.from({ length: 33 }, () => valid().calls[0]) }, reasonCode: "MODEL_TOOL_CALL_LIMIT_EXCEEDED" },
   { name: "null tool call", step: { ...valid(), calls: [null] }, reasonCode: "MODEL_TOOL_CALL_NULL", callIndex: 0 },
   { name: "nonobject tool call", step: { ...valid(), calls: [17] }, reasonCode: "MODEL_TOOL_CALL_NOT_OBJECT", callIndex: 0 },

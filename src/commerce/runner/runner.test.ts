@@ -118,6 +118,70 @@ test("R01/P12 zero remote grant supports final referral without model runtime/cr
     ["finalResponse"],
   );
 });
+test("natural text is wrapped in the pinned canonical final response envelope", async () => {
+  const f = fixture([{ calls: [], text: "  Hello there!  ", outputTokens: 12 }]);
+  const result = await runCommerceTurn(f.input);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  if (!result.ok) return;
+  assert.deepEqual(result.result, {
+    answerKind: "ANSWER", replyText: "Hello there!", referralReason: null,
+    detectedLanguageTag: null, detectedLanguageConfidence: null,
+    evidenceIds: [], details: {},
+  });
+  assert.deepEqual(result.usage, { modelSteps: 1, remoteCalls: 0 });
+});
+
+test("natural text after authorised tool completion is a valid final response", async () => {
+  const f = fixture([call(), { calls: [], text: "Coat is available.", outputTokens: 9 }], true);
+  const result = await runCommerceTurn(f.input);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  if (!result.ok) return;
+  assert.equal(result.result.replyText, "Coat is available.");
+  assert.deepEqual(result.usage, { modelSteps: 2, remoteCalls: 1 });
+  assert.equal(f.counts().tools, 1);
+});
+
+test("natural text cannot bypass required pinned response details", async () => {
+  const f = fixture([{ calls: [], text: "Natural reply", outputTokens: 8 }]);
+  f.input.manifest.responseContract.detailsSchema = {
+    type: "object",
+    properties: { requiredField: { type: "string" } },
+    required: ["requiredField"],
+    additionalProperties: false,
+  };
+  f.input.manifest.responseContractHash = digest(
+    responseContractCanonicalJson(f.input.manifest.responseContract),
+  );
+  expectFailure(await runCommerceTurn(f.input), "INVALID_FINAL", "FINAL_SCHEMA_INVALID");
+});
+
+test("interim text cannot skip requested tool execution", async () => {
+  const f = fixture([
+    { ...call(), text: "I will check that." },
+    { calls: [], text: "Here is the result.", outputTokens: 8 },
+  ], true);
+  const result = await runCommerceTurn(f.input);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  if (!result.ok) return;
+  assert.equal(result.result.replyText, "Here is the result.");
+  assert.equal(f.counts().tools, 1);
+});
+
+test("natural text cannot bypass required store referral after a denied tool", async () => {
+  const f = fixture([call("ungranted_tool"), { calls: [], text: "I completed the request.", outputTokens: 9 }], true);
+  expectFailure(await runCommerceTurn(f.input), "INVALID_FINAL", "FINAL_REFERRAL_REQUIRED");
+  assert.equal(f.counts().tools, 0);
+});
+
+test("malformed and empty natural responses remain fail-closed", async () => {
+  for (const text of ["", "  ", "x".repeat(4097)]) {
+    const f = fixture([{ calls: [], text, outputTokens: 9 }]);
+    await fails(f.input, "INVALID_FINAL");
+  }
+  const f = fixture([{ calls: [...final().calls, ...call().calls], text: "Ignore tools", outputTokens: 9 }]);
+  expectFailure(await runCommerceTurn(f.input), "INVALID_FINAL", "MODEL_CALL_ROUTE_INVALID");
+});
+
 test("generic multi-step basket -> discount -> qualifying-products -> final without name switch", async () => {
   const f = fixture([], true);
   const names = [

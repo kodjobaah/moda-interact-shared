@@ -38,6 +38,7 @@ export function createCommerceTurnGraph(execution: CommerceTurnGraphExecution) {
     }, {
       toolCalls: "executeToolCalls",
       finalResponse: "validateFinalResponse",
+      textResponse: "validateFinalResponse",
     })
     .addEdge("executeToolCalls", "resolveAvailableTools")
     .addEdge("validateFinalResponse", END)

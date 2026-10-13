@@ -201,7 +201,21 @@ function modelStepFromResponse(response: unknown): ModelStep {
     ) throw unavailable({ stage: "response", reason: "PROVIDER_RESPONSE_TOOL_CALL_INVALID" });
     return { name: call.name, arguments: call.args };
   });
-  return { calls, outputTokens: outputTokens as number };
+  // LangChain returns plain text in `content` (string or typed text blocks).
+  // Ignore non-text blocks such as provider reasoning; never surface them as replies.
+  const content = value.content;
+  let text: string | undefined;
+  if (typeof content === "string") text = content;
+  else if (Array.isArray(content)) {
+    const blocks = content.filter((block): block is { type: "text"; text: string } =>
+      !!block && typeof block === "object" && !Array.isArray(block) &&
+      (block as { type?: unknown }).type === "text" &&
+      typeof (block as { text?: unknown }).text === "string");
+    text = blocks.map((block) => block.text).join("");
+  } else if (content !== undefined) {
+    throw unavailable({ stage: "response", reason: "PROVIDER_RESPONSE_INVALID" });
+  }
+  return { calls, outputTokens: outputTokens as number, ...(text ? { text } : {}) };
 }
 
 const defaultFactory: ChatModelFactory = (options) =>
@@ -265,7 +279,7 @@ export function createOpenRouterInvoker(
 
         let bound: BoundChatModel;
         try {
-          bound = model.bindTools(tools, { tool_choice: "required" });
+          bound = model.bindTools(tools, { tool_choice: "auto" });
         } catch (error) {
           const diagnostic = { stage: "binding", reason: "TOOL_BIND_FAILED" } as const;
           safeDiagnostic(options.onDiagnostic, diagnostic);

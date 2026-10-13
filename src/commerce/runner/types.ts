@@ -11,7 +11,8 @@ import type { GrantedTool, ToolDescriptor } from "../definitions.js";
 import type { StructuredLogger } from "../../logging/index.js";
 
 export type ModelCall = { name: string; arguments: unknown };
-export type ModelStep = { calls: ModelCall[]; outputTokens: number };
+/** `text` is optional so existing structured-tool invokers remain compatible. */
+export type ModelStep = { calls: ModelCall[]; outputTokens: number; text?: string };
 export type ModelRequest = {
   instructions: readonly string[];
   context: unknown;
