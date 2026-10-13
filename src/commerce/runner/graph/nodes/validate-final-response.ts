@@ -1,6 +1,7 @@
 import { RunnerFailure } from "../../failure.js";
 import { validateFinalResponse } from "../../final-response.js";
 import { logModelInvalid } from "../../observability.js";
+import { safeReferralText } from "../../safe-referral-text.js";
 import type { CommerceTurnGraphExecution } from "../graph.js";
 import type { CommerceTurnGraphStateValue } from "../state.js";
 
@@ -9,14 +10,17 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
     if (!state.pendingStep)
       throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "MODEL_RESULT_MISSING" });
     try {
-      // A plain-text answer has no authority to invent detection metadata, evidence or
-      // response-contract details. The same pinned final schema still validates it.
-      // If a denied/failed tool requires referral, do not let text evade that rule.
+      // Natural text may finish a turn, but cannot override mandatory referral
+      // after a failed/denied tool. Use trusted, localized host copy instead of
+      // repeating potentially unsupported claims from the model.
+      // The same pinned final schema validates both resulting envelopes.
       const raw = state.pendingStep.calls.length === 0
         ? {
-            answerKind: "ANSWER",
-            replyText: state.pendingStep.text?.trim() ?? "",
-            referralReason: null,
+            answerKind: state.requiredReferral ? "REFER_TO_STORE" : "ANSWER",
+            replyText: state.requiredReferral
+              ? safeReferralText(execution.input.language.tag)
+              : state.pendingStep.text?.trim() ?? "",
+            referralReason: state.requiredReferral,
             detectedLanguageTag: null,
             detectedLanguageConfidence: null,
             evidenceIds: [],
