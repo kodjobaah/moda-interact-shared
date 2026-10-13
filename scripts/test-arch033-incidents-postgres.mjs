@@ -46,7 +46,7 @@ try {
   // The local fixture is the only database reachable by the test; never consult ambient DATABASE_URL.
   const fixtureUrl = `postgresql://postgres:arch033-disposable@127.0.0.1:${port}/${dbName}?schema=public`;
   execFileSync("npm", ["run", "prisma:generate"], { cwd: dbRepo, stdio: "inherit", env: { ...process.env, DATABASE_URL: fixtureUrl } });
-  execFileSync(resolve(root, "node_modules/.bin/tsx"), ["src/incidents/postgres.integration.test.ts"], {
+  execFileSync(resolve(root, "node_modules/.bin/tsx"), ["src/incidents/postgres.integration.ts"], {
     cwd: root, stdio: "inherit",
     env: { ...process.env, DATABASE_URL: fixtureUrl, ARCH033_DISPOSABLE_POSTGRES: "1" },
   });

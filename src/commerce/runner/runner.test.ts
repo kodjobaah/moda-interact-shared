@@ -145,7 +145,7 @@ test("natural text cannot bypass required pinned response details", async () => 
   const f = fixture([{ calls: [], text: "Natural reply", outputTokens: 8 }]);
   f.input.manifest.responseContract.detailsSchema = {
     type: "object",
-    properties: { requiredField: { type: "string" } },
+    properties: { requiredField: { type: "string", maxLength: 64 } },
     required: ["requiredField"],
     additionalProperties: false,
   };
@@ -167,10 +167,62 @@ test("interim text cannot skip requested tool execution", async () => {
   assert.equal(f.counts().tools, 1);
 });
 
-test("natural text cannot bypass required store referral after a denied tool", async () => {
+test("natural text after a denied tool produces a safe, typed store referral", async () => {
   const f = fixture([call("ungranted_tool"), { calls: [], text: "I completed the request.", outputTokens: 9 }], true);
-  expectFailure(await runCommerceTurn(f.input), "INVALID_FINAL", "FINAL_REFERRAL_REQUIRED");
+  const result = await runCommerceTurn(f.input);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  if (!result.ok) return;
+  assert.equal(result.result.answerKind, "REFER_TO_STORE");
+  assert.equal(result.result.referralReason, "INSUFFICIENT_TOOLS");
+  assert.match(result.result.replyText, /contact the store/i);
+  assert.equal(result.result.replyText.includes("I completed the request"), false);
+  assert.deepEqual(result.result.evidenceIds, []);
+  assert.deepEqual(result.result.details, {});
+  assert.deepEqual(result.usage, { modelSteps: 2, remoteCalls: 0 });
   assert.equal(f.counts().tools, 0);
+});
+
+test("nonretryable unavailable Merchant Knowledge tool yields safe referral after text", async () => {
+  const f = fixture([call(), { calls: [], text: "The store offers free returns.", outputTokens: 78 }], true);
+  let attempts = 0;
+  f.input.dependencies.tools[0].execute = async () => {
+    attempts++;
+    return { contractVersion: "commerce.v1", status: "ERROR", code: "UNAVAILABLE", retryable: false };
+  };
+  const result = await runCommerceTurn(f.input);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  if (!result.ok) return;
+  assert.equal(result.result.answerKind, "REFER_TO_STORE");
+  assert.equal(result.result.referralReason, "TOOL_UNAVAILABLE");
+  assert.equal(result.result.replyText.includes("free returns"), false);
+  assert.deepEqual(result.result.evidenceIds, []);
+  assert.deepEqual(result.result.details, {});
+  assert.deepEqual(result.usage, { modelSteps: 2, remoteCalls: 1 });
+  assert.equal(attempts, 1);
+});
+
+test("referral text uses the conversation locale without accepting model claims", async () => {
+  for (const [language, expected] of [
+    ["fr-FR", /boutique/],
+    ["pt-BR", /loja/],
+    ["zh-Hant-TW", /商家/],
+    ["sw-KE", /contact the store/],
+  ] as const) {
+    const f = fixture([call("ungranted_tool"), { calls: [], text: "Order refunded.", outputTokens: 9 }], true);
+    f.input.language = { tag: language, source: "customer-explicit" };
+    const result = await runCommerceTurn(f.input);
+    assert.equal(result.ok, true, `${language}: ${JSON.stringify(result)}`);
+    if (!result.ok) continue;
+    assert.equal(result.result.answerKind, "REFER_TO_STORE");
+    assert.match(result.result.replyText, expected);
+    assert.equal(result.result.replyText.includes("Order refunded"), false);
+    assert.equal(result.result.detectedLanguageTag, null);
+  }
+});
+
+test("structured ANSWER cannot bypass required referral after a denied tool", async () => {
+  const f = fixture([call("ungranted_tool"), final({ ...exampleFinal, answerKind: "ANSWER", referralReason: null })], true);
+  expectFailure(await runCommerceTurn(f.input), "INVALID_FINAL", "FINAL_REFERRAL_REQUIRED");
 });
 
 test("malformed and empty natural responses remain fail-closed", async () => {
