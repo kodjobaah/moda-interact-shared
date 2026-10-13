@@ -96,9 +96,10 @@ export function prepareCommerceTurn(input: RunCommerceTurnInput): PreparedCommer
     outputTokens: 800,
     ...input.budgets,
   };
+  // Budget policy belongs to the caller. Shared validates only that supplied
+  // limits can be represented safely, then enforces them during execution.
   for (const key of ["modelSteps", "remoteCalls", "deadlineMs", "outputTokens"] as const) {
-    const maximum = { modelSteps: 12, remoteCalls: 10, deadlineMs: 90000, outputTokens: 800 }[key];
-    if (!Number.isSafeInteger(budgets[key]) || budgets[key] < 1 || budgets[key] > maximum)
+    if (!Number.isSafeInteger(budgets[key]) || budgets[key] < 1)
       throw new RunnerFailure("INVALID_INPUT", { stage: "preflight.validate", reasonCode: "BUDGET_INVALID" });
   }
   if (

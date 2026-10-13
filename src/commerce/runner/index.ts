@@ -1,5 +1,5 @@
 import { RunnerFailure, mapRunnerFailure } from "./failure.js";
-import { createCommerceTurnGraph, COMMERCE_TURN_GRAPH_RECURSION_LIMIT } from "./graph/graph.js";
+import { createCommerceTurnGraph, commerceTurnGraphRecursionLimit } from "./graph/graph.js";
 import { initialCommerceTurnGraphState } from "./graph/state.js";
 import {
   createRootTurnLogger,
@@ -59,7 +59,7 @@ export async function runCommerceTurn(input: RunCommerceTurnInput): Promise<RunC
 
     const graph = createCommerceTurnGraph({ input, prepared, runtime, logger, stats });
     const state = await graph.invoke(initialCommerceTurnGraphState(), {
-      recursionLimit: COMMERCE_TURN_GRAPH_RECURSION_LIMIT,
+      recursionLimit: commerceTurnGraphRecursionLimit(prepared.budgets.modelSteps),
     });
     modelSteps = state.modelSteps;
     remoteCalls = state.remoteCalls;

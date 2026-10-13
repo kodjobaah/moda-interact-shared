@@ -17,7 +17,7 @@ const explanations = {
   RUNNER_VERSION_INCOMPATIBLE: ["The release manifest requires a different runner version.", "Align the deployed Shared runner version with the release's compatibility range."],
   RESPONSE_CONTRACT_INVALID: ["The trusted final-response contract failed integrity or compatibility verification.", "Recheck the published release and contract digest."],
   LANGUAGE_INVALID: ["The supplied conversation language or language-source fields are invalid.", "Check the host language configuration and supported locale values."],
-  BUDGET_INVALID: ["A configured model, remote-call, deadline or token budget is invalid.", "Check budget ranges supplied by the caller."],
+  BUDGET_INVALID: ["A configured model, remote-call, deadline or token budget is invalid.", "Supply positive safe integers for each budget; the caller owns budget policy."],
   CONTEXT_INVALID: ["The trusted instructions, history or context failed size or shape constraints.", "Inspect context construction and trim oversized history or instructions."],
   TOOL_REGISTRATION_INVALID: ["The host registered duplicate or otherwise invalid tools.", "Check the tool registry supplied to the runner."],
   MODEL_STEP_BUDGET_EXHAUSTED: ["The model used every allowed reasoning step without reaching a valid final answer.", "Inspect model routing and tool-call loops; reassess the configured step budget."],

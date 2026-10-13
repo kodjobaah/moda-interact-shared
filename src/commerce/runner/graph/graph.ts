@@ -16,6 +16,14 @@ import { validateFinalResponseNode } from "./nodes/validate-final-response.js";
 
 export const COMMERCE_TURN_GRAPH_RECURSION_LIMIT = 64;
 
+// Each model step can traverse resolveAvailableTools, invokeModel and
+// executeToolCalls; a final step validates the response instead. Keep the
+// original minimum for existing callers, but derive the ceiling from the
+// caller's requested model-step budget.
+export function commerceTurnGraphRecursionLimit(modelSteps: number): number {
+  return Math.max(COMMERCE_TURN_GRAPH_RECURSION_LIMIT, modelSteps * 3 + 4);
+}
+
 export type CommerceTurnGraphExecution = {
   input: RunCommerceTurnInput;
   prepared: PreparedCommerceTurn;

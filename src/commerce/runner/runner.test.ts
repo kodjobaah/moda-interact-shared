@@ -520,6 +520,52 @@ test("current revocation, missing adapter and unsupported facts lead to referral
   assert.equal((await runCommerceTurn(denied.input)).ok, true);
   assert.equal(attempts, 1);
 });
+test("caller owns valid Commerce budgets without Shared policy ceilings", async () => {
+  const atPreviousMaximum = fixture([final()]);
+  atPreviousMaximum.input.budgets = { modelSteps: 4, remoteCalls: 4, deadlineMs: 30_000, outputTokens: 800 };
+  assert.equal((await runCommerceTurn(atPreviousMaximum.input)).ok, true);
+  assert.equal(atPreviousMaximum.requests[0].maxOutputTokens, 800);
+
+  const higher = fixture([final()]);
+  higher.input.budgets = { modelSteps: 13, remoteCalls: 11, deadlineMs: 120_000, outputTokens: 1_200 };
+  assert.equal((await runCommerceTurn(higher.input)).ok, true);
+  assert.equal(higher.requests[0].maxOutputTokens, 1_200);
+
+  const excessiveModelOutput = fixture([{ ...final(), outputTokens: 1_201 }]);
+  excessiveModelOutput.input.budgets = { outputTokens: 1_200 };
+  const overBudget = await runCommerceTurn(excessiveModelOutput.input);
+  expectFailure(overBudget, "INVALID_FINAL", "MODEL_OUTPUT_TOKENS_OVER_BUDGET");
+
+  for (const key of ["modelSteps", "remoteCalls", "deadlineMs", "outputTokens"] as const) {
+    for (const value of [0, -1, 1.5, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) {
+      const invalid = fixture([final()]);
+      invalid.input.budgets = { modelSteps: 4, remoteCalls: 4, deadlineMs: 30_000, outputTokens: 800, [key]: value };
+      expectFailure(await runCommerceTurn(invalid.input), "INVALID_INPUT", "BUDGET_INVALID");
+    }
+  }
+});
+
+test("caller model-step budget above old fixed graph recursion limit remains usable", async () => {
+  const toolCalls = 21;
+  const f = fixture([...Array.from({ length: toolCalls }, () => call()), final()], true);
+  f.input.budgets = { modelSteps: toolCalls + 1, remoteCalls: toolCalls, outputTokens: 1_200 };
+  const result = await runCommerceTurn(f.input);
+  assert.equal(result.ok, true);
+  if (result.ok) assert.deepEqual(result.usage, { modelSteps: toolCalls + 1, remoteCalls: toolCalls });
+  assert.equal(f.counts().tools, toolCalls);
+});
+
+test("long caller deadlines do not overflow JavaScript timers", async () => {
+  const f = fixture([final()]);
+  f.input.budgets = { deadlineMs: 2_147_483_648 };
+  f.input.dependencies.model.invoke = async (request) => {
+    f.requests.push(request);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    return final();
+  };
+  assert.equal((await runCommerceTurn(f.input)).ok, true);
+});
+
 test("call/step budgets, deadline and cancellation stop adapters; exception secrets stay out of failures", async () => {
   const f = fixture([call(), call(), final()], true);
   f.input.budgets = { remoteCalls: 1 };

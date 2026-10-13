@@ -3,6 +3,28 @@ import type { RunnerDiagnostic } from "./diagnostics.js";
 
 type BoundedOperationContext = Pick<RunnerDiagnostic, "stage" | "reasonCode" | "modelStep" | "toolName" | "attempt" | "remoteCallNumber">;
 
+// Node/browser timers overflow above this delay. Schedule in segments rather
+// than silently shortening a caller-provided deadline to a few milliseconds.
+const MAX_TIMEOUT_MS = 2_147_483_647;
+function scheduleTimeout(callback: () => void, delayMs: number): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancelled = false;
+  const schedule = (remainingMs: number) => {
+    const interval = Math.min(remainingMs, MAX_TIMEOUT_MS);
+    timer = setTimeout(() => {
+      if (cancelled) return;
+      const next = remainingMs - interval;
+      if (next > 0) schedule(next);
+      else callback();
+    }, interval);
+  };
+  schedule(delayMs);
+  return () => {
+    cancelled = true;
+    clearTimeout(timer);
+  };
+}
+
 export type CommerceTurnRuntime = {
   signal: AbortSignal;
   checkCancellationAndDeadline(): void;
@@ -20,7 +42,7 @@ export function createCommerceTurnRuntime(input: {
   const abortFromCaller = () => controller.abort();
   input.callerSignal.addEventListener("abort", abortFromCaller, { once: true });
   if (input.callerSignal.aborted) controller.abort();
-  const deadlineTimer = setTimeout(() => controller.abort(), input.deadlineMs);
+  const cancelDeadlineTimer = scheduleTimeout(() => controller.abort(), input.deadlineMs);
 
   const abortFailure = () => input.callerSignal.aborted
     ? new RunnerFailure("CANCELLED", { stage: "runtime.cancellation", reasonCode: "CANCELLED_BY_CALLER" })
@@ -40,7 +62,7 @@ export function createCommerceTurnRuntime(input: {
     ) {
       checkCancellationAndDeadline();
       const local = new AbortController();
-      let timeout: ReturnType<typeof setTimeout> | undefined;
+      let cancelOperationTimer: (() => void) | undefined;
       let rejectAbort: (() => void) | undefined;
       const aborted = new Promise<never>((_, reject) => {
         rejectAbort = () => {
@@ -50,7 +72,7 @@ export function createCommerceTurnRuntime(input: {
         controller.signal.addEventListener("abort", rejectAbort, { once: true });
         const remainingMs = input.deadlineMs - (input.now() - startedAt);
         const operationTimeout = timeoutMs < remainingMs;
-        timeout = setTimeout(() => {
+        cancelOperationTimer = scheduleTimeout(() => {
           local.abort();
           reject(input.callerSignal.aborted || controller.signal.aborted || !operationTimeout
             ? abortFailure()
@@ -77,13 +99,13 @@ export function createCommerceTurnRuntime(input: {
         checkCancellationAndDeadline();
         return value;
       } finally {
-        clearTimeout(timeout);
+        cancelOperationTimer?.();
         if (rejectAbort) controller.signal.removeEventListener("abort", rejectAbort);
         local.abort();
       }
     },
     dispose() {
-      clearTimeout(deadlineTimer);
+      cancelDeadlineTimer();
       input.callerSignal.removeEventListener("abort", abortFromCaller);
       controller.abort();
     },
