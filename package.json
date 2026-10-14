@@ -99,6 +99,10 @@
     "./incidents": {
       "types": "./dist/incidents/index.d.ts",
       "import": "./dist/incidents/index.js"
+    },
+    "./security/credentials/node": {
+      "types": "./dist/security/credentials/node.d.ts",
+      "import": "./dist/security/credentials/node.js"
     }
   },
   "files": [
