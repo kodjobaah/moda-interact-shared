@@ -8,3 +8,8 @@ export {
   CredentialSecurityError,
   type CredentialSecurityErrorCode,
 } from "./errors.js";
+export {
+  encryptCredential,
+  decryptCredential,
+  type CredentialEnvelope,
+} from "./aead.js";
