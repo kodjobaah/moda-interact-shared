@@ -1,5 +1,11 @@
 /** Node-only credential-security API. No environment or database access. */
 export {
+  createCommerceEmbeddingCredentialAad,
+  createWooRestReadGrantAad,
+  type CommerceEmbeddingCredentialAadInput,
+  type WooRestReadGrantAadInput,
+} from "./aad.js";
+export {
   parseCredentialKeyring,
   resolveActiveCredentialKey,
   type CredentialKeyring,
