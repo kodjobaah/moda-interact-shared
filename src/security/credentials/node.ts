@@ -10,6 +10,7 @@ export {
   resolveActiveCredentialKey,
   type CredentialKeyring,
 } from "./keyring.js";
+export { parseCommerceConnectionCommandHmacKey } from "./command-hmac-key.js";
 export {
   CredentialSecurityError,
   type CredentialSecurityErrorCode,
