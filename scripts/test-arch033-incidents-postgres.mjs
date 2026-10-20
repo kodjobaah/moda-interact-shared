@@ -18,6 +18,17 @@ const docker = (args, opts = {}) => execFileSync("docker", args, {
   encoding: "utf8", maxBuffer: 32 * 1024 * 1024, ...opts,
 });
 const sql = (statement) => docker(["exec", "-i", container, "psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", dbName], { input: statement });
+const sqlWhenReady = async (statement) => {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try { return sql(statement); }
+    catch (error) {
+      const message = String(error);
+      if (!message.includes("database system is starting up") && !message.includes("database system is shutting down") && !message.includes("No such file or directory")) throw error;
+      await delay(500);
+    }
+  }
+  throw new Error("PostgreSQL remained unavailable while applying the migration");
+};
 try {
   docker(["run", "--detach", "--name", container, "--publish", "127.0.0.1::5432",
     "--env", "POSTGRES_PASSWORD=arch033-disposable", "--env", `POSTGRES_DB=${dbName}`,
@@ -32,9 +43,9 @@ try {
   const names = readdirSync(migrations).filter(x => /^\d{14}_/.test(x)).sort();
   assert.ok(names.includes("20261011160000_arch033_generic_operational_incidents"), "ARCH-033 database patch required");
   for (const name of names) {
-    sql(readFileSync(resolve(migrations, name, "migration.sql"), "utf8"));
+    await sqlWhenReady(readFileSync(resolve(migrations, name, "migration.sql"), "utf8"));
   }
-  sql(`INSERT INTO commerce."Shop" ("id","domain","platform","updatedAt") VALUES
+  await sqlWhenReady(`INSERT INTO commerce."Shop" ("id","domain","platform","updatedAt") VALUES
     ('arch033-shop','arch033-shared.example.invalid','SHOPIFY',now());
     INSERT INTO public."PlatformAdmin" ("id","email","updatedAt") VALUES
     ('arch033-admin','arch033-fixture@example.invalid',now());

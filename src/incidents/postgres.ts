@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import type { OperationalIncidentOccurrenceV1 } from "./index.js";
 import type { IncidentPersistence, IncidentSnapshot, IncidentTransaction } from "./reporter.js";
 
@@ -50,12 +51,12 @@ class PgIncidentTransaction implements IncidentTransaction {
       INSERT INTO support."OperationalIncident" (
         "id", "incidentKey", "sourceService", "environment", "category", "reasonCode",
         "resourceKey", "shopId", "severity", "status", "occurrenceCount",
-        "firstOccurredAt", "lastOccurredAt", "lastCorrelationId")
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'OPEN',1,$10::timestamptz,$10::timestamptz,$11)
+        "firstOccurredAt", "lastOccurredAt", "lastCorrelationId", "lastErrorMessage")
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'OPEN',1,$10::timestamptz,$10::timestamptz,$11,$12)
       ON CONFLICT ("incidentKey") DO NOTHING RETURNING *`,
       randomUUID(), incidentKey, occurrence.sourceService, occurrence.environment,
       occurrence.category, occurrence.reasonCode, occurrence.resourceKey,
-      occurrence.shopId, occurrence.severity, occurrence.occurredAt, occurrence.correlationId);
+      occurrence.shopId, occurrence.severity, occurrence.occurredAt, occurrence.correlationId, occurrence.errorMessage ?? null);
     this.newIncident = inserted.length > 0;
     const found = await rows<IncidentRow>(this.tx,
       `SELECT * FROM support."OperationalIncident" WHERE "incidentKey" = $1 FOR UPDATE`, incidentKey);
@@ -70,10 +71,10 @@ class PgIncidentTransaction implements IncidentTransaction {
     if (!this.incidentId) throw new Error("incident not loaded");
     const created = await rows<{ id: string }>(this.tx, `
       INSERT INTO support."OperationalIncidentEvent"
-        ("id", "incidentId", "eventType", "correlationId", "occurredAt")
-      VALUES ($1::uuid, $2, 'OCCURRED', $3, $4::timestamptz)
+        ("id", "incidentId", "eventType", "correlationId", "occurredAt", "errorMessage")
+      VALUES ($1::uuid, $2, 'OCCURRED', $3, $4::timestamptz, $5)
       ON CONFLICT ("id") DO NOTHING RETURNING "id"`,
-      occurrence.occurrenceId, this.incidentId, occurrence.correlationId, occurrence.occurredAt);
+      occurrence.occurrenceId, this.incidentId, occurrence.correlationId, occurrence.occurredAt, occurrence.errorMessage ?? null);
     if (!created.length) {
       if (this.newIncident) throw new Error("duplicate occurrence cannot create new incident");
       const existing = await rows<{ incidentKey: string }>(this.tx, `
@@ -104,12 +105,14 @@ class PgIncidentTransaction implements IncidentTransaction {
         "occurrenceCount" = "occurrenceCount" + $2::integer,
         "lastOccurredAt" = GREATEST("lastOccurredAt", $3::timestamptz),
         "lastCorrelationId" = $4,
+        "lastErrorMessage" = CASE WHEN $3::timestamptz >= "lastOccurredAt" AND $6::text IS NOT NULL
+          THEN $6::text ELSE "lastErrorMessage" END,
         "severity" = $5,
         "status" = 'OPEN', "resolvedAt" = NULL,
         "resolvedByPlatformAdminId" = NULL, "resolutionNote" = NULL,
         "revision" = "revision" + 1
       WHERE "incidentKey" = $1 RETURNING *`, incidentKey,
-      newlyCreated ? 0 : 1, occurrence.occurredAt, occurrence.correlationId, occurrence.severity);
+      newlyCreated ? 0 : 1, occurrence.occurredAt, occurrence.correlationId, occurrence.severity, occurrence.errorMessage ?? null);
     if (updated.length !== 1) throw new Error("incident update failed");
     return snapshot(updated[0]!);
   }
@@ -152,6 +155,7 @@ export function createPrismaOperationalIncidentPersistence(options: {
           }, { isolationLevel: "Serializable", timeout: 15000 });
         } catch (error) {
           if (attempt >= maxAttempts || !retryable(error)) throw error;
+          await delay(attempt * 10);
         }
       }
     },

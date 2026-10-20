@@ -11,6 +11,19 @@ const valid = {
 test("strict v1 occurrence accepts safe bounded fields", () => {
   assert.equal(parseOperationalIncidentOccurrenceV1(valid).sourceService, "background");
 });
+test("permits one bounded redacted diagnostic without changing incident identity", () => {
+  const message = "PlatformConfigurationFailure: Platform configuration missing (messaging.sender)";
+  assert.equal(parseOperationalIncidentOccurrenceV1({ ...valid, errorMessage: message }).errorMessage, message);
+  for (const invalid of ["", "x".repeat(513), "Line one\nLine two", "Error\rMore", "Error\u0000More"]) {
+    assert.throws(() => parseOperationalIncidentOccurrenceV1({ ...valid, errorMessage: invalid }));
+  }
+  const identity = {
+    sourceService: valid.sourceService, environment: valid.environment,
+    category: valid.category, reasonCode: valid.reasonCode,
+    resourceKey: valid.resourceKey, shopId: valid.shopId,
+  };
+  assert.equal(createOperationalIncidentKey(identity), createOperationalIncidentKey(identity));
+});
 test("rejects arbitrary metadata, tokens, raw failures and unknown versions", () => {
   for (const key of ["metadata", "headers", "token", "error", "customerPayload"]) {
     assert.throws(() => parseOperationalIncidentOccurrenceV1({ ...valid, [key]: "secret" }));

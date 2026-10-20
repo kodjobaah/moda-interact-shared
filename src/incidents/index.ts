@@ -18,7 +18,9 @@ export const OperationalIncidentOccurrenceV1Schema = z.strictObject({
   occurrenceId: opaqueId,
   correlationId: identifier,
   occurredAt: z.iso.datetime({ offset: true }),
-  // Deliberately no arbitrary metadata bag, message, headers or exception object.
+  // Already redacted, single-line exception excerpt from a trusted server producer.
+  // Never accept arbitrary metadata bags, headers, stacks or Error objects.
+  errorMessage: z.string().min(1).max(512).regex(/^[^\r\n\x00-\x1f\x7f]*$/).optional(),
 });
 export type OperationalIncidentOccurrenceV1 = z.infer<typeof OperationalIncidentOccurrenceV1Schema>;
 export function parseOperationalIncidentOccurrenceV1(input: unknown): OperationalIncidentOccurrenceV1 {
