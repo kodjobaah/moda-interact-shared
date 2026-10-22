@@ -40,6 +40,11 @@
       "types": "./dist/testing/node.d.ts",
       "import": "./dist/testing/node.js"
     },
+    "./identity": {
+      "types": "./dist/identity/index.d.ts",
+      "import": "./dist/identity/index.js"
+    },
+    "./identity/fixtures": "./fixtures/identity-v1.json",
     "./shopify": {
       "types": "./dist/shopify/index.d.ts",
       "import": "./dist/shopify/index.js"
@@ -106,7 +111,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "fixtures/identity-v1.json"
   ],
   "scripts": {
     "build": "tsup",
@@ -142,6 +148,7 @@
     "@prisma/instrumentation": "^6.19.3",
     "bullmq-otel": "^2.0.1",
     "intl-messageformat": "^10.7.18",
+    "libphonenumber-js": "1.12.30",
     "semver": "7.8.5",
     "winston": "3.19.0",
     "winston-loki": "6.1.7",

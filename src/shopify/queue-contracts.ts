@@ -17,6 +17,10 @@ export const SHOPIFY_WEBHOOK_QUEUE_CONTRACTS = {
     queueName: "order-events",
     jobName: "order-completed",
   },
+  WHATSAPP_CONSENT_SYNC: {
+    queueName: "checkout-events",
+    jobName: "shopify-whatsapp-consent-sync",
+  },
   SHOPIFY_DISCOUNT_SYNC: {
     queueName: "shopify-discount-sync",
     jobName: "reconcile-shopify-discounts",

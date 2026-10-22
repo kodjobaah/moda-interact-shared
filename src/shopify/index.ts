@@ -12,3 +12,4 @@ export * from "./v3/checkout-updated.schema.js";
 export * from "./v3/recovery-event.schema.js";
 export * from "./recovery-event.schema.js";
 export * from "./queue-contracts.js";
+export * from "./whatsapp-consent-sync.schema.js";

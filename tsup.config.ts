@@ -19,6 +19,7 @@ export default defineConfig({
     "testing/node": "src/testing/node.ts",
     "security/credentials/node": "src/security/credentials/node.ts",
     "shopify/index": "src/shopify/index.ts",
+    "identity/index": "src/identity/index.ts",
     "shopify/node": "src/shopify/node.ts",
     "logging/index": "src/logging/index.ts",
     "logging/node": "src/logging/node.ts",
