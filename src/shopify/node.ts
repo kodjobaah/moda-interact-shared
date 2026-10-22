@@ -1,3 +1,4 @@
+import { ShopifyWhatsAppConsentSyncJobV1Schema, type ShopifyWhatsAppConsentSyncJobV1 } from "./whatsapp-consent-sync.schema.js";
 import { createHash } from "node:crypto";
 
 function createShopifyWebhookJobDigest(prefix: string, first: string, second: string): string {
@@ -58,4 +59,19 @@ export function createShopifyDiscountSyncJobId(event: {
   }
 
   return createShopifyWebhookJobDigest("discount-sync", `${event.shopId}:${event.reason}`, event.requestedAt);
+}
+
+/**
+ * One deduplication identity per authenticated shop + webhook delivery.
+ * Length-safe JSON tuple serialization avoids `a:b` vs `a`/`b:c` collisions;
+ * the job ID never reveals the customer ID, delivery ID or phone.
+ */
+export function createShopifyWhatsAppConsentSyncJobId(
+  input: ShopifyWhatsAppConsentSyncJobV1,
+): string {
+  const job = ShopifyWhatsAppConsentSyncJobV1Schema.parse(input);
+  const digest = createHash("sha256")
+    .update(JSON.stringify([job.shopId, job.deliveryId]))
+    .digest("hex");
+  return `shopify-whatsapp-consent-sync-${digest}`;
 }
