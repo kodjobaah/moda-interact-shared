@@ -129,7 +129,7 @@ test("enforces exactly nine own JSON keys, including explicit nullable fields", 
     assert.equal(MetaTemplateStatusObservationV2Schema.safeParse(missing).success, false, `missing ${key}`);
   }
   const inherited = Object.assign(Object.create({wabaId: "123456789"}) as Record<string, unknown>, {...fixture.observation});
-  delete inherited.wabaId;
+  assert.equal(Reflect.deleteProperty(inherited, "wabaId"), true);
   assert.equal(MetaTemplateStatusObservationV2Schema.safeParse(inherited).success, false);
   assert.equal(MetaTemplateStatusObservationV2Schema.safeParse([]).success, false);
 });
