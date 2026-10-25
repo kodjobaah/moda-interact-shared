@@ -1,0 +1,91 @@
+{
+  "observation": {
+    "schemaVersion": 2,
+    "eventIdentity": "meta-template-status:v2:550e8400-e29b-41d4-a716-446655440000",
+    "wabaId": "123456789",
+    "providerTemplateId": "987654321",
+    "providerTemplateName": "checkout_recovery_initial_v2",
+    "providerLanguageCode": "en_GB",
+    "providerStatus": "APPROVED",
+    "reasonCode": "NONE",
+    "receivedAt": "2026-10-25T19:00:00.000Z"
+  },
+  "expectedJobId": "meta-template-status-v2-550e8400-e29b-41d4-a716-446655440000",
+  "additionalObservations": [
+    {
+      "case": "identical-content-other-occurrence",
+      "observation": {
+        "schemaVersion": 2,
+        "eventIdentity": "meta-template-status:v2:550e8400-e29b-41d4-a716-446655440001",
+        "wabaId": "123456789",
+        "providerTemplateId": "987654321",
+        "providerTemplateName": "checkout_recovery_initial_v2",
+        "providerLanguageCode": "en_GB",
+        "providerStatus": "APPROVED",
+        "reasonCode": "NONE",
+        "receivedAt": "2026-10-25T19:00:00.000Z"
+      },
+      "expectedJobId": "meta-template-status-v2-550e8400-e29b-41d4-a716-446655440001"
+    },
+    {
+      "case": "transition-paused",
+      "observation": {
+        "schemaVersion": 2,
+        "eventIdentity": "meta-template-status:v2:550e8400-e29b-41d4-a716-446655440002",
+        "wabaId": "123456789",
+        "providerTemplateId": "987654321",
+        "providerTemplateName": "checkout_recovery_initial_v2",
+        "providerLanguageCode": "en_GB",
+        "providerStatus": "PAUSED",
+        "reasonCode": "NONE",
+        "receivedAt": "2026-10-25T19:01:00.000Z"
+      },
+      "expectedJobId": "meta-template-status-v2-550e8400-e29b-41d4-a716-446655440002"
+    },
+    {
+      "case": "transition-approved-again",
+      "observation": {
+        "schemaVersion": 2,
+        "eventIdentity": "meta-template-status:v2:550e8400-e29b-41d4-a716-446655440003",
+        "wabaId": "123456789",
+        "providerTemplateId": "987654321",
+        "providerTemplateName": "checkout_recovery_initial_v2",
+        "providerLanguageCode": "en_GB",
+        "providerStatus": "APPROVED",
+        "reasonCode": "NONE",
+        "receivedAt": "2026-10-25T19:02:00.000Z"
+      },
+      "expectedJobId": "meta-template-status-v2-550e8400-e29b-41d4-a716-446655440003"
+    },
+    {
+      "case": "identical-delivery-first",
+      "observation": {
+        "schemaVersion": 2,
+        "eventIdentity": "meta-template-status:v2:550e8400-e29b-41d4-a716-446655440004",
+        "wabaId": "123456789",
+        "providerTemplateId": "987654321",
+        "providerTemplateName": "checkout_recovery_initial_v2",
+        "providerLanguageCode": "en_GB",
+        "providerStatus": "APPROVED",
+        "reasonCode": "NONE",
+        "receivedAt": "2026-10-25T19:00:00.000Z"
+      },
+      "expectedJobId": "meta-template-status-v2-550e8400-e29b-41d4-a716-446655440004"
+    },
+    {
+      "case": "identical-delivery-second",
+      "observation": {
+        "schemaVersion": 2,
+        "eventIdentity": "meta-template-status:v2:550e8400-e29b-41d4-a716-446655440005",
+        "wabaId": "123456789",
+        "providerTemplateId": "987654321",
+        "providerTemplateName": "checkout_recovery_initial_v2",
+        "providerLanguageCode": "en_GB",
+        "providerStatus": "APPROVED",
+        "reasonCode": "NONE",
+        "receivedAt": "2026-10-25T19:00:00.000Z"
+      },
+      "expectedJobId": "meta-template-status-v2-550e8400-e29b-41d4-a716-446655440005"
+    }
+  ]
+}

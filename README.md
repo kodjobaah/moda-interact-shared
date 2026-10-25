@@ -31,6 +31,8 @@ necessarily a supported package subpath. Type-only exports require `import type`
 | `/billing` | Billing plan/usage contracts, provider-status normalization, subscription-reconciliation jobs, purchased-credit counters and deterministic billing identifiers. |
 | `/recovery-policy` | Recovery offer modes and validation of an already-resolved effective recovery policy. Does not retrieve or decide merchant entitlements. |
 | `/whatsapp` | Normalized inbound WhatsApp content/message schemas and parsers. Provider delivery statuses are in `/billing`. |
+| `/whatsapp-template-events` | ARCH-047 v2 Meta template-status observations: strict nine-field schema and pure occurrence UUID v4 event/job ID formatters. |
+| `/whatsapp-template-events/fixtures` | Portable JSON golden vectors for v2 status observations and expected BullMQ job IDs. |
 | `/merchant-communications` | Merchant communication and translation job contracts, constants and validation. |
 | `/merchant-communications/node` | Node-only deterministic translation queue-job identifiers. |
 | `/shopify` | Shopify commerce/recovery event schemas, parsers, event versions and shared queue contracts. |
@@ -1656,6 +1658,40 @@ Type-only exports:
 
 - `NormalizedWhatsAppInboundMessage`
 - `WhatsAppInboundContent`
+
+</details>
+
+<details>
+<summary>/whatsapp-template-events — 6 runtime exports, 1 type</summary>
+
+Import: `@modainteract/moda-interact-shared/whatsapp-template-events`.
+
+From [src/whatsapp-template-events.ts](src/whatsapp-template-events.ts):
+
+Runtime exports:
+
+- `META_TEMPLATE_STATUS_QUEUE`
+- `META_TEMPLATE_STATUS_JOB`
+- `META_TEMPLATE_STATUS_SCHEMA_VERSION`
+- `MetaTemplateStatusObservationV2Schema`
+- `formatMetaTemplateStatusEventIdentity`
+- `formatMetaTemplateStatusJobId`
+
+Type-only export:
+
+- `MetaTemplateStatusObservationV2`
+
+Messaging must verify the complete webhook batch **before** generating a fresh
+cryptographically random UUID v4 for every matching observation. Shared formats
+that UUID without generating randomness. Both ingress and Background must parse
+events with `MetaTemplateStatusObservationV2Schema`; it checks the exact nine own
+fields and the 4096-byte UTF-8 JSON limit. Neither event UUID nor `receivedAt`
+orders provider statuses, which remain Background-owned policy. Repeated Meta
+status values can correspond to separate event occurrences.
+
+Compatibility vectors: [fixtures/meta-template-status-v2.json](fixtures/meta-template-status-v2.json),
+published at `/whatsapp-template-events/fixtures`. The fixture is test data,
+not a provider webhook payload.
 
 </details>
 
