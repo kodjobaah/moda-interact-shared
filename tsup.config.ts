@@ -14,6 +14,7 @@ export default defineConfig({
     billing: "src/billing.ts",
     "recovery-policy": "src/recovery-policy.ts",
     whatsapp: "src/whatsapp.ts",
+    "whatsapp-template-events": "src/whatsapp-template-events.ts",
     "merchant-communications": "src/merchant-communications.ts",
     "merchant-communications/node": "src/merchant-communications.node.ts",
     "testing/node": "src/testing/node.ts",

@@ -26,3 +26,15 @@ The UK success vectors use a number in a valid GB mobile numbering range.
 strict numbering-plan validator; `gb-reserved-fictional` explicitly covers
 that case. Every fixture is for offline parsing/comparison **only** and must
 never be dialled or messaged.
+
+# ARCH-047 Meta template-status event v2 interoperability vectors
+
+`meta-template-status-v2.json` is a pure JSON fixture available at
+`@modainteract/moda-interact-shared/whatsapp-template-events/fixtures`.
+It contains the exact canonical observation, expected BullMQ job ID, and
+additional distinct occurrence UUID v4 vectors for identical provider values,
+APPROVED → PAUSED → APPROVED, and separate identical webhook deliveries.
+A producer assigns new occurrence IDs only after signed whole-batch preflight.
+A retry of an already-enqueued job retains its existing job ID. The fixture
+asserts wire compatibility and uniqueness—not provider status ordering or
+permission to contact a customer.
