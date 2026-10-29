@@ -113,6 +113,10 @@
     "./security/credentials/node": {
       "types": "./dist/security/credentials/node.d.ts",
       "import": "./dist/security/credentials/node.js"
+    },
+    "./recovery-template-bindings": {
+      "types": "./dist/recovery-template-bindings.d.ts",
+      "import": "./dist/recovery-template-bindings.js"
     }
   },
   "files": [
