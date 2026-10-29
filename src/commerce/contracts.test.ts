@@ -28,6 +28,8 @@ import {
   CommerceToolOutputs,
   CommerceEvidenceSchema,
   CommerceFinalResponseSchema,
+  CommerceOutreachToolContextSchema,
+  type CommerceOutreachToolContext,
 } from "./index";
 import {
   validateSubset,
@@ -58,6 +60,20 @@ const bad = (
   s: { safeParse: (v: unknown) => { success: boolean } },
   v: unknown,
 ) => assert.equal(s.safeParse(v).success, false);
+
+test("outreach tool context is strict and requires recovery-attempt identity", () => {
+  const context = {
+    purpose: "INITIAL_RECOVERY_OUTREACH",
+    checkoutRecoveryId: "recovery_456",
+    outreachAttemptId: "attempt_789",
+  } satisfies CommerceOutreachToolContext;
+
+  ok(CommerceOutreachToolContextSchema, context);
+  bad(CommerceOutreachToolContextSchema, { ...context, shopId: "model_forged_shop" });
+  bad(CommerceOutreachToolContextSchema, { ...context, purpose: "CONVERSATION" });
+  const { outreachAttemptId: _missingAttemptId, ...missingAttempt } = context;
+  bad(CommerceOutreachToolContextSchema, missingAttempt);
+});
 test("canonical JSON rejects undefined, cycles, nonfinite and sparse data; C4 and RFC8785 ordering are explicit", () => {
   assert.equal(canonicalJson({ b: 2, a: [3, 1] }), '{"a":[3,1],"b":2}');
   for (const v of [
