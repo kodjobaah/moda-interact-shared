@@ -20,6 +20,7 @@ import {
 import { canonicalJson, responseContractCanonicalJson } from "./canonical-json";
 import {
   CommerceOutreachToolContextSchema,
+  InitialOutreachCheckoutOfferSetSchema,
   type CommerceOutreachToolContext,
 } from "./index";
 import {
@@ -48,6 +49,22 @@ test("outreach tool context is strict and contains only its purpose", () => {
   bad(CommerceOutreachToolContextSchema, { ...context, checkoutRecoveryId: "recovery_456" });
   bad(CommerceOutreachToolContextSchema, { ...context, outreachAttemptId: "attempt_789" });
   bad(CommerceOutreachToolContextSchema, { ...context, purpose: "CONVERSATION" });
+});
+
+test("published commerce entrypoint exports ordered bounded checkout offer receipts", () => {
+  const receipt = {
+    schemaVersion: "moda.outreach.checkout-offers.v1",
+    offers: [
+      { offerId: "offer-a", providerDiscountId: "shopify:discount-a", method: "CODE", code: "SAVE10" },
+      { offerId: "offer-b", providerDiscountId: null, method: "AUTOMATIC", code: null },
+    ],
+  } as const;
+  assert.deepEqual(InitialOutreachCheckoutOfferSetSchema.parse(receipt), receipt);
+  assert.equal(InitialOutreachCheckoutOfferSetSchema.safeParse({ ...receipt, offers: [] }).success, false);
+  assert.equal(InitialOutreachCheckoutOfferSetSchema.safeParse({
+    ...receipt,
+    offers: [...receipt.offers, ...receipt.offers],
+  }).success, false);
 });
 
 test("canonical JSON rejects undefined, cycles, nonfinite and sparse data; C4 and RFC8785 ordering are explicit", () => {
