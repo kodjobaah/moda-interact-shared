@@ -24,6 +24,10 @@
       "types": "./dist/recovery-policy.d.ts",
       "import": "./dist/recovery-policy.js"
     },
+    "./recovery-offer-proof": {
+      "types": "./dist/recovery-offer-proof.d.ts",
+      "import": "./dist/recovery-offer-proof.js"
+    },
     "./whatsapp": {
       "types": "./dist/whatsapp.d.ts",
       "import": "./dist/whatsapp.js"
@@ -113,6 +117,10 @@
     "./security/credentials/node": {
       "types": "./dist/security/credentials/node.d.ts",
       "import": "./dist/security/credentials/node.js"
+    },
+    "./recovery-template-bindings": {
+      "types": "./dist/recovery-template-bindings.d.ts",
+      "import": "./dist/recovery-template-bindings.js"
     }
   },
   "files": [

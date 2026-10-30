@@ -7,5 +7,6 @@ export * from "./response";
 export * from "./selection";
 export * from "./external";
 export * from "./store-category-prompt";
+export * from "./outreach-context";
 
 export * from "./fixtures";
