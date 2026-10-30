@@ -231,7 +231,7 @@ export type CommerceProductSaleEvidence =
 
 export const CommerceProductSchema = z.strictObject({
   productId: ID,
-  variantId: ID,
+  variantId: ID.nullable(),
   title: z.string().min(1).max(512),
   url: z
     .url({ protocol: /^https$/ })
@@ -246,6 +246,8 @@ export const CommerceProductSchema = z.strictObject({
   productType: z.string().max(512).nullable(),
   vendor: z.string().max(512).nullable(),
   categories: z.array(z.string()).optional(),
+  categoryIds: z.array(ID).max(128).optional(),
+  collectionIds: z.array(ID).max(128).optional(),
   imageUrl: z.string().nullable().optional(),
   saleEvidence: CommerceProductSaleEvidenceSchema.nullable().optional(),
   observedAt: DateSchema,
@@ -268,6 +270,62 @@ export const CommerceOfferSchema = z
         Date.parse(v.startsAt) < Date.parse(v.endsAt)) &&
       (v.method !== "AUTOMATIC" || v.code === null),
   );
+export const CommerceDiscountConditionFactsSchema = z.strictObject({
+  provider: z.enum(["SHOPIFY", "WOOCOMMERCE"]),
+  completeness: z.enum(["COMPLETE", "PARTIAL", "UNKNOWN"]),
+  observedAt: DateSchema,
+  providerStatus: z.string().max(64),
+  unavailableAt: DateSchema.nullable(),
+  discountKind: z.enum([
+    "PERCENTAGE",
+    "FIXED_AMOUNT",
+    "FREE_SHIPPING",
+    "BUY_X_GET_Y",
+    "OTHER",
+    "UNKNOWN",
+  ]),
+  discountValue: MoneySchema.nullable(),
+  discountCurrency: CurrencySchema.nullable(),
+  targeting: z.strictObject({
+    kind: z.enum([
+      "ALL",
+      "PRODUCTS",
+      "VARIANTS",
+      "CATEGORIES",
+      "COLLECTIONS",
+      "MIXED",
+      "UNKNOWN",
+    ]),
+    includedProductIds: z.array(ID).max(128),
+    includedVariantIds: z.array(ID).max(128),
+    includedCategoryIds: z.array(ID).max(128),
+    includedCollectionIds: z.array(ID).max(128),
+    excludedProductIds: z.array(ID).max(128),
+    excludedVariantIds: z.array(ID).max(128),
+    excludedCategoryIds: z.array(ID).max(128),
+    excludedCollectionIds: z.array(ID).max(128),
+  }),
+  minimumSubtotal: MoneySchema.nullable(),
+  maximumSubtotal: MoneySchema.nullable(),
+  minimumQuantity: z.number().int().nonnegative().nullable(),
+  usageLimit: z.number().int().nonnegative().nullable(),
+  usageCount: z.number().int().nonnegative().nullable(),
+  perCustomerLimit: z.number().int().nonnegative().nullable(),
+  customerScope: z.enum(["ALL", "RESTRICTED", "UNKNOWN"]),
+  excludesSaleItems: z.boolean().nullable(),
+  individualUse: z.boolean().nullable(),
+  unrepresentedConditions: z.array(z.string().min(1).max(128)).max(24),
+});
+export type CommerceDiscountConditionFacts = z.infer<
+  typeof CommerceDiscountConditionFactsSchema
+>;
+export const CommerceDiscountDetailsSchema = z.strictObject({
+  offer: CommerceOfferSchema,
+  facts: CommerceDiscountConditionFactsSchema,
+});
+export type CommerceDiscountDetails = z.infer<
+  typeof CommerceDiscountDetailsSchema
+>;
 const condition = z.strictObject({
   code: z.string().min(1).max(64),
   description: z.string().max(256),
@@ -369,7 +427,11 @@ export const CommerceToolInputs = {
     productId: ID,
     variantId: ID.nullable(),
   }),
-  commerce_get_discount_options: z.strictObject({}),
+  commerce_get_discount_options: z.strictObject({
+    limit: z.number().int().min(1).max(50).default(20),
+    cursor: z.string().max(2048).nullable().default(null),
+  }),
+  commerce_get_discount_details: z.strictObject({ offerId: ID }),
   commerce_evaluate_discount: z.strictObject({
     offerId: ID,
     proposal: CommerceProposalSchema.nullable(),
@@ -403,6 +465,10 @@ export const CommerceToolOutputs = {
     mode: z.enum(["NONE", "FIXED", "AI_BEST_APPLICABLE"]),
     offers: z.array(CommerceOfferSchema).max(50),
     truncated: z.boolean(),
+    cursor: z.string().max(2048).nullable().optional(),
+  }),
+  commerce_get_discount_details: z.strictObject({
+    details: CommerceDiscountDetailsSchema.nullable(),
   }),
   commerce_evaluate_discount: CommerceEvidenceSchema,
   commerce_find_qualifying_products: alternatives,

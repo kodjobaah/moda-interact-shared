@@ -29,8 +29,13 @@ import {
   CommerceEvidenceSchema,
   CommerceProductSchema,
   CommerceProductSaleEvidenceSchema,
+  CommerceDiscountConditionFactsSchema,
+  CommerceDiscountDetailsSchema,
+  commerceToolResultSchema,
   CommerceFinalResponseSchema,
   CommerceOutreachToolContextSchema,
+  type CommerceDiscountConditionFacts,
+  type CommerceDiscountDetails,
   type CommerceOutreachToolContext,
 } from "./index";
 import {
@@ -74,6 +79,51 @@ const product = {
   vendor: "Moda Store",
   observedAt: "2026-10-29T18:00:00.000Z",
 };
+const discountOffer = {
+  offerId: "offer-20",
+  title: "Socks 20",
+  method: "CODE" as const,
+  code: "SOCKS20",
+  startsAt: null,
+  endsAt: null,
+  support: "SUPPORTED" as const,
+  reasonCodes: [],
+};
+const discountFacts = {
+  provider: "WOOCOMMERCE",
+  completeness: "COMPLETE",
+  observedAt: "2026-10-30T09:00:00.000Z",
+  providerStatus: "ACTIVE",
+  unavailableAt: null,
+  discountKind: "PERCENTAGE",
+  discountValue: "20",
+  discountCurrency: null,
+  targeting: {
+    kind: "PRODUCTS",
+    includedProductIds: ["401"],
+    includedVariantIds: [],
+    includedCategoryIds: [],
+    includedCollectionIds: [],
+    excludedProductIds: [],
+    excludedVariantIds: [],
+    excludedCategoryIds: [],
+    excludedCollectionIds: [],
+  },
+  minimumSubtotal: null,
+  maximumSubtotal: null,
+  minimumQuantity: null,
+  usageLimit: null,
+  usageCount: null,
+  perCustomerLimit: null,
+  customerScope: "ALL",
+  excludesSaleItems: false,
+  individualUse: false,
+  unrepresentedConditions: [],
+} satisfies CommerceDiscountConditionFacts;
+const discountDetails = {
+  offer: discountOffer,
+  facts: discountFacts,
+} satisfies CommerceDiscountDetails;
 test("outreach tool context is strict and requires recovery-attempt identity", () => {
   const context = {
     purpose: "INITIAL_RECOVERY_OUTREACH",
@@ -424,7 +474,16 @@ test("six policy input/output fixtures preserve exact money and explicit unknown
     ],
     commerce_get_discount_options: [
       {},
-      { mode: "NONE", offers: [], truncated: false },
+      {
+        mode: "FIXED",
+        offers: [discountOffer],
+        cursor: "opaque-continuation-token",
+        truncated: true,
+      },
+    ],
+    commerce_get_discount_details: [
+      { offerId: "offer-20" },
+      { details: discountDetails },
     ],
     commerce_evaluate_discount: [
       { offerId: "offer", proposal: null },
@@ -452,11 +511,92 @@ test("six policy input/output fixtures preserve exact money and explicit unknown
   bad(CommerceEvidenceSchema, { ...evidence, savings: 1 });
   bad(CommerceEvidenceSchema, { ...evidence, currency: "INVALID" });
 });
+test("discount discovery and condition contracts stay structural and use the generic result envelope", () => {
+  const discountOptionsInput = CommerceToolInputs.commerce_get_discount_options;
+  assert.deepEqual(discountOptionsInput.parse({}), { limit: 20, cursor: null });
+  bad(discountOptionsInput, { limit: 0 });
+  bad(discountOptionsInput, { limit: 51 });
+  bad(discountOptionsInput, { cursor: 7 });
+  bad(discountOptionsInput, { unexpected: true });
+  bad(CommerceToolInputs.commerce_get_discount_details, {
+    offerId: "offer-20",
+    shopId: "model_forged_shop",
+  });
+
+  const optionsOutput = {
+    mode: "FIXED",
+    offers: [discountOffer],
+    cursor: "opaque-continuation-token",
+    truncated: true,
+  };
+  ok(CommerceToolOutputs.commerce_get_discount_options, optionsOutput);
+  ok(CommerceToolOutputs.commerce_get_discount_options, {
+    mode: "NONE",
+    offers: [],
+    truncated: false,
+  });
+  bad(CommerceToolOutputs.commerce_get_discount_options, {
+    ...optionsOutput,
+    unexpected: true,
+  });
+
+  ok(CommerceDiscountConditionFactsSchema, discountFacts);
+  ok(CommerceDiscountDetailsSchema, discountDetails);
+  bad(CommerceDiscountConditionFactsSchema, {
+    ...discountFacts,
+    discountValue: 20,
+  });
+  bad(CommerceDiscountConditionFactsSchema, {
+    ...discountFacts,
+    targeting: {
+      ...discountFacts.targeting,
+      includedProductIds: [401],
+    },
+  });
+  bad(CommerceDiscountConditionFactsSchema, {
+    ...discountFacts,
+    completeness: "INFERRED",
+  });
+  bad(CommerceToolOutputs.commerce_get_discount_details, {
+    details: { offer: discountOffer },
+  });
+
+  const genericResult = commerceToolResultSchema(
+    CommerceToolOutputs.commerce_get_discount_details,
+  );
+  ok(genericResult, {
+    contractVersion: "commerce.v1",
+    status: "OK",
+    data: { details: discountDetails },
+    renderedText: "Discount details loaded",
+  });
+  ok(genericResult, {
+    contractVersion: "commerce.v1",
+    status: "OK",
+    data: { details: null },
+    renderedText: "Discount not found",
+  });
+  bad(genericResult, {
+    contractVersion: "commerce.v1",
+    status: "OK",
+    data: { details: discountDetails },
+    renderedText: "x".repeat(4097),
+  });
+  bad(genericResult, {
+    contractVersion: "commerce.v1",
+    status: "OK",
+    data: { details: discountDetails },
+    renderedText: "Discount details loaded",
+    unexpected: true,
+  });
+});
 test("existing products remain compatible and sale evidence stays structural", () => {
   ok(CommerceProductSchema, product);
   ok(CommerceProductSchema, {
     ...product,
     categories: ["Running", "Accessories"],
+    categoryIds: ["cat_123"],
+    collectionIds: ["gid://shopify/Collection/456"],
     imageUrl: "not-a-validated-provider-url",
     saleEvidence: {
       regularPrice: "20.00",
@@ -464,6 +604,19 @@ test("existing products remain compatible and sale evidence stays structural", (
       observedAt: "2026-10-29T18:00:00.000Z",
     },
   });
+  ok(CommerceProductSchema, { ...product, variantId: null });
+  ok(CommerceProductSchema, {
+    ...product,
+    variantId: "gid://shopify/ProductVariant/456",
+  });
+  bad(CommerceProductSchema, { ...product, categoryIds: [123] });
+  bad(CommerceProductSchema, { ...product, collectionIds: [123] });
+  ok(CommerceToolOutputs.commerce_search_products, {
+    products: [product],
+    cursor: null,
+    truncated: false,
+  });
+  ok(CommerceToolOutputs.commerce_get_product, { product });
   ok(CommerceProductSaleEvidenceSchema, {
     regularPrice: null,
     salePrice: "16.00",
