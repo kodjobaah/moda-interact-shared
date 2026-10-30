@@ -54,6 +54,11 @@
       "import": "./dist/identity/index.js"
     },
     "./identity/fixtures": "./fixtures/identity-v1.json",
+    "./woocommerce": {
+      "types": "./dist/woocommerce/index.d.ts",
+      "import": "./dist/woocommerce/index.js"
+    },
+    "./woocommerce/fixtures": "./src/woocommerce/__fixtures__/woo-restore-v1.json",
     "./shopify": {
       "types": "./dist/shopify/index.d.ts",
       "import": "./dist/shopify/index.js"
@@ -126,7 +131,8 @@
   "files": [
     "dist",
     "fixtures/identity-v1.json",
-    "fixtures/meta-template-status-v2.json"
+    "fixtures/meta-template-status-v2.json",
+    "src/woocommerce/__fixtures__/woo-restore-v1.json"
   ],
   "scripts": {
     "build": "tsup",
