@@ -539,6 +539,15 @@ test("discount discovery and condition contracts stay structural and use the gen
     ...optionsOutput,
     unexpected: true,
   });
+  const optionsResult = commerceToolResultSchema(
+    CommerceToolOutputs.commerce_get_discount_options,
+  );
+  ok(optionsResult, {
+    contractVersion: "commerce.v1",
+    status: "OK",
+    data: optionsOutput,
+    renderedText: "Discount options loaded",
+  });
 
   ok(CommerceDiscountConditionFactsSchema, discountFacts);
   ok(CommerceDiscountDetailsSchema, discountDetails);
