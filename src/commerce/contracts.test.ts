@@ -27,6 +27,8 @@ import {
   CommerceToolInputs,
   CommerceToolOutputs,
   CommerceEvidenceSchema,
+  CommerceProductSchema,
+  CommerceProductSaleEvidenceSchema,
   CommerceFinalResponseSchema,
   CommerceOutreachToolContextSchema,
   type CommerceOutreachToolContext,
@@ -60,7 +62,18 @@ const bad = (
   s: { safeParse: (v: unknown) => { success: boolean } },
   v: unknown,
 ) => assert.equal(s.safeParse(v).success, false);
-
+const product = {
+  productId: "product_123",
+  variantId: "variant_456",
+  title: "Running socks",
+  url: "https://store.example.com/products/running-socks",
+  available: true,
+  unitPrice: "16.00",
+  currency: "GBP",
+  productType: "Accessories",
+  vendor: "Moda Store",
+  observedAt: "2026-10-29T18:00:00.000Z",
+};
 test("outreach tool context is strict and requires recovery-attempt identity", () => {
   const context = {
     purpose: "INITIAL_RECOVERY_OUTREACH",
@@ -74,6 +87,7 @@ test("outreach tool context is strict and requires recovery-attempt identity", (
   const { outreachAttemptId: _missingAttemptId, ...missingAttempt } = context;
   bad(CommerceOutreachToolContextSchema, missingAttempt);
 });
+
 test("canonical JSON rejects undefined, cycles, nonfinite and sparse data; C4 and RFC8785 ordering are explicit", () => {
   assert.equal(canonicalJson({ b: 2, a: [3, 1] }), '{"a":[3,1],"b":2}');
   for (const v of [
@@ -389,7 +403,24 @@ test("six policy input/output fixtures preserve exact money and explicit unknown
     commerce_get_basket: [{}, basket],
     commerce_search_products: [
       { query: "coat" },
-      { products: [], cursor: null, truncated: false },
+      {
+        products: [{
+          ...product,
+          categories: ["Running", "Accessories"],
+          imageUrl: "https://store.example.com/media/socks.jpg",
+          saleEvidence: {
+            regularPrice: "20.00",
+            salePrice: "22.00",
+            observedAt: "2026-10-29T18:00:00.000Z",
+          },
+        }],
+        cursor: null,
+        truncated: false,
+      },
+    ],
+    commerce_get_product: [
+      { productId: "product_123", variantId: null },
+      { product: null },
     ],
     commerce_get_discount_options: [
       {},
@@ -420,6 +451,39 @@ test("six policy input/output fixtures preserve exact money and explicit unknown
   });
   bad(CommerceEvidenceSchema, { ...evidence, savings: 1 });
   bad(CommerceEvidenceSchema, { ...evidence, currency: "INVALID" });
+});
+test("existing products remain compatible and sale evidence stays structural", () => {
+  ok(CommerceProductSchema, product);
+  ok(CommerceProductSchema, {
+    ...product,
+    categories: ["Running", "Accessories"],
+    imageUrl: "not-a-validated-provider-url",
+    saleEvidence: {
+      regularPrice: "20.00",
+      salePrice: "22.00",
+      observedAt: "2026-10-29T18:00:00.000Z",
+    },
+  });
+  ok(CommerceProductSaleEvidenceSchema, {
+    regularPrice: null,
+    salePrice: "16.00",
+    observedAt: "2026-10-29T18:00:00.000Z",
+  });
+
+  bad(CommerceProductSchema, (({ productId: _id, ...rest }) => rest)(product));
+  bad(CommerceProductSchema, { ...product, unexpected: true });
+  bad(CommerceProductSaleEvidenceSchema, {
+    regularPrice: "20.00",
+    salePrice: "16.00",
+    observedAt: "not-a-date",
+  });
+  bad(CommerceToolInputs.commerce_get_product, { productId: "", variantId: null });
+  bad(CommerceToolInputs.commerce_get_product, { productId: "product_123", variantId: 7 });
+  bad(CommerceToolInputs.commerce_get_product, {
+    productId: "product_123",
+    variantId: null,
+    shopId: "model_forged_shop",
+  });
 });
 test("response schema rejects total-property overflow, duplicates, invalid bounds, unsupported unions and runtime detail overflow", () => {
   const properties = Object.fromEntries(

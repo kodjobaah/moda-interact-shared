@@ -24,6 +24,10 @@
       "types": "./dist/recovery-policy.d.ts",
       "import": "./dist/recovery-policy.js"
     },
+    "./recovery-offer-proof": {
+      "types": "./dist/recovery-offer-proof.d.ts",
+      "import": "./dist/recovery-offer-proof.js"
+    },
     "./whatsapp": {
       "types": "./dist/whatsapp.d.ts",
       "import": "./dist/whatsapp.js"

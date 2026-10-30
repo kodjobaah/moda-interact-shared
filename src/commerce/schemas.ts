@@ -221,6 +221,14 @@ export const CommerceBasketSchema = z
     unknownFields: z.array(z.string().min(1).max(256)).max(128),
   })
   .refine((v) => distinct(v.lines.map((line) => line.lineId)));
+export const CommerceProductSaleEvidenceSchema = z.strictObject({
+  regularPrice: MoneySchema.nullable(),
+  salePrice: MoneySchema.nullable(),
+  observedAt: DateSchema,
+});
+export type CommerceProductSaleEvidence =
+  z.infer<typeof CommerceProductSaleEvidenceSchema>;
+
 export const CommerceProductSchema = z.strictObject({
   productId: ID,
   variantId: ID,
@@ -237,6 +245,9 @@ export const CommerceProductSchema = z.strictObject({
   currency: CurrencySchema.nullable(),
   productType: z.string().max(512).nullable(),
   vendor: z.string().max(512).nullable(),
+  categories: z.array(z.string()).optional(),
+  imageUrl: z.string().nullable().optional(),
+  saleEvidence: CommerceProductSaleEvidenceSchema.nullable().optional(),
   observedAt: DateSchema,
 });
 export const CommerceOfferSchema = z
@@ -354,6 +365,10 @@ export const CommerceToolInputs = {
     limit: z.number().int().min(1).max(20).default(10),
     cursor: z.string().max(2048).nullable().default(null),
   }),
+  commerce_get_product: z.strictObject({
+    productId: ID,
+    variantId: ID.nullable(),
+  }),
   commerce_get_discount_options: z.strictObject({}),
   commerce_evaluate_discount: z.strictObject({
     offerId: ID,
@@ -380,6 +395,9 @@ export const CommerceToolOutputs = {
     products: z.array(CommerceProductSchema).max(20),
     cursor: z.string().max(2048).nullable(),
     truncated: z.boolean(),
+  }),
+  commerce_get_product: z.strictObject({
+    product: CommerceProductSchema.nullable(),
   }),
   commerce_get_discount_options: z.strictObject({
     mode: z.enum(["NONE", "FIXED", "AI_BEST_APPLICABLE"]),
