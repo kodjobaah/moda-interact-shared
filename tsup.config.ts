@@ -13,6 +13,7 @@ export default defineConfig({
     "merchant-knowledge/node": "src/merchant-knowledge.node.ts",
     billing: "src/billing.ts",
     "recovery-policy": "src/recovery-policy.ts",
+    "ai-response-delay": "src/ai-response-delay.ts",
     "recovery-offer-proof": "src/recovery-offer-proof.ts",
     whatsapp: "src/whatsapp.ts",
     "whatsapp-template-events": "src/whatsapp-template-events.ts",

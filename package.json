@@ -24,6 +24,10 @@
       "types": "./dist/recovery-policy.d.ts",
       "import": "./dist/recovery-policy.js"
     },
+    "./ai-response-delay": {
+      "types": "./dist/ai-response-delay.d.ts",
+      "import": "./dist/ai-response-delay.js"
+    },
     "./recovery-offer-proof": {
       "types": "./dist/recovery-offer-proof.d.ts",
       "import": "./dist/recovery-offer-proof.js"
