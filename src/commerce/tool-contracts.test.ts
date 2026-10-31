@@ -8,9 +8,11 @@ import {
   CommerceProductSchema,
   CommerceProductSaleEvidenceSchema,
   CommerceDiscountConditionFactsSchema,
+  CommerceDiscountCombinationFactsSchema,
   CommerceDiscountDetailsSchema,
   commerceToolResultSchema,
   type CommerceDiscountConditionFacts,
+  type CommerceDiscountCombinationFacts,
   type CommerceDiscountDetails,
 } from "./index";
 import { exampleTurn } from "./fixtures";
@@ -71,11 +73,19 @@ const discountFacts = {
   customerScope: "ALL",
   excludesSaleItems: false,
   individualUse: false,
+  combination: {
+    discountClasses: null,
+    shopifyPlus: null,
+    combinesWith: null,
+    discountTags: null,
+    allowedSameLineProductTags: null,
+  },
   unrepresentedConditions: [],
 } satisfies CommerceDiscountConditionFacts;
 const discountDetails = {
   offer: discountOffer,
   facts: discountFacts,
+  providerDiscountId: "woo:coupon:offer-20",
 } satisfies CommerceDiscountDetails;
 
 test("six policy input/output fixtures preserve exact money and explicit unknown/unsupported outcomes", () => {
@@ -228,6 +238,10 @@ test("discount discovery and condition contracts stay structural and use the gen
     ...discountFacts,
     completeness: "INFERRED",
   });
+  bad(CommerceDiscountConditionFactsSchema, {
+    ...discountFacts,
+    combination: undefined,
+  });
   bad(CommerceToolOutputs.commerce_get_discount_details, {
     details: { offer: discountOffer },
   });
@@ -260,6 +274,51 @@ test("discount discovery and condition contracts stay structural and use the gen
     renderedText: "Discount details loaded",
     unexpected: true,
   });
+});
+
+test("combination facts preserve source nulls, empty observations, and provider-specific facts", () => {
+  const shopifyFacts = {
+    discountClasses: ["ORDER", "PRODUCT"],
+    shopifyPlus: true,
+    combinesWith: { orderDiscounts: true, productDiscounts: false, shippingDiscounts: null },
+    discountTags: ["VIP"],
+    allowedSameLineProductTags: ["BUNDLE"],
+  } satisfies CommerceDiscountCombinationFacts;
+  assert.deepEqual(CommerceDiscountCombinationFactsSchema.parse(shopifyFacts), shopifyFacts);
+  assert.deepEqual(CommerceDiscountCombinationFactsSchema.parse({
+    discountClasses: null, shopifyPlus: null, combinesWith: null,
+    discountTags: null, allowedSameLineProductTags: null,
+  }), { discountClasses: null, shopifyPlus: null, combinesWith: null, discountTags: null, allowedSameLineProductTags: null });
+  assert.deepEqual(CommerceDiscountCombinationFactsSchema.parse({
+    discountClasses: [], shopifyPlus: false,
+    combinesWith: { orderDiscounts: false, productDiscounts: false, shippingDiscounts: false },
+    discountTags: [], allowedSameLineProductTags: [],
+  }).combinesWith, { orderDiscounts: false, productDiscounts: false, shippingDiscounts: false });
+  assert.equal(CommerceDiscountConditionFactsSchema.parse({ ...discountFacts,
+    individualUse: null, combination: shopifyFacts }).individualUse, null);
+  assert.equal(CommerceDiscountConditionFactsSchema.parse({ ...discountFacts,
+    completeness: "PARTIAL", individualUse: null, combination: {
+      discountClasses: null, shopifyPlus: null,
+      combinesWith: { orderDiscounts: true, productDiscounts: null, shippingDiscounts: null },
+      discountTags: null, allowedSameLineProductTags: null,
+    } }).completeness, "PARTIAL");
+  bad(CommerceDiscountCombinationFactsSchema, { ...shopifyFacts, unexpected: true });
+  bad(CommerceDiscountCombinationFactsSchema, { ...shopifyFacts, discountClasses: ["ORDER", "PRODUCT", "SHIPPING", "ORDER"] });
+  bad(CommerceDiscountCombinationFactsSchema, { ...shopifyFacts, shopifyPlus: "true" });
+  bad(CommerceDiscountCombinationFactsSchema, { ...shopifyFacts, combinesWith: { orderDiscounts: true, productDiscounts: true, shippingDiscounts: "unknown" } });
+  bad(CommerceDiscountCombinationFactsSchema, { ...shopifyFacts, combinesWith: { orderDiscounts: true, productDiscounts: true, shippingDiscounts: false, unexpected: true } });
+  bad(CommerceDiscountCombinationFactsSchema, { ...shopifyFacts, discountTags: ["x".repeat(129)] });
+  bad(CommerceDiscountCombinationFactsSchema, { ...shopifyFacts, allowedSameLineProductTags: Array(65).fill("tag") });
+});
+
+test("discount detail identity distinguishes unknown provider identity from an authoritative value", () => {
+  ok(CommerceDiscountDetailsSchema, { ...discountDetails, providerDiscountId: null });
+  ok(CommerceDiscountDetailsSchema, discountDetails);
+  bad(CommerceDiscountDetailsSchema, { ...discountDetails, providerDiscountId: "" });
+  bad(CommerceDiscountDetailsSchema, { ...discountDetails, providerDiscountId: "x".repeat(192) });
+  bad(CommerceDiscountDetailsSchema, { ...discountDetails, providerDiscountId: null, other: true });
+  const { providerDiscountId: _providerDiscountId, ...withoutProviderIdentity } = discountDetails;
+  bad(CommerceDiscountDetailsSchema, withoutProviderIdentity);
 });
 
 test("existing products remain compatible and sale evidence stays structural", () => {

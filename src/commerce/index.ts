@@ -8,5 +8,6 @@ export * from "./selection";
 export * from "./external";
 export * from "./store-category-prompt";
 export * from "./outreach-context";
+export * from "./outreach-checkout-offer-set";
 
 export * from "./fixtures";

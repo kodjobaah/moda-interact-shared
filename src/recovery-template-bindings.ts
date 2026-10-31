@@ -7,6 +7,7 @@ export const RecoveryTemplateSemanticKeySchema = z.enum([
   "checkout.url",
   "checkout.itemsSummary",
   "offer.code",
+  "offer.codes",
   "offer.description",
   "promotion.productName",
   "promotion.productUrl",

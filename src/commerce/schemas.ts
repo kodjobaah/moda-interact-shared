@@ -270,6 +270,20 @@ export const CommerceOfferSchema = z
         Date.parse(v.startsAt) < Date.parse(v.endsAt)) &&
       (v.method !== "AUTOMATIC" || v.code === null),
   );
+export const CommerceDiscountCombinationFactsSchema = z.strictObject({
+  discountClasses: z.array(z.enum(["ORDER", "PRODUCT", "SHIPPING"])).max(3).nullable(),
+  shopifyPlus: z.boolean().nullable(),
+  combinesWith: z.strictObject({
+    orderDiscounts: z.boolean().nullable(),
+    productDiscounts: z.boolean().nullable(),
+    shippingDiscounts: z.boolean().nullable(),
+  }).nullable(),
+  discountTags: z.array(z.string().min(1).max(128)).max(64).nullable(),
+  allowedSameLineProductTags: z.array(z.string().min(1).max(128)).max(64).nullable(),
+});
+export type CommerceDiscountCombinationFacts = z.infer<
+  typeof CommerceDiscountCombinationFactsSchema
+>;
 export const CommerceDiscountConditionFactsSchema = z.strictObject({
   provider: z.enum(["SHOPIFY", "WOOCOMMERCE"]),
   completeness: z.enum(["COMPLETE", "PARTIAL", "UNKNOWN"]),
@@ -314,6 +328,7 @@ export const CommerceDiscountConditionFactsSchema = z.strictObject({
   customerScope: z.enum(["ALL", "RESTRICTED", "UNKNOWN"]),
   excludesSaleItems: z.boolean().nullable(),
   individualUse: z.boolean().nullable(),
+  combination: CommerceDiscountCombinationFactsSchema,
   unrepresentedConditions: z.array(z.string().min(1).max(128)).max(24),
 });
 export type CommerceDiscountConditionFacts = z.infer<
@@ -322,6 +337,7 @@ export type CommerceDiscountConditionFacts = z.infer<
 export const CommerceDiscountDetailsSchema = z.strictObject({
   offer: CommerceOfferSchema,
   facts: CommerceDiscountConditionFactsSchema,
+  providerDiscountId: z.string().min(1).max(191).nullable(),
 });
 export type CommerceDiscountDetails = z.infer<
   typeof CommerceDiscountDetailsSchema

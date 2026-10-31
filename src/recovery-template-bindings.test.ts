@@ -5,6 +5,8 @@ import {
   RecoveryTemplateFrozenBindingsSchema,
   RecoveryTemplateHeaderMediaRoleSchema,
   RecoveryTemplateSemanticKeySchema,
+  RecoveryTemplateTextBindingSchema,
+  RecoveryTemplateUrlButtonBindingSchema,
 } from "./recovery-template-bindings.js";
 
 const checkoutProjection = {
@@ -35,6 +37,7 @@ const expectedSemanticKeys = [
   "checkout.url",
   "checkout.itemsSummary",
   "offer.code",
+  "offer.codes",
   "offer.description",
   "promotion.productName",
   "promotion.productUrl",
@@ -58,6 +61,19 @@ test("preserves all semantic keys and existing ShopBrand media roles", () => {
     "COVER_IMAGE",
     "CHECKOUT_PRODUCT",
   ]);
+});
+
+test("offer.codes is one body text semantic and is not a template button binding", () => {
+  assert.deepEqual(RecoveryTemplateTextBindingSchema.parse({ position: 4, variable: "offer.codes" }), {
+    position: 4,
+    variable: "offer.codes",
+  });
+  assert.equal(RecoveryTemplateSemanticKeySchema.safeParse(["offer.codes"]).success, false);
+  assert.equal(RecoveryTemplateUrlButtonBindingSchema.safeParse({
+    index: 0,
+    subType: "url",
+    variable: "offer.codes",
+  }).success, false);
 });
 
 test("parses the illustrative checkout and alternative-product projections", () => {
