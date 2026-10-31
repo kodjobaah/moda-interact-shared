@@ -66,6 +66,7 @@ const discountFacts = {
   },
   minimumSubtotal: null,
   maximumSubtotal: null,
+  subtotalRequirementCurrency: null,
   minimumQuantity: null,
   usageLimit: null,
   usageCount: null,
@@ -273,6 +274,89 @@ test("discount discovery and condition contracts stay structural and use the gen
     data: { details: discountDetails },
     renderedText: "Discount details loaded",
     unexpected: true,
+  });
+});
+
+test("discount threshold currency is required and remains structurally nullable", () => {
+  const known = {
+    ...discountFacts,
+    minimumSubtotal: "100.00",
+    maximumSubtotal: null,
+    subtotalRequirementCurrency: "GBP",
+    discountCurrency: null,
+  } satisfies CommerceDiscountConditionFacts;
+  ok(CommerceDiscountConditionFactsSchema, known);
+  ok(CommerceDiscountDetailsSchema, { ...discountDetails, facts: known });
+
+  const noThreshold = {
+    ...discountFacts,
+    minimumSubtotal: null,
+    maximumSubtotal: null,
+    subtotalRequirementCurrency: null,
+  } satisfies CommerceDiscountConditionFacts;
+  ok(CommerceDiscountConditionFactsSchema, noThreshold);
+
+  const unknownCurrency = {
+    ...discountFacts,
+    minimumSubtotal: "100.00",
+    maximumSubtotal: null,
+    subtotalRequirementCurrency: null,
+    completeness: "PARTIAL",
+    unrepresentedConditions: ["THRESHOLD_CURRENCY_UNKNOWN"],
+  } satisfies CommerceDiscountConditionFacts;
+  ok(CommerceDiscountConditionFactsSchema, unknownCurrency);
+
+  const conflictingCurrencies = {
+    ...discountFacts,
+    minimumSubtotal: "100.00",
+    maximumSubtotal: "200.00",
+    subtotalRequirementCurrency: null,
+    completeness: "PARTIAL",
+    unrepresentedConditions: ["THRESHOLD_CURRENCY_UNKNOWN"],
+  } satisfies CommerceDiscountConditionFacts;
+  ok(CommerceDiscountConditionFactsSchema, conflictingCurrencies);
+
+  const { subtotalRequirementCurrency: _unused, ...omitted } = known;
+  bad(CommerceDiscountConditionFactsSchema, omitted);
+  bad(CommerceDiscountDetailsSchema, { ...discountDetails, facts: omitted });
+  bad(CommerceToolOutputs.commerce_get_discount_details, {
+    details: { ...discountDetails, facts: omitted },
+  });
+
+  for (const invalid of ["gbp", "GB", "ZZZ", "", 0, 123, false, {}, []]) {
+    bad(CommerceDiscountConditionFactsSchema, {
+      ...known,
+      subtotalRequirementCurrency: invalid,
+    });
+  }
+  bad(CommerceDiscountConditionFactsSchema, {
+    ...known,
+    extraCurrencyProperty: "GBP",
+  });
+
+  ok(CommerceDiscountConditionFactsSchema, {
+    ...unknownCurrency,
+    unrepresentedConditions: [],
+  });
+  ok(CommerceDiscountConditionFactsSchema, {
+    ...noThreshold,
+    subtotalRequirementCurrency: "GBP",
+  });
+
+  const resultSchema = commerceToolResultSchema(
+    CommerceToolOutputs.commerce_get_discount_details,
+  );
+  const response = {
+    contractVersion: "commerce.v1",
+    status: "OK" as const,
+    data: { details: { ...discountDetails, facts: known } },
+    renderedText: "Discount details loaded",
+  };
+  ok(resultSchema, response);
+  assert.deepEqual(resultSchema.parse(response), response);
+  bad(resultSchema, {
+    ...response,
+    data: { details: { ...discountDetails, facts: omitted } },
   });
 });
 
