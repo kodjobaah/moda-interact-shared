@@ -10,9 +10,10 @@ import {
   WooCartRestoreUnsupportedSnapshotV1Schema,
   WooCheckoutRestoreExtensionV1Schema,
   WooRestoreOutreachOfferV1Schema,
+  type WooRestoreOutreachOfferV1,
   WooRestoreResolveRequestV1Schema,
   WooRestoreResolveResponseV1Schema,
-} from "./contracts.js";
+} from "./index.js";
 
 const fixture = JSON.parse(readFileSync(
   new URL("./__fixtures__/woo-restore-v1.json", import.meta.url), "utf8",
@@ -144,6 +145,10 @@ test("parses the optional checkout restoration extension without inventing state
 test("accepts only the exact resolver v1 request and complete eligible response", () => {
   assert.equal(WooRestoreResolveRequestV1Schema.safeParse(fixture.resolveRequest).success, true);
   assert.equal(WooRestoreResolveResponseV1Schema.safeParse(fixture.eligibleResolveResponse).success, true);
+  assert.equal(
+    WooRestoreResolveResponseV1Schema.safeParse(fixture.eligibleResolveResponseWithCheckoutOffers).success,
+    true,
+  );
   const request = fixture.resolveRequest as Record<string, unknown>;
   const response = fixture.eligibleResolveResponse as Record<string, unknown>;
   assertInvalid(WooRestoreResolveRequestV1Schema, { ...request, schemaVersion: "woo.restore.resolve.v2" });
@@ -157,14 +162,79 @@ test("accepts only the exact resolver v1 request and complete eligible response"
     snapshot: fixture.unsupportedSnapshot,
   });
   assertInvalid(WooRestoreResolveResponseV1Schema, { ...response, checkoutKey: "bad\nkey" });
+  assertInvalid(WooRestoreResolveResponseV1Schema, {
+    ...(fixture.eligibleResolveResponseWithCheckoutOffers as Record<string, unknown>),
+    schemaVersion: "woo.restore.resolve.v2",
+  });
 });
 
-test("parses only the four strict confirmed-outreach offer variants", () => {
+test("parses strict confirmed-outreach offer variants including ordered checkout groups", () => {
   const examples = (fixture.outreachOfferExamples ?? {}) as Record<string, unknown>;
-  for (const key of ["none", "unverifiable", "checkoutCode", "checkoutAutomatic", "alternativeProduct"]) {
+  for (const key of ["none", "unverifiable", "checkoutCode", "checkoutAutomatic", "checkoutOffersMixed", "alternativeProduct"]) {
     assert.equal(WooRestoreOutreachOfferV1Schema.safeParse(examples[key]).success, true);
   }
+  const groupResponse = fixture.eligibleResolveResponseWithCheckoutOffers as {
+    outreachOffer: unknown;
+  };
+  assert.deepEqual(
+    WooRestoreOutreachOfferV1Schema.parse(groupResponse.outreachOffer),
+    {
+      kind: "CHECKOUT_OFFERS",
+      offers: [
+        { method: "CODE", code: "SAVE10", providerDiscountId: "woo:coupon:10" },
+        { method: "CODE", code: "SHIPFREE", providerDiscountId: "woo:coupon:20" },
+      ],
+    },
+  );
+  const inferredGroup: WooRestoreOutreachOfferV1 = {
+    kind: "CHECKOUT_OFFERS",
+    offers: [
+      { method: "CODE", code: "SAVE10", providerDiscountId: "woo:coupon:10" },
+      { method: "AUTOMATIC", providerDiscountId: "woo:discount:22" },
+    ],
+  };
+  assert.equal(WooRestoreOutreachOfferV1Schema.safeParse(inferredGroup).success, true);
+  assert.equal(WooRestoreOutreachOfferV1Schema.safeParse({
+    kind: "CHECKOUT_OFFERS",
+    offers: [
+      { method: "CODE", code: "SAVE10", providerDiscountId: "woo:coupon:10" },
+      { method: "CODE", code: "SHIPFREE", providerDiscountId: "woo:coupon:20" },
+      { method: "AUTOMATIC", providerDiscountId: "woo:discount:22" },
+    ],
+  }).success, true);
   assertInvalid(WooRestoreOutreachOfferV1Schema, { kind: "NONE" });
+  assertInvalid(WooRestoreOutreachOfferV1Schema, { kind: "CHECKOUT_OFFERS", offers: [] });
+  assertInvalid(WooRestoreOutreachOfferV1Schema, {
+    kind: "CHECKOUT_OFFERS",
+    offers: [
+      { method: "CODE", code: "SAVE10", providerDiscountId: "woo:coupon:10" },
+      { method: "CODE", code: "SHIPFREE", providerDiscountId: "woo:coupon:20" },
+      { method: "CODE", code: "THREE", providerDiscountId: "woo:coupon:30" },
+      { method: "AUTOMATIC", providerDiscountId: "woo:discount:22" },
+    ],
+  });
+  assertInvalid(WooRestoreOutreachOfferV1Schema, {
+    kind: "CHECKOUT_OFFERS",
+    offers: [
+      { method: "CODE", code: "SAVE10", providerDiscountId: "woo:coupon:10" },
+      { method: "CODE", code: "SHIPFREE" },
+    ],
+  });
+  assertInvalid(WooRestoreOutreachOfferV1Schema, {
+    kind: "CHECKOUT_OFFERS",
+    offers: [
+      { method: "CODE", code: "SAVE10", providerDiscountId: "woo:coupon:10", extra: true },
+      { method: "AUTOMATIC", providerDiscountId: "woo:discount:22" },
+    ],
+  });
+  // Shared validates structure; duplicate identity/pairing policy is enforced by API/Woo.
+  assert.equal(WooRestoreOutreachOfferV1Schema.safeParse({
+    kind: "CHECKOUT_OFFERS",
+    offers: [
+      { method: "CODE", code: "SAVE10", providerDiscountId: "woo:coupon:10" },
+      { method: "CODE", code: "SAVE10", providerDiscountId: "woo:coupon:10" },
+    ],
+  }).success, true);
   assertInvalid(WooRestoreOutreachOfferV1Schema, {
     kind: "CHECKOUT_AUTOMATIC",
     providerDiscountId: "id-1",
@@ -196,9 +266,10 @@ test("parses only the four strict confirmed-outreach offer variants", () => {
   });
 });
 
-test("golden fixture has exactly five keys and stable schema round trips", () => {
+test("golden fixture has exactly six keys and stable schema round trips", () => {
   assert.deepEqual(Object.keys(fixture).sort(), [
     "eligibleResolveResponse",
+    "eligibleResolveResponseWithCheckoutOffers",
     "outreachOfferExamples",
     "resolveRequest",
     "supportedSnapshot",
@@ -210,10 +281,15 @@ test("golden fixture has exactly five keys and stable schema round trips", () =>
   const unsupported = WooCartRestoreUnsupportedSnapshotV1Schema.parse(fixture.unsupportedSnapshot);
   const request = WooRestoreResolveRequestV1Schema.parse(fixture.resolveRequest);
   const response = WooRestoreResolveResponseV1Schema.parse(fixture.eligibleResolveResponse);
+  const groupedResponse = WooRestoreResolveResponseV1Schema.parse(
+    fixture.eligibleResolveResponseWithCheckoutOffers,
+  );
   assert.deepEqual(clone(supported), fixture.supportedSnapshot);
   assert.deepEqual(clone(unsupported), fixture.unsupportedSnapshot);
   assert.deepEqual(clone(request), fixture.resolveRequest);
   assert.deepEqual(clone(response), fixture.eligibleResolveResponse);
+  assert.deepEqual(clone(groupedResponse), fixture.eligibleResolveResponseWithCheckoutOffers);
+  assert.deepEqual(groupedResponse.snapshot.appliedCouponCodes, ["save10", "freeship"]);
 
   const offers = fixture.outreachOfferExamples as Record<string, unknown>;
   for (const example of Object.values(offers)) {

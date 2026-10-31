@@ -97,6 +97,20 @@ export const WooRestoreOutreachOfferV1Schema = z.discriminatedUnion("kind", [
     kind: z.literal("CHECKOUT_AUTOMATIC"),
     providerDiscountId: WooNoControlTextSchema(191),
   }),
+  z.strictObject({
+    kind: z.literal("CHECKOUT_OFFERS"),
+    offers: z.array(z.discriminatedUnion("method", [
+      z.strictObject({
+        method: z.literal("CODE"),
+        code: WooNoControlTextSchema(128),
+        providerDiscountId: WooNoControlTextSchema(191),
+      }),
+      z.strictObject({
+        method: z.literal("AUTOMATIC"),
+        providerDiscountId: WooNoControlTextSchema(191),
+      }),
+    ])).min(2).max(3),
+  }),
   z.strictObject({ kind: z.literal("ALTERNATIVE_PRODUCT") }),
 ]);
 export type WooRestoreOutreachOfferV1 = z.infer<typeof WooRestoreOutreachOfferV1Schema>;
