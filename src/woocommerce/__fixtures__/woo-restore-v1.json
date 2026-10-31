@@ -52,6 +52,33 @@
       "providerDiscountId": "woo-discount-915"
     }
   },
+  "eligibleResolveResponseWithCheckoutOffers": {
+    "schemaVersion": "woo.restore.resolve.v1",
+    "status": "eligible",
+    "recoveryId": "recovery_456",
+    "checkoutKey": "woo-example-checkout",
+    "snapshot": {
+      "schemaVersion": "woo.cart-restore.v1",
+      "kind": "supported",
+      "appliedCouponCodes": ["save10", "freeship"],
+      "lines": [
+        {"productId": "101", "quantity": 2},
+        {
+          "productId": "202",
+          "variationId": "207",
+          "quantity": 1,
+          "attributes": {"attribute_pa_color": "navy", "attribute_pa_size": "m"}
+        }
+      ]
+    },
+    "outreachOffer": {
+      "kind": "CHECKOUT_OFFERS",
+      "offers": [
+        {"method": "CODE", "code": "SAVE10", "providerDiscountId": "woo:coupon:10"},
+        {"method": "CODE", "code": "SHIPFREE", "providerDiscountId": "woo:coupon:20"}
+      ]
+    }
+  },
   "outreachOfferExamples": {
     "none": {"kind": "NONE", "reason": "NO_CONFIRMED_OFFER"},
     "unverifiable": {"kind": "NONE", "reason": "UNVERIFIABLE"},
@@ -63,6 +90,13 @@
     "checkoutAutomatic": {
       "kind": "CHECKOUT_AUTOMATIC",
       "providerDiscountId": "woo-discount-916"
+    },
+    "checkoutOffersMixed": {
+      "kind": "CHECKOUT_OFFERS",
+      "offers": [
+        {"method": "CODE", "code": "SAVE10", "providerDiscountId": "woo:coupon:10"},
+        {"method": "AUTOMATIC", "providerDiscountId": "woo:discount:22"}
+      ]
     },
     "alternativeProduct": {"kind": "ALTERNATIVE_PRODUCT"}
   }
