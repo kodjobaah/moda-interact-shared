@@ -321,6 +321,7 @@ export const CommerceDiscountConditionFactsSchema = z.strictObject({
   }),
   minimumSubtotal: MoneySchema.nullable(),
   maximumSubtotal: MoneySchema.nullable(),
+  subtotalRequirementCurrency: CurrencySchema.nullable(),
   minimumQuantity: z.number().int().nonnegative().nullable(),
   usageLimit: z.number().int().nonnegative().nullable(),
   usageCount: z.number().int().nonnegative().nullable(),
