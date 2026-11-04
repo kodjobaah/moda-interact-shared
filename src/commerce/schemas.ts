@@ -259,14 +259,27 @@ export const CommerceProductSchema = z.strictObject({
   saleEvidence: CommerceProductSaleEvidenceSchema.nullable().optional(),
   observedAt: DateSchema,
 });
+// Discount outputs own their UTC wire syntax; general DateSchema remains unchanged.
+// The final lookahead requires absolute end-of-input (unlike JavaScript's $).
+const discountUtcPattern = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.[0-9]+)?Z(?![\s\S])/;
+const CommerceDiscountDateTimeSchema = z.string().regex(discountUtcPattern).refine(value => {
+  const match = discountUtcPattern.exec(value);
+  if (!match) return false;
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
+  if (month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59) return false;
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day >= 1 && day <= daysInMonth[month - 1];
+}, "Expected a valid UTC discount timestamp with seconds");
+
 export const CommerceOfferSchema = z
   .strictObject({
     offerId: ID,
     title: z.string().min(1).max(512),
     method: z.enum(["AUTOMATIC", "CODE"]),
     code: z.string().min(1).max(128).nullable(),
-    startsAt: DateSchema.nullable(),
-    endsAt: DateSchema.nullable(),
+    startsAt: CommerceDiscountDateTimeSchema.nullable(),
+    endsAt: CommerceDiscountDateTimeSchema.nullable(),
     support: z.enum(["SUPPORTED", "UNSUPPORTED", "UNKNOWN"]),
     reasonCodes: z.array(z.string().min(1).max(64)).max(16),
   })
@@ -294,9 +307,9 @@ export type CommerceDiscountCombinationFacts = z.infer<
 export const CommerceDiscountConditionFactsSchema = z.strictObject({
   provider: z.enum(["SHOPIFY", "WOOCOMMERCE"]),
   completeness: z.enum(["COMPLETE", "PARTIAL", "UNKNOWN"]),
-  observedAt: DateSchema,
+  observedAt: CommerceDiscountDateTimeSchema,
   providerStatus: z.string().max(64),
-  unavailableAt: DateSchema.nullable(),
+  unavailableAt: CommerceDiscountDateTimeSchema.nullable(),
   discountKind: z.enum([
     "PERCENTAGE",
     "FIXED_AMOUNT",

@@ -10,7 +10,7 @@ function immutable<T extends object>(value: T): T {
 /** Code-owned descriptors with stable name/version identities. */
 export const commerceDiscountBuiltInDescriptors: readonly CommerceBuiltInToolDescriptor[] = immutable<CommerceBuiltInToolDescriptor[]>([
   {
-    kind: "BUILT_IN", name: "commerce_get_discount_options", definitionVersion: "1.0.0",
+    kind: "BUILT_IN", name: "commerce_get_discount_options", definitionVersion: "2.0.0",
     description: "Read the current shop's permitted discount options.",
     inputSchema: {
       type: "object", properties: {
@@ -20,7 +20,7 @@ export const commerceDiscountBuiltInDescriptors: readonly CommerceBuiltInToolDes
     },
   },
   {
-    kind: "BUILT_IN", name: "commerce_get_discount_details", definitionVersion: "1.0.0",
+    kind: "BUILT_IN", name: "commerce_get_discount_details", definitionVersion: "2.0.0",
     description: "Read details for a permitted discount in the current shop.",
     inputSchema: {
       type: "object", properties: {offerId: {type: "string", minLength: 1, maxLength: 128}},

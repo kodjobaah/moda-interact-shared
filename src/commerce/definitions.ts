@@ -57,12 +57,12 @@ export const CommerceBuiltInToolNameSchema = z.enum([
 export const CommerceBuiltInToolGrantSchema = z.strictObject({
   kind: z.enum(["BUILT_IN"]).meta({maxLength: 8}),
   toolName: CommerceBuiltInToolNameSchema,
-  definitionVersion: z.enum(["1.0.0"]).meta({maxLength: 5}),
+  definitionVersion: z.enum(["2.0.0"]).meta({maxLength: 5}),
 });
 export const CommerceBuiltInToolDescriptorSchema = z.strictObject({
   kind: z.enum(["BUILT_IN"]).meta({maxLength: 8}),
   name: CommerceBuiltInToolNameSchema,
-  definitionVersion: z.enum(["1.0.0"]).meta({maxLength: 5}),
+  definitionVersion: z.enum(["2.0.0"]).meta({maxLength: 5}),
   description: z.string().min(1).max(4096),
   inputSchema: InputSchemaSchema,
 });
