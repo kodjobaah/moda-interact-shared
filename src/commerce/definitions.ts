@@ -96,6 +96,7 @@ export const POLICY_OPERATIONS = [
   "taxonomy.resolveCategories",
   "products.search",
   "products.get",
+  "shipping.getInformation",
   "recovery.getBasket",
   "shopify.searchProducts",
   "discounts.getOptions",

@@ -2426,5 +2426,26 @@ fixtures. To execute the actual Commerce-owned projector/publication integration
 set `COMMERCE_CONTRACT_SOURCE_ROOT` to its explicit accepted source checkout.
 The test passes candidate schemas as function arguments to that existing
 projector; it neither changes nor links the consumer's installed package.
+The installed consumer still has the released operation registry: candidate operation
+metadata is checked against candidate Shared, and the installed publication pipeline
+is exercised with a registered operation and the actual generated input schema.
+This does not certify consumer adoption of the new operations before release.
 Without this test-only source prerequisite, that integration case is explicitly
 skipped rather than reported as executed.
+
+The discovery input dictionary also supports explicit `browse` (default `false`)
+and the published `commerce_get_shipping_information` operation
+(`shipping.getInformation`, version `1.0.0`). The named
+`CommerceShippingInformationInputSchema` / `CommerceShippingInformationSchema`
+and inferred types expose bounded native facts and independent product/policy outcomes.
+Policy HTML remains untrusted data; adapters enforce ownership, status relationships,
+verified hosts and the UTF-8 body budget.
+
+`CommerceResponseDispositionSchema` / `CommerceResponseDisposition` and
+`CommerceAnswerPresentationSelectionSchema` / `CommerceAnswerPresentationSelection`
+add optional identifier-only presentation fields. Merge their shape with recommendation
+and existing release details; Commerce owns explicit published instructions, and Background
+owns controlled composition. Product-bearing shipping observations latch that host path even
+without a selection; policy-only observations alone may retain ordinary grounded answers.
+Expected limitations never clear a terminal tool error. The default empty response contract,
+hard-referral envelope and two-tool discount built-in allowlist remain unchanged.

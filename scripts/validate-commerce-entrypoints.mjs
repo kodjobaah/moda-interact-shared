@@ -10,11 +10,14 @@ assert.equal(promptValidation.valid,true);
 const promptContext=c.createStoreCategoryPromptContext({availableConditionKeys:['shoes'],selectedConditionKeys:['shoes']});
 const promptRendered=c.renderStoreCategoryPromptTemplate({source:'Base {% if mappings.shoes %}shoe{% endif %}',context:promptContext});
 assert.deepEqual(promptRendered,{ok:true,promptText:'Base shoe',referencedConditionKeys:['shoes']});
-for (const name of ['CommerceCategoryCandidateSchema','CommerceCategoryResolutionSchema','CommerceOptionalLookupUnavailableSchema','CommerceBuiltInToolDescriptorSchema','CommerceBuiltInToolGrantSchema','CommerceConversationToolContextSchema','CommerceProductRecommendationSelectionSchema','commerceDiscountBuiltInDescriptors','commerceBuiltInToolContractPayload']) assert(name in c, name);
+for (const name of ['CommerceShippingInformationInputSchema','CommerceShippingInformationSchema','CommerceResponseDispositionSchema','CommerceAnswerPresentationSelectionSchema','CommerceCategoryCandidateSchema','CommerceCategoryResolutionSchema','CommerceOptionalLookupUnavailableSchema','CommerceBuiltInToolDescriptorSchema','CommerceBuiltInToolGrantSchema','CommerceConversationToolContextSchema','CommerceProductRecommendationSelectionSchema','commerceDiscountBuiltInDescriptors','commerceBuiltInToolContractPayload']) assert(name in c, name);
 for (const descriptor of c.commerceDiscountBuiltInDescriptors) {
  assert(c.CommerceBuiltInToolDescriptorSchema.safeParse(descriptor).success);
  assert.equal(digest(c.commerceBuiltInToolContractPayload(descriptor)),descriptor.contractHash);
 }
+assert.deepEqual(c.CommerceShippingInformationInputSchema.parse({}),{productId:null,variantId:null});
+assert.equal(c.CommerceToolInputs.commerce_search_products.parse({}).browse,false);
+assert(c.CommerceAnswerPresentationSelectionSchema.safeParse({responseDisposition:'STANDARD',shippingInformationSelection:{productId:null,variantId:null}}).success);
 const manifest=c.exampleManifest(digest);
 assert(c.CommerceManifestSchema.safeParse(manifest).success);
 const result=await runCommerceTurn({turn:c.exampleTurn,grant:c.exampleGrant(manifest),manifest,hostInstructions:[],context:{},history:[],language:{tag:null,source:null},signal:new AbortController().signal,dependencies:{digest,now:()=>Date.now(),tools:[],model:{invoke:async()=>({calls:[{name:'finalResponse',arguments:c.exampleFinal}],outputTokens:30})}}});

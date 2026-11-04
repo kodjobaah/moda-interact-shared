@@ -489,12 +489,64 @@ export const CommerceProductRecommendationSelectionSchema = z.strictObject({
   })).min(1).max(3).optional(),
 });
 export type CommerceProductRecommendationSelection = z.infer<typeof CommerceProductRecommendationSelectionSchema>;
+export const CommerceResponseDispositionSchema = z.enum([
+  "STANDARD", "OUT_OF_SCOPE_REDIRECT", "SHIPPING_INFORMATION_UNVERIFIED",
+]).meta({maxLength: 31});
+export type CommerceResponseDisposition = z.infer<typeof CommerceResponseDispositionSchema>;
+export const CommerceAnswerPresentationSelectionSchema = z.strictObject({
+  responseDisposition: CommerceResponseDispositionSchema.optional(),
+  shippingInformationSelection: z.strictObject({
+    productId: wireId.nullable(),
+    variantId: wireId.nullable(),
+  }).optional(),
+});
+export type CommerceAnswerPresentationSelection = z.infer<typeof CommerceAnswerPresentationSelectionSchema>;
+export const CommerceShippingInformationInputSchema = z.strictObject({
+  productId: wireId.nullable().default(null),
+  variantId: wireId.nullable().default(null),
+});
+export type CommerceShippingInformationInput = z.infer<typeof CommerceShippingInformationInputSchema>;
+// Relationships, current-shop ownership and policy UTF-8 budgets belong to the adapter.
+export const CommerceShippingInformationSchema = z.strictObject({
+  provider: z.enum(["SHOPIFY", "WOOCOMMERCE"]).meta({maxLength: 11}),
+  observedAt: DateSchema,
+  product: z.strictObject({
+    status: z.enum(["NOT_REQUESTED", "VARIANT_REQUIRED", "AVAILABLE"]).meta({maxLength: 16}),
+    productId: wireId.nullable(),
+    variantId: wireId.nullable(),
+    requiresShipping: z.boolean().nullable(),
+    virtual: z.boolean().nullable(),
+    weight: z.strictObject({
+      value: z.number().min(0),
+      unit: z.enum(["GRAMS", "KILOGRAMS", "OUNCES", "POUNDS"]).meta({maxLength: 9}).nullable(),
+    }).nullable(),
+    dimensions: z.strictObject({
+      length: z.number().min(0).nullable(),
+      width: z.number().min(0).nullable(),
+      height: z.number().min(0).nullable(),
+      unit: z.string().min(1).max(16).nullable(),
+    }).nullable(),
+    shippingClassId: wireId.nullable(),
+    shippingClassSlug: z.string().min(1).max(512).nullable(),
+  }),
+  policy: z.strictObject({
+    status: z.enum(["AVAILABLE", "NOT_CONFIGURED", "SCOPE_NOT_GRANTED", "UNSUPPORTED"]).meta({maxLength: 17}),
+    trust: z.enum(["UNTRUSTED_REFERENCE"]).meta({maxLength: 19}),
+    title: z.string().min(1).max(512).nullable(),
+    bodyStatus: z.enum(["AVAILABLE", "EMPTY", "TOO_LARGE", "NOT_AVAILABLE"]).meta({maxLength: 13}),
+    bodyHtml: z.string().min(1).max(8000).nullable(),
+    url: z.url({protocol: /^https$/}).min(1).max(2048).nullable(),
+    updatedAt: DateSchema.nullable(),
+  }),
+});
+export type CommerceShippingInformation = z.infer<typeof CommerceShippingInformationSchema>;
 const limit = z.number().int().min(1).max(3).default(3);
 export const CommerceToolInputs = {
   commerce_resolve_product_categories: z.strictObject({
     query: z.string().min(1).max(200),
     limit: z.number().int().min(1).max(10).default(5),
   }),
+  commerce_get_shipping_information: CommerceShippingInformationInputSchema,
   commerce_get_basket: z.strictObject({}),
   commerce_search_products: z.strictObject({
     query: z.string().min(1).max(200).nullable().default(null),
@@ -503,6 +555,7 @@ export const CommerceToolInputs = {
       id: wireId,
       taxonomyVersion: z.string().min(1).max(64).nullable(),
     }).optional(),
+    browse: z.boolean().default(false),
     maximumPrice: MoneySchema.optional(),
     availableOnly: z.boolean().default(true),
     limit: z.number().int().min(1).max(20).default(10),
@@ -538,6 +591,7 @@ const alternatives = z.strictObject({
 });
 export const CommerceToolOutputs = {
   commerce_resolve_product_categories: CommerceCategoryResolutionSchema,
+  commerce_get_shipping_information: CommerceShippingInformationSchema,
   commerce_get_basket: CommerceBasketSchema,
   commerce_search_products: z.strictObject({
     products: z.array(CommerceProductSchema).max(20),

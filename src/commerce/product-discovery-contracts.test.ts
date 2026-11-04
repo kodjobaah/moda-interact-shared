@@ -4,6 +4,8 @@ import {createHash} from "node:crypto";
 import {z} from "zod";
 import {
   CommerceCategoryCandidateSchema, CommerceCategoryResolutionSchema,
+  CommerceShippingInformationSchema, CommerceShippingInformationInputSchema,
+  CommerceAnswerPresentationSelectionSchema, CommerceResponseDispositionSchema,
   CommerceConversationToolContextSchema, CommerceProductRecommendationSelectionSchema,
   CommerceOptionalLookupUnavailableSchema, CommerceToolInputs, CommerceToolOutputs,
   CommerceManifestSchema, CommerceConversationGrantSchema,
@@ -44,7 +46,7 @@ test("category contracts enforce wire bounds without imposing service ranking or
 });
 test("flat search input preserves old filters and defaults while leaving category applicability to services", () => {
   const schema = CommerceToolInputs.commerce_search_products;
-  assert.deepEqual(schema.parse({}), {query: null, availableOnly: true, limit: 10, cursor: null});
+  assert.deepEqual(schema.parse({}), {query: null, browse: false, availableOnly: true, limit: 10, cursor: null});
   assert.equal(schema.parse({query: "coat", maximumPrice: "12.50", availableOnly: false, limit: 20}).query, "coat");
   assert.ok(schema.safeParse({category: {system: "WOOCOMMERCE_PRODUCT_CATEGORY", id: "not-a-native-id", taxonomyVersion: "service-rejects"}}).success);
   for (const patch of [{query: ""}, {query: "x".repeat(201)}, {limit: 21}, {cursor: "x".repeat(2049)},
@@ -123,4 +125,77 @@ test("mixed manifest/grants retain published provenance and exactly the trusted 
   assert.throws(() => deduplicateTools(Array.from({length: 32}, (_, i) => ({
     key: "cap-" + i, toolDescriptor: {...exampleTool, toolId: "tool-" + i, toolRevisionId: "rev-" + i, name: "tool_" + i},
   })), commerceDiscountBuiltInDescriptors));
+});
+
+export const shipping = {
+  provider: "SHOPIFY", observedAt: "2026-11-04T00:00:00.000Z",
+  product: {status: "NOT_REQUESTED", productId: null, variantId: null,
+    requiresShipping: null, virtual: null, weight: null, dimensions: null,
+    shippingClassId: null, shippingClassSlug: null},
+  policy: {status: "SCOPE_NOT_GRANTED", trust: "UNTRUSTED_REFERENCE", title: null,
+    bodyStatus: "NOT_AVAILABLE", bodyHtml: null, url: null, updatedAt: null},
+};
+test("browse and shipping requests stay flat, bounded and service-neutral", () => {
+  assert.equal(CommerceToolInputs.commerce_search_products.parse({browse: true}).query, null);
+  assert.ok(CommerceToolInputs.commerce_search_products.safeParse({browse: true, query: "coat",
+    category: {system: "WOOCOMMERCE_PRODUCT_CATEGORY", id: "1", taxonomyVersion: null}}).success);
+  assert.deepEqual(CommerceShippingInformationInputSchema.parse({}), {productId: null, variantId: null});
+  assert.equal(CommerceToolInputs.commerce_get_shipping_information, CommerceShippingInformationInputSchema);
+  assert.ok(CommerceShippingInformationInputSchema.safeParse({variantId: "variation"}).success);
+  for (const patch of [{productId: ""}, {variantId: "x".repeat(129)}, {productId: 1},
+    ...["destination", "cart", "query", "scope", "shopId", "token", "url"].map(key => ({[key]: "injected"}))])
+    assert.equal(CommerceShippingInformationInputSchema.safeParse(patch).success, false);
+});
+test("shipping has required nullable facts and independent bounded product/policy outcomes", () => {
+  assert.equal(CommerceToolOutputs.commerce_get_shipping_information, CommerceShippingInformationSchema);
+  for (const provider of ["SHOPIFY", "WOOCOMMERCE"])
+    for (const status of ["NOT_REQUESTED", "VARIANT_REQUIRED", "AVAILABLE"])
+      for (const policyStatus of ["AVAILABLE", "NOT_CONFIGURED", "SCOPE_NOT_GRANTED", "UNSUPPORTED"])
+        assert.ok(CommerceShippingInformationSchema.safeParse({...shipping, provider,
+          product: {...shipping.product, status}, policy: {...shipping.policy, status: policyStatus}}).success);
+  const measured = {...shipping, product: {...shipping.product, productId: "p", variantId: "v",
+    weight: {value: 0, unit: null}, dimensions: {length: 0, width: null, height: 1, unit: null}}};
+  assert.ok(CommerceShippingInformationSchema.safeParse(measured).success);
+  for (const patch of [{weight: {value: Infinity, unit: null}}, {weight: {value: -1, unit: "GRAMS"}},
+    {weight: {value: 1, unit: "CM"}}, {dimensions: {length: NaN, width: null, height: null, unit: null}},
+    {dimensions: {length: -1, width: null, height: null, unit: null}},
+    {dimensions: {length: 1, width: null, height: null, unit: "x".repeat(17)}},
+    {productId: ""}, {shippingClassId: "x".repeat(129)}, {shippingClassSlug: "x".repeat(513)}, {rate: 1}])
+    assert.equal(CommerceShippingInformationSchema.safeParse({...shipping, product: {...shipping.product, ...patch}}).success, false);
+  for (const patch of [{title: ""}, {title: "x".repeat(513)}, {bodyHtml: ""}, {bodyHtml: "x".repeat(8001)},
+    {url: "http://store.test/policy"}, {url: "https://store.test/" + "x".repeat(2048)},
+    {trust: "TRUSTED"}, {bodyStatus: "UNKNOWN"}, {updatedAt: "not-a-timestamp"}, {deliveryDays: 1}])
+    assert.equal(CommerceShippingInformationSchema.safeParse({...shipping, policy: {...shipping.policy, ...patch}}).success, false);
+  // UTF-8 budget, host verification and status/payload relationships remain service policy.
+  assert.ok(CommerceShippingInformationSchema.safeParse({...shipping,
+    policy: {...shipping.policy, bodyHtml: "界".repeat(8000), url: "https://unverified.example/policy"}}).success);
+  for (const object of [shipping, shipping.product, shipping.policy]) {
+    for (const key of Object.keys(object)) {
+      const omitted = structuredClone(shipping) as any;
+      const target = object === shipping ? omitted : object === shipping.product ? omitted.product : omitted.policy;
+      delete target[key];
+      assert.equal(CommerceShippingInformationSchema.safeParse(omitted).success, false, key);
+    }
+  }
+  assert.equal(CommerceShippingInformationSchema.safeParse({...shipping, extra: true}).success, false);
+});
+test("presentation selection owns optional identifiers, leaving relationships to the host", () => {
+  const schema = CommerceAnswerPresentationSelectionSchema;
+  assert.deepEqual(schema.parse({}), {});
+  for (const responseDisposition of CommerceResponseDispositionSchema.options)
+    assert.ok(schema.safeParse({responseDisposition, shippingInformationSelection: {productId: null, variantId: null}}).success);
+  assert.ok(schema.safeParse({shippingInformationSelection: {productId: null, variantId: "v"}}).success);
+  for (const value of [{responseDisposition: "OTHER"}, {shippingInformationSelection: {}},
+    {shippingInformationSelection: {productId: "", variantId: null}},
+    {shippingInformationSelection: {productId: null, variantId: "x".repeat(129)}},
+    {shippingInformationSelection: {productId: null, variantId: null, url: "https://store.test"}},
+    ...["replyText", "amount", "url", "evidenceIds", "scope", "deliveryDays"].map(key => ({[key]: "invented"}))])
+    assert.equal(schema.safeParse(value).success, false);
+  const composed = CommerceProductRecommendationSelectionSchema.extend({...schema.shape, unrelated: z.string().max(20).optional()});
+  assert.ok(composed.safeParse({...recommendation, responseDisposition: "STANDARD", unrelated: "retained"}).success);
+  // Existing exact-get/search outputs are unchanged, including rejection of new presentation fields.
+  assert.deepEqual(CommerceToolOutputs.commerce_get_product.parse({product: null}), {product: null});
+  const empty = {products: [], cursor: null, truncated: false};
+  assert.deepEqual(CommerceToolOutputs.commerce_search_products.parse(empty), empty);
+  assert.equal(CommerceToolOutputs.commerce_search_products.safeParse({...empty, browse: true}).success, false);
 });
