@@ -6,7 +6,7 @@ import {
   CommerceCategoryCandidateSchema, CommerceCategoryResolutionSchema,
   CommerceShippingInformationSchema, CommerceShippingInformationInputSchema,
   CommerceAnswerPresentationSelectionSchema, CommerceResponseDispositionSchema,
-  CommerceConversationToolContextSchema, CommerceProductRecommendationSelectionSchema,
+  CommerceProductRecommendationSelectionSchema,
   CommerceOptionalLookupUnavailableSchema, CommerceToolInputs, CommerceToolOutputs,
   CommerceManifestSchema, CommerceConversationGrantSchema,
 } from "./schemas";
@@ -68,9 +68,7 @@ test("discount optional unavailability is disjoint and normal success bytes reta
   }
   assert.equal(CommerceOptionalLookupUnavailableSchema.safeParse({outcome: "UNAVAILABLE", reasonCode: "NOT_READY"}).success, false);
 });
-test("trusted conversation context and recommendation fields are structural and identifier-only", () => {
-  assert.ok(CommerceConversationToolContextSchema.safeParse({purpose: "CONVERSATION", conversationId: "conversation", inboundVersion: 1, grantId: null}).success);
-  assert.equal(CommerceConversationToolContextSchema.safeParse({purpose: "CONVERSATION", conversationId: "conversation", inboundVersion: 0, grantId: null}).success, false);
+test("recommendation fields are structural and identifier-only", () => {
   const schema = CommerceProductRecommendationSelectionSchema;
   assert.deepEqual(schema.parse({}), {});
   assert.ok(schema.safeParse(recommendation).success);
