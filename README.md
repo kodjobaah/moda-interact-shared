@@ -112,14 +112,19 @@ import { runCommerceTurn, type RunnerTool } from
 | `ToolDescriptorSchema`, `definitionToMcpDescriptor` | Full versioned Tool descriptor versus the MCP-facing name/description/inputSchema projection. The server-only execution definition is not exposed as model instructions. |
 | `CommerceManifestSchema` | Resolved immutable release contract. Each selected Capability identifies one Feature and one exact Tool descriptor; `featureBehaviours` contains one behaviour prompt for each represented Feature. Commerce provides the manifest; callers validate it. |
 | `GrantedToolSchema`, `GrantedToolsSchema` | Pinned Tool identity, exact Tool revision, name/version and sorted originating Capability keys selected for a conversation. One Tool reused by several Capabilities is emitted once with all Capability provenance. |
-| `CommerceConversationGrantSchema` | Persisted conversation permission snapshot. Background stores the resolved release, selected Capability keys and granted Tools and reuses them on later turns. Empty Capability/Tool selections are valid. |
-| `CommerceTurnIdentitySchema`, `CommerceAssertionSchema` | Turn identity and resolve/execute assertion shapes. These do not sign or verify JWT signatures; transport/authentication belongs to the services. |
+| `CommerceConversationGrantSchema` | Persisted conversation permission snapshot. Background owns it and stores the resolved release, selected Capability keys and granted Tools for reuse on later turns. Empty Capability/Tool selections are valid. |
+| `CommerceTurnIdentitySchema`, `CommerceAssertionSchema` | Background-owned turn identity and resolve/execute assertion shapes. These do not sign or verify JWT signatures; transport/authentication belongs to the services. |
 | `selectCapabilities` | Pure selection over ordinary Feature Capabilities plus caller-supplied Feature eligibility facts. There is no BASE/RECOVERY_POLICY Capability kind or mandatory `conversation_core`. |
 | `deduplicateTools` | Builds the granted-Tool union from one Tool descriptor per selected Capability while retaining deterministic Capability provenance. |
 | `manifestMatchesGrant`, `currentlyGrantedTools` | Compare pinned selection and current availability. Do not replace signature, tenant, lease or persistence checks. |
 | `CommerceToolInputs`, `CommerceToolOutputs` | Named supported operation contracts; custom authored inputs still use the validated Tool definition's schema. |
 | `CommerceBasketSchema`, `CommerceProductSchema`, `CommerceOfferSchema`, `CommerceEvidenceSchema`, `CommerceAlternativeSchema` | Bounded commerce facts/evidence exchanged between services. Parsing does not prove external facts are true or current. |
 | `CommerceToolResultSchema`, `commerceToolResultSchema` | Standard result envelope; the factory accepts a specific data schema. |
+
+Background owns conversation, grant and turn state. MCP receives authenticated
+shop identity and may forward only already accepted opaque adapter context, such
+as `CommerceOutreachToolContextSchema`; it does not interpret that context as
+conversation authority.
 
 The direct release contract is Feature/Capability/Tool based. A selected Capability
 contains exactly one `featureId` and one exact `toolDescriptor`; Feature behaviour
@@ -2388,8 +2393,7 @@ Type-only exports:
 
 The existing `/commerce` entrypoint exports `CommerceCategoryCandidateSchema`,
 `CommerceCategoryResolutionSchema`, `CommerceOptionalLookupUnavailableSchema`,
-`CommerceConversationToolContextSchema`, and
-`CommerceProductRecommendationSelectionSchema`, with matching inferred types.
+and `CommerceProductRecommendationSelectionSchema`, with matching inferred types.
 The product input/output dictionaries include category resolution and flat,
 category-aware search. Recommendation selection contains identifiers and quantity,
 not model-authored prices or savings; applicability and cross-field relationships

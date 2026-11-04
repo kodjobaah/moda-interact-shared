@@ -1,4 +1,10 @@
+import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+const commerceDeclarations = readFileSync(resolve("dist/commerce/index.d.ts"), "utf8");
+for (const name of ["CommerceConversationToolContextSchema", "CommerceConversationToolContext"])
+ assert.equal(commerceDeclarations.includes(name), false, `${name} remains in built Commerce declarations`);
 const code = `
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
@@ -10,7 +16,8 @@ assert.equal(promptValidation.valid,true);
 const promptContext=c.createStoreCategoryPromptContext({availableConditionKeys:['shoes'],selectedConditionKeys:['shoes']});
 const promptRendered=c.renderStoreCategoryPromptTemplate({source:'Base {% if mappings.shoes %}shoe{% endif %}',context:promptContext});
 assert.deepEqual(promptRendered,{ok:true,promptText:'Base shoe',referencedConditionKeys:['shoes']});
-for (const name of ['CommerceShippingInformationInputSchema','CommerceShippingInformationSchema','CommerceResponseDispositionSchema','CommerceAnswerPresentationSelectionSchema','CommerceCategoryCandidateSchema','CommerceCategoryResolutionSchema','CommerceOptionalLookupUnavailableSchema','CommerceBuiltInToolDescriptorSchema','CommerceBuiltInToolGrantSchema','CommerceConversationToolContextSchema','CommerceProductRecommendationSelectionSchema','commerceDiscountBuiltInDescriptors']) assert(name in c, name);
+for (const name of ['CommerceShippingInformationInputSchema','CommerceShippingInformationSchema','CommerceResponseDispositionSchema','CommerceAnswerPresentationSelectionSchema','CommerceCategoryCandidateSchema','CommerceCategoryResolutionSchema','CommerceOptionalLookupUnavailableSchema','CommerceTurnIdentitySchema','CommerceResolveAssertionSchema','CommerceExecuteAssertionSchema','CommerceAssertionSchema','CommerceConversationGrantSchema','CommerceOutreachToolContextSchema','CommerceBuiltInToolDescriptorSchema','CommerceBuiltInToolGrantSchema','CommerceProductRecommendationSelectionSchema','commerceDiscountBuiltInDescriptors']) assert(name in c, name);
+for (const name of ['CommerceConversationToolContextSchema','CommerceConversationToolContext']) assert.equal(name in c, false, name);
 assert.equal('commerceBuiltInToolContractPayload' in c, false);
 for (const descriptor of c.commerceDiscountBuiltInDescriptors) {
  assert(c.CommerceBuiltInToolDescriptorSchema.safeParse(descriptor).success);

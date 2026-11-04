@@ -469,13 +469,6 @@ export const CommerceOptionalLookupUnavailableSchema = z.strictObject({
   reasonCode: z.enum(["TEMPORARY_UNAVAILABLE"]).meta({maxLength: 21}),
 });
 export type CommerceOptionalLookupUnavailable = z.infer<typeof CommerceOptionalLookupUnavailableSchema>;
-export const CommerceConversationToolContextSchema = z.strictObject({
-  purpose: z.enum(["CONVERSATION"]).meta({maxLength: 12}),
-  conversationId: ID,
-  inboundVersion: z.number().int().positive(),
-  grantId: ID.nullable(),
-});
-export type CommerceConversationToolContext = z.infer<typeof CommerceConversationToolContextSchema>;
 export const CommerceProductRecommendationSelectionSchema = z.strictObject({
   productRecommendationVersion: z.enum(["1"]).meta({maxLength: 1}).optional(),
   productRecommendations: z.array(z.strictObject({
