@@ -2395,13 +2395,11 @@ category-aware search. Recommendation selection contains identifiers and quantit
 not model-authored prices or savings; applicability and cross-field relationships
 remain service policy.
 
-`CommerceBuiltInToolDescriptorSchema`, `CommerceBuiltInToolGrantSchema`,
-`commerceDiscountBuiltInDescriptors`, and `commerceBuiltInToolContractPayload`
-define the two code-owned discount reads. Their checked-in SHA256 hashes cover
-the name, version, description, bounded input schema and actual generated output
-schema using canonical JSON. The helper returns canonical text; hashing is
-injected by the trusted Node adapter. Reading these exports needs no Node crypto
-or provider/database configuration.
+`CommerceBuiltInToolDescriptorSchema`, `CommerceBuiltInToolGrantSchema`, and
+`commerceDiscountBuiltInDescriptors` define the two code-owned discount reads.
+Their durable identity is the canonical tool name and `definitionVersion`; the
+strict descriptor and grant schemas reject extra fields. Reading these exports
+needs no provider/database configuration.
 
 Grants and runner descriptors now explicitly distinguish published identities
 from `kind: "BUILT_IN"`. Built-ins have no fabricated tool/revision IDs or

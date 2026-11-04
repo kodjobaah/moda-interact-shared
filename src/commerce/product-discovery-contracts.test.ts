@@ -14,7 +14,7 @@ import {
   CommerceBuiltInToolDescriptorSchema, CommerceBuiltInToolGrantSchema,
   GrantedToolsSchema, isBuiltInTool,
 } from "./definitions";
-import {commerceDiscountBuiltInDescriptors, commerceBuiltInToolContractPayload} from "./built-in-tools";
+import {commerceDiscountBuiltInDescriptors} from "./built-in-tools";
 import {deduplicateTools, manifestMatchesGrant, currentlyGrantedTools} from "./selection";
 import {exampleManifest, exampleGrant, exampleTool} from "./fixtures";
 import {compileSubset} from "./subset";
@@ -84,14 +84,37 @@ test("trusted conversation context and recommendation fields are structural and 
   assert.equal(schema.safeParse({productRecommendations: []}).success, false);
   assert.equal(schema.safeParse({productRecommendations: Array(4).fill(entry)}).success, false);
 });
-test("built-in constants hash exact schemas and their bounded input contracts are immutable", () => {
-  for (const descriptor of commerceDiscountBuiltInDescriptors) {
+test("built-in contracts preserve canonical name/version and bounded inputs without hash identity", () => {
+  const expected = [
+    {
+      name: "commerce_get_discount_options",
+      description: "Read the current shop's permitted discount options.",
+      inputSchema: {type: "object", properties: {
+        limit: {type: "integer", minimum: 1, maximum: 50},
+        cursor: {type: ["string", "null"], maxLength: 2048},
+      }, additionalProperties: false},
+    },
+    {
+      name: "commerce_get_discount_details",
+      description: "Read details for a permitted discount in the current shop.",
+      inputSchema: {type: "object", properties: {
+        offerId: {type: "string", minLength: 1, maxLength: 128},
+      }, required: ["offerId"], additionalProperties: false},
+    },
+  ];
+  for (const [index, descriptor] of commerceDiscountBuiltInDescriptors.entries()) {
+    assert.equal(descriptor.name, expected[index].name);
+    assert.equal(descriptor.definitionVersion, "1.0.0");
+    assert.equal(descriptor.description, expected[index].description);
+    assert.deepEqual(descriptor.inputSchema, expected[index].inputSchema);
+    assert.deepEqual(Object.keys(descriptor).sort(), ["kind", "name", "definitionVersion", "description", "inputSchema"].sort());
     assert.ok(CommerceBuiltInToolDescriptorSchema.safeParse(descriptor).success);
-    assert.equal(digest(commerceBuiltInToolContractPayload(descriptor)), descriptor.contractHash);
     assert.ok(compileSubset(descriptor.inputSchema, "input"));
     assert.ok(Object.isFrozen(descriptor.inputSchema));
-    const output = JSON.parse(commerceBuiltInToolContractPayload(descriptor)).outputSchema;
-    assert.deepEqual(output, z.toJSONSchema(CommerceToolOutputs[descriptor.name], {io: "output", unrepresentable: "any"}));
+    const grant = {kind: "BUILT_IN", toolName: descriptor.name, definitionVersion: "1.0.0"};
+    assert.ok(CommerceBuiltInToolGrantSchema.safeParse(grant).success);
+    assert.equal(CommerceBuiltInToolGrantSchema.safeParse({...grant, contractHash: "0".repeat(64)}).success, false);
+    assert.equal(CommerceBuiltInToolDescriptorSchema.safeParse({...descriptor, contractHash: "0".repeat(64)}).success, false);
   }
 });
 test("mixed manifest/grants retain published provenance and exactly the trusted built-in set", () => {

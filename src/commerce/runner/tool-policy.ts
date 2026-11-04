@@ -16,7 +16,7 @@ export async function resolveAvailableTools(
     const tool = prepared.registered.get(granted.toolName);
     const descriptor = isBuiltInTool(granted)
       ? prepared.manifest.builtInTools.find(candidate => candidate.name === granted.toolName &&
-          candidate.contractHash === granted.contractHash && candidate.definitionVersion === granted.definitionVersion)
+          candidate.definitionVersion === granted.definitionVersion)
       : prepared.manifest.capabilities.map(capability => capability.toolDescriptor)
           .find(candidate => candidate.toolId === granted.toolId);
     if (!tool || !descriptor) continue;

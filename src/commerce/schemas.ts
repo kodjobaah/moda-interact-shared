@@ -143,7 +143,7 @@ export const CommerceManifestSchema = z
       v.grantedTools.some((t) => {
         if (isBuiltInTool(t)) return !v.builtInTools.some(descriptor =>
           descriptor.name === t.toolName && descriptor.definitionVersion === t.definitionVersion &&
-          descriptor.contractHash === t.contractHash && isTrustedCommerceBuiltInGrant(t));
+          isTrustedCommerceBuiltInGrant(t));
         const expected = union.get(t.toolId)?.tool;
         return (
           !expected ||

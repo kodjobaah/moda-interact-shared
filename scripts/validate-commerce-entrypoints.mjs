@@ -10,11 +10,16 @@ assert.equal(promptValidation.valid,true);
 const promptContext=c.createStoreCategoryPromptContext({availableConditionKeys:['shoes'],selectedConditionKeys:['shoes']});
 const promptRendered=c.renderStoreCategoryPromptTemplate({source:'Base {% if mappings.shoes %}shoe{% endif %}',context:promptContext});
 assert.deepEqual(promptRendered,{ok:true,promptText:'Base shoe',referencedConditionKeys:['shoes']});
-for (const name of ['CommerceShippingInformationInputSchema','CommerceShippingInformationSchema','CommerceResponseDispositionSchema','CommerceAnswerPresentationSelectionSchema','CommerceCategoryCandidateSchema','CommerceCategoryResolutionSchema','CommerceOptionalLookupUnavailableSchema','CommerceBuiltInToolDescriptorSchema','CommerceBuiltInToolGrantSchema','CommerceConversationToolContextSchema','CommerceProductRecommendationSelectionSchema','commerceDiscountBuiltInDescriptors','commerceBuiltInToolContractPayload']) assert(name in c, name);
+for (const name of ['CommerceShippingInformationInputSchema','CommerceShippingInformationSchema','CommerceResponseDispositionSchema','CommerceAnswerPresentationSelectionSchema','CommerceCategoryCandidateSchema','CommerceCategoryResolutionSchema','CommerceOptionalLookupUnavailableSchema','CommerceBuiltInToolDescriptorSchema','CommerceBuiltInToolGrantSchema','CommerceConversationToolContextSchema','CommerceProductRecommendationSelectionSchema','commerceDiscountBuiltInDescriptors']) assert(name in c, name);
+assert.equal('commerceBuiltInToolContractPayload' in c, false);
 for (const descriptor of c.commerceDiscountBuiltInDescriptors) {
  assert(c.CommerceBuiltInToolDescriptorSchema.safeParse(descriptor).success);
- assert.equal(digest(c.commerceBuiltInToolContractPayload(descriptor)),descriptor.contractHash);
+ assert.equal(descriptor.definitionVersion,'1.0.0');
+ assert.equal('contractHash' in descriptor,false);
 }
+const builtInGrant={kind:'BUILT_IN',toolName:'commerce_get_discount_options',definitionVersion:'1.0.0'};
+assert(c.CommerceBuiltInToolGrantSchema.safeParse(builtInGrant).success);
+assert.equal(c.CommerceBuiltInToolGrantSchema.safeParse({...builtInGrant,contractHash:'0'.repeat(64)}).success,false);
 assert.deepEqual(c.CommerceShippingInformationInputSchema.parse({}),{productId:null,variantId:null});
 assert.equal(c.CommerceToolInputs.commerce_search_products.parse({}).browse,false);
 assert(c.CommerceAnswerPresentationSelectionSchema.safeParse({responseDisposition:'STANDARD',shippingInformationSelection:{productId:null,variantId:null}}).success);
