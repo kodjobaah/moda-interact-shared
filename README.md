@@ -2405,6 +2405,23 @@ Their durable identity is the canonical tool name and `definitionVersion`; the
 strict descriptor and grant schemas reject extra fields. Reading these exports
 needs no provider/database configuration.
 
+The corrected built-in identities are exactly
+`commerce_get_discount_options@2.0.0` and
+`commerce_get_discount_details@2.0.0`. Their strict descriptor/grant schemas reject
+legacy `1.0.0`; the coordinated pre-production Database/consumer migration must
+finish before corrected consumers run. No legacy version union is supported.
+
+Only discount offer `startsAt`/`endsAt` and discount condition-facts
+`observedAt`/`unavailableAt` use the internal Shared-owned UTC validator:
+`YYYY-MM-DDTHH:mm:ssZ` or `YYYY-MM-DDTHH:mm:ss.<digits>Z`, with one or more
+fractional digits when the fraction is present. Seconds and uppercase `T`/`Z`
+are required; Gregorian dates and clock ranges are validated, including leap-year
+rules. Minute-only times, numeric offsets, leap seconds, invalid calendar dates
+and surrounding whitespace are rejected. Values are validated without coercion
+or normalization. Existing nullability and offer start-before-end checks remain.
+The exported general `DateSchema` and all its non-discount uses are unchanged.
+This correction is independent of Zod's `z.iso.datetime` implementation.
+
 Grants and runner descriptors now explicitly distinguish published identities
 from `kind: "BUILT_IN"`. Built-ins have no fabricated tool/revision IDs or
 capability provenance. Manifest `builtInTools` defaults to an empty array, but
@@ -2419,9 +2436,10 @@ inside `status: "OK"`; hard errors, stale turns and required referrals retain
 their existing semantics. Details permit bounded nullable scalars and depth five;
 input depth stays three and details payloads stay at 16KiB.
 
-These inferred output/grant changes require the coordinated **4.0.0** publication
-and consumer migrations in the separate release task. This source change does
-not bump package metadata or publish to a registry.
+The timestamp/version correction and prior identity cleanup require a coordinated
+breaking package publication and consumer migrations in the separate release task
+(ARCH-058-SHARED-006). This source change does not bump package metadata or publish
+to a registry.
 
 Run `npm run test:product-discovery-contracts` for the focused contracts/runner
 fixtures. To execute the actual Commerce-owned projector/publication integration,

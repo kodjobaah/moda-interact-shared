@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
 import {z} from "zod";
 import {
+  CommerceOfferSchema, CommerceDiscountConditionFactsSchema,
   CommerceCategoryCandidateSchema, CommerceCategoryResolutionSchema,
   CommerceShippingInformationSchema, CommerceShippingInformationInputSchema,
   CommerceAnswerPresentationSelectionSchema, CommerceResponseDispositionSchema,
@@ -102,15 +103,17 @@ test("built-in contracts preserve canonical name/version and bounded inputs with
   ];
   for (const [index, descriptor] of commerceDiscountBuiltInDescriptors.entries()) {
     assert.equal(descriptor.name, expected[index].name);
-    assert.equal(descriptor.definitionVersion, "1.0.0");
+    assert.equal(descriptor.definitionVersion, "2.0.0");
     assert.equal(descriptor.description, expected[index].description);
     assert.deepEqual(descriptor.inputSchema, expected[index].inputSchema);
     assert.deepEqual(Object.keys(descriptor).sort(), ["kind", "name", "definitionVersion", "description", "inputSchema"].sort());
     assert.ok(CommerceBuiltInToolDescriptorSchema.safeParse(descriptor).success);
     assert.ok(compileSubset(descriptor.inputSchema, "input"));
     assert.ok(Object.isFrozen(descriptor.inputSchema));
-    const grant = {kind: "BUILT_IN", toolName: descriptor.name, definitionVersion: "1.0.0"};
+    const grant = {kind: "BUILT_IN", toolName: descriptor.name, definitionVersion: "2.0.0"};
     assert.ok(CommerceBuiltInToolGrantSchema.safeParse(grant).success);
+    assert.equal(CommerceBuiltInToolGrantSchema.safeParse({...grant, definitionVersion: "1.0.0"}).success, false);
+    assert.equal(CommerceBuiltInToolDescriptorSchema.safeParse({...descriptor, definitionVersion: "1.0.0"}).success, false);
     assert.equal(CommerceBuiltInToolGrantSchema.safeParse({...grant, contractHash: "0".repeat(64)}).success, false);
     assert.equal(CommerceBuiltInToolDescriptorSchema.safeParse({...descriptor, contractHash: "0".repeat(64)}).success, false);
   }
@@ -132,7 +135,7 @@ test("mixed manifest/grants retain published provenance and exactly the trusted 
   const builtin = grant.grantedTools.find(isBuiltInTool)!;
   assert.equal(CommerceBuiltInToolGrantSchema.safeParse({...builtin, toolId: "fake"}).success, false);
   assert.equal(CommerceBuiltInToolGrantSchema.safeParse({...builtin, capabilityKeys: ["extra"]}).success, false);
-  for (const patch of [{contractHash: "0".repeat(64)}, {toolName: "unexpected"}, {definitionVersion: "2.0.0"}]) {
+  for (const patch of [{contractHash: "0".repeat(64)}, {toolName: "unexpected"}, {definitionVersion: "1.0.0"}]) {
     const changed = structuredClone(grant);
     changed.grantedTools = changed.grantedTools.map(tool => isBuiltInTool(tool) ? {...tool, ...patch} as typeof tool : tool);
     assert.equal(CommerceConversationGrantSchema.safeParse(changed).success, false);
@@ -219,4 +222,72 @@ test("presentation selection owns optional identifiers, leaving relationships to
   const empty = {products: [], cursor: null, truncated: false};
   assert.deepEqual(CommerceToolOutputs.commerce_search_products.parse(empty), empty);
   assert.equal(CommerceToolOutputs.commerce_search_products.safeParse({...empty, browse: true}).success, false);
+});
+
+const timestampOffer = {
+  offerId: "offer-fixture", title: "Fixture", method: "CODE", code: null,
+  startsAt: null, endsAt: null, support: "SUPPORTED", reasonCodes: [],
+};
+const timestampFacts = {
+  provider: "SHOPIFY", completeness: "UNKNOWN", observedAt: "2026-11-04T10:00:00Z",
+  providerStatus: "ACTIVE", unavailableAt: null, discountKind: "UNKNOWN",
+  discountValue: null, discountCurrency: null,
+  targeting: {kind: "UNKNOWN", includedProductIds: [], includedVariantIds: [],
+    includedCategoryIds: [], includedCollectionIds: [], excludedProductIds: [],
+    excludedVariantIds: [], excludedCategoryIds: [], excludedCollectionIds: []},
+  minimumSubtotal: null, maximumSubtotal: null, subtotalRequirementCurrency: null,
+  minimumQuantity: null, usageLimit: null, usageCount: null, perCustomerLimit: null,
+  customerScope: "UNKNOWN", excludesSaleItems: null, individualUse: null,
+  combination: {discountClasses: null, shopifyPlus: null, combinesWith: null,
+    discountTags: null, allowedSameLineProductTags: null},
+  unrepresentedConditions: [],
+};
+const acceptedDiscountTimestamps = [
+  "2026-11-04T10:00:00Z", "2026-11-04T10:00:00.1Z", "2026-11-04T10:00:00.12Z",
+  "2026-11-04T10:00:00.123Z", "2026-11-04T10:00:00.1234567890Z",
+  "2024-02-29T23:59:59Z", "2000-02-29T00:00:00Z", "2400-02-29T00:00:00Z",
+  "0099-01-01T00:00:00Z", "9999-12-31T23:59:59Z",
+];
+const rejectedDiscountTimestamps = [
+  "2026-11-04T10:00Z", "2026-11-04T10:00:00+00:00", "2026-02-30T10:00:00Z",
+  "2026-11-04T10:00:60Z", "2026-11-04T10:00:00z", "2026-11-04t10:00:00Z",
+  " 2026-11-04T10:00:00Z", "2026-11-04T10:00:00Z ", "2026-11-04T10:00:00Z\n",
+  "2026-11-04T10:00:00.Z", "2026-11-04T10:00:00", "2026-11-04T10:00:00-01:00",
+  "2026-11-04T24:00:00Z", "2026-11-04T10:60:00Z", "2026-00-04T10:00:00Z",
+  "2026-13-04T10:00:00Z", "2026-11-00T10:00:00Z", "2026-04-31T10:00:00Z",
+  "1900-02-29T10:00:00Z", "2100-02-29T10:00:00Z", "2026-02-29T10:00:00Z",
+  "2026-1-04T10:00:00Z", "2026-11-04T1:00:00Z", "10000-11-04T10:00:00Z",
+  "2026-11-04T10:00:00.1e2Z", "2026-11-04T10:00:00Zsuffix",
+];
+for (const [expected, values] of [[true, acceptedDiscountTimestamps], [false, rejectedDiscountTimestamps]] as const) {
+  for (const value of values) test(`discount UTC timestamp ${expected ? "PASS" : "FAIL"} ${JSON.stringify(value)}`, () => {
+    for (const field of ["startsAt", "endsAt"]) {
+      const offer = {...timestampOffer, [field]: value};
+      assert.equal(CommerceOfferSchema.safeParse(offer).success, expected, field);
+      assert.equal(CommerceToolOutputs.commerce_get_discount_options.safeParse({
+        mode: "FIXED", offers: [offer], truncated: false,
+      }).success, expected, `options.${field}`);
+      assert.equal(CommerceToolOutputs.commerce_get_discount_details.safeParse({
+        details: {offer, facts: timestampFacts, providerDiscountId: null},
+      }).success, expected, `details.${field}`);
+    }
+    for (const field of ["observedAt", "unavailableAt"]) {
+      const facts = {...timestampFacts, [field]: value};
+      assert.equal(CommerceDiscountConditionFactsSchema.safeParse(facts).success, expected, field);
+      assert.equal(CommerceToolOutputs.commerce_get_discount_details.safeParse({
+        details: {offer: timestampOffer, facts, providerDiscountId: null},
+      }).success, expected, `details.facts.${field}`);
+    }
+  });
+}
+test("discount timestamps preserve nullable fields, original wire bytes and offer ordering", () => {
+  assert.deepEqual(CommerceOfferSchema.parse(timestampOffer), timestampOffer);
+  assert.deepEqual(CommerceDiscountConditionFactsSchema.parse(timestampFacts), timestampFacts);
+  const startsAt = "2026-11-04T10:00:00.1234567890Z";
+  const endsAt = "2026-11-04T10:00:01.1234567890Z";
+  const ordered = {...timestampOffer, startsAt, endsAt};
+  assert.deepEqual(CommerceOfferSchema.parse(ordered), ordered);
+  for (const [start, end] of [[endsAt, startsAt], [startsAt, startsAt]])
+    assert.equal(CommerceOfferSchema.safeParse({...timestampOffer, startsAt: start, endsAt: end}).success, false);
+  assert.equal(CommerceDiscountConditionFactsSchema.safeParse({...timestampFacts, observedAt: null}).success, false);
 });

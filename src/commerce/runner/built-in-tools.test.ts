@@ -77,7 +77,8 @@ test("malformed optional output and thrown bugs remain errors", async () => {
 test("name/version/schema drift, extra registrations, missing descriptor and stale tenant fail closed", async () => {
   const changes: Array<(input: RunCommerceTurnInput) => void> = [
     input => {input.dependencies.tools[1].descriptor.name = "ungranted_tool";},
-    input => {input.dependencies.tools[1].descriptor.definitionVersion = "1.0.1";},
+    input => {input.dependencies.tools[1].descriptor.definitionVersion = "1.0.0";},
+    input => {input.dependencies.tools[1].descriptor.definitionVersion = "2.0.1";},
     input => {input.dependencies.tools[1].descriptor.inputSchema.properties = {};},
     input => {input.manifest.builtInTools = [];},
     input => {input.dependencies.tools.pop();},

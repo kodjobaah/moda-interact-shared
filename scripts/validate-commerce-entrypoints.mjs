@@ -21,11 +21,13 @@ for (const name of ['CommerceConversationToolContextSchema','CommerceConversatio
 assert.equal('commerceBuiltInToolContractPayload' in c, false);
 for (const descriptor of c.commerceDiscountBuiltInDescriptors) {
  assert(c.CommerceBuiltInToolDescriptorSchema.safeParse(descriptor).success);
- assert.equal(descriptor.definitionVersion,'1.0.0');
+ assert.equal(descriptor.definitionVersion,'2.0.0');
  assert.equal('contractHash' in descriptor,false);
 }
-const builtInGrant={kind:'BUILT_IN',toolName:'commerce_get_discount_options',definitionVersion:'1.0.0'};
+const builtInGrant={kind:'BUILT_IN',toolName:'commerce_get_discount_options',definitionVersion:'2.0.0'};
 assert(c.CommerceBuiltInToolGrantSchema.safeParse(builtInGrant).success);
+assert.equal(c.CommerceBuiltInToolGrantSchema.safeParse({...builtInGrant,definitionVersion:'1.0.0'}).success,false);
+assert.equal(c.CommerceBuiltInToolDescriptorSchema.safeParse({...c.commerceDiscountBuiltInDescriptors[0],definitionVersion:'1.0.0'}).success,false);
 assert.equal(c.CommerceBuiltInToolGrantSchema.safeParse({...builtInGrant,contractHash:'0'.repeat(64)}).success,false);
 assert.deepEqual(c.CommerceShippingInformationInputSchema.parse({}),{productId:null,variantId:null});
 assert.equal(c.CommerceToolInputs.commerce_search_products.parse({}).browse,false);
