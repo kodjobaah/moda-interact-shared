@@ -28,7 +28,7 @@ JavaScript processing uses the versioned `quickjs-sync.v1` configuration and an
 empty result path. Both output paths validate the closed, authored result schema
 under the `values` wrapper before templates can consume it.
 
-The contract version is `commerce.v1`; the runner API version is `1.0.0`.
+The contract version is `commerce.v1`; the runner API version is `1.1.0`.
 Package SemVer is separate. A host must satisfy the pinned manifest's SemVer
 runnerCompatibility range. Unknown wire versions or missing/mismatched
 response.v1 definitions fail closed. Never substitute the active release for an

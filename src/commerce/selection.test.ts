@@ -65,6 +65,7 @@ test("direct Tool descriptors deduplicate provenance and conflicting association
     { key: "a_feature", toolDescriptor: exampleTool },
   ]);
   assert.equal(tools.length, 1);
+  assert.ok("capabilityKeys" in tools[0]);
   assert.deepEqual(tools[0].capabilityKeys, ["a_feature", "z_feature"]);
   assert.throws(() =>
     deduplicateTools([

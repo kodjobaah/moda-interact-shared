@@ -10,10 +10,15 @@ assert.equal(promptValidation.valid,true);
 const promptContext=c.createStoreCategoryPromptContext({availableConditionKeys:['shoes'],selectedConditionKeys:['shoes']});
 const promptRendered=c.renderStoreCategoryPromptTemplate({source:'Base {% if mappings.shoes %}shoe{% endif %}',context:promptContext});
 assert.deepEqual(promptRendered,{ok:true,promptText:'Base shoe',referencedConditionKeys:['shoes']});
+for (const name of ['CommerceCategoryCandidateSchema','CommerceCategoryResolutionSchema','CommerceOptionalLookupUnavailableSchema','CommerceBuiltInToolDescriptorSchema','CommerceBuiltInToolGrantSchema','CommerceConversationToolContextSchema','CommerceProductRecommendationSelectionSchema','commerceDiscountBuiltInDescriptors','commerceBuiltInToolContractPayload']) assert(name in c, name);
+for (const descriptor of c.commerceDiscountBuiltInDescriptors) {
+ assert(c.CommerceBuiltInToolDescriptorSchema.safeParse(descriptor).success);
+ assert.equal(digest(c.commerceBuiltInToolContractPayload(descriptor)),descriptor.contractHash);
+}
 const manifest=c.exampleManifest(digest);
 assert(c.CommerceManifestSchema.safeParse(manifest).success);
 const result=await runCommerceTurn({turn:c.exampleTurn,grant:c.exampleGrant(manifest),manifest,hostInstructions:[],context:{},history:[],language:{tag:null,source:null},signal:new AbortController().signal,dependencies:{digest,now:()=>Date.now(),tools:[],model:{invoke:async()=>({calls:[{name:'finalResponse',arguments:c.exampleFinal}],outputTokens:30})}}});
-assert(result.ok);assert.equal(runnerVersion,'1.0.0');
+assert(result.ok);assert.equal(runnerVersion,'1.1.0');
 const oversized={name:'oversize_tool',definitionVersion:'1.0.0',description:'Fixture',inputSchema:{},execution:{x:'x'.repeat(40000)},responseTemplate:{x:'x'.repeat(40000)}};
 assert.equal(c.CommerceToolDraftDefinitionSchema.safeParse(oversized).success,false);
 const malformed=await runCommerceTurn({turn:c.exampleTurn,grant:c.exampleGrant(manifest),manifest,hostInstructions:[],context:{},history:[],language:{tag:null,source:null},signal:new AbortController().signal,dependencies:{digest,now:()=>Date.now(),tools:[],model:{invoke:async()=>({calls:[null],outputTokens:1})}}});

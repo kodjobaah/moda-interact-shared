@@ -11,7 +11,8 @@ import {
   distinct,
   boundedJson,
 } from "./primitives";
-import { GrantedToolsSchema, ToolDescriptorSchema } from "./definitions";
+import { GrantedToolsSchema, PublishedToolDescriptorSchema, CommerceBuiltInToolDescriptorSchema, isBuiltInTool, type PublishedGrantedTool } from "./definitions";
+import { isTrustedCommerceBuiltInDescriptor, isTrustedCommerceBuiltInGrant } from "./built-in-tools";
 import { CommerceResponseContractSchema } from "./response";
 import { canonicalJson, jsonBytes } from "./canonical-json";
 export const CommerceTurnIdentitySchema = z.strictObject({
@@ -45,7 +46,7 @@ export const CommerceConversationGrantSchema = z
       jsonBytes(v.grantedTools) > 65536 ||
       jsonBytes(v.selectedCapabilityKeys) > 8192 ||
       v.grantedTools.some((t) =>
-        t.capabilityKeys.some((k) => !v.selectedCapabilityKeys.includes(k)),
+        isBuiltInTool(t) ? !isTrustedCommerceBuiltInGrant(t) : t.capabilityKeys.some((k) => !v.selectedCapabilityKeys.includes(k)),
       )
     )
       c.addIssue({ code: "custom", message: "Unselected grant provenance" });
@@ -69,7 +70,7 @@ export const CommerceManifestSchema = z
           key: ID,
           featureId: ID,
           position: z.number().int().nonnegative(),
-          toolDescriptor: ToolDescriptorSchema,
+          toolDescriptor: PublishedToolDescriptorSchema,
         }),
       )
       .max(32),
@@ -82,6 +83,7 @@ export const CommerceManifestSchema = z
       )
       .max(32),
     selectedCapabilityKeys: z.array(ID).max(32).refine(distinct),
+    builtInTools: z.array(CommerceBuiltInToolDescriptorSchema).max(2).default([]),
     grantedTools: GrantedToolsSchema,
     responseContract: CommerceResponseContractSchema,
     responseContractHash: HashSchema,
@@ -109,7 +111,7 @@ export const CommerceManifestSchema = z
       });
     const union = new Map<
       string,
-      { tool: (typeof v.grantedTools)[number]; descriptor: string }
+      { tool: PublishedGrantedTool; descriptor: string }
     >();
     for (const cap of v.capabilities) {
       const d = cap.toolDescriptor;
@@ -135,8 +137,13 @@ export const CommerceManifestSchema = z
         });
     }
     if (
-      union.size !== v.grantedTools.length ||
+      union.size + v.builtInTools.length !== v.grantedTools.length ||
+      !distinct(v.builtInTools.map(tool => tool.name)) ||
+      v.builtInTools.some(tool => !isTrustedCommerceBuiltInDescriptor(tool)) ||
       v.grantedTools.some((t) => {
+        if (isBuiltInTool(t)) return !v.builtInTools.some(descriptor =>
+          descriptor.name === t.toolName && descriptor.definitionVersion === t.definitionVersion &&
+          descriptor.contractHash === t.contractHash && isTrustedCommerceBuiltInGrant(t));
         const expected = union.get(t.toolId)?.tool;
         return (
           !expected ||
@@ -430,11 +437,72 @@ export const CommerceToolResultSchema = commerceToolResultSchema(
   boundedJson(262144),
 );
 export type CommerceToolResult = z.infer<typeof CommerceToolResultSchema>;
+const wireId = z.string().min(1).max(128);
+const taxonomySource = z.enum(["SHOPIFY_STANDARD_PRODUCT_TAXONOMY"]).meta({maxLength: 33});
+export const CommerceCategoryCandidateSchema = z.strictObject({
+  categoryId: wireId,
+  name: z.string().min(1).max(512),
+  fullName: z.string().min(1).max(4096),
+  parentId: wireId.nullable(),
+  level: z.number().int().min(0).max(32),
+  ancestorIds: z.array(wireId).max(32),
+  distance: z.number().min(0).max(2),
+});
+export type CommerceCategoryCandidate = z.infer<typeof CommerceCategoryCandidateSchema>;
+export const CommerceCategoryResolutionSchema = z.union([
+  z.strictObject({
+    outcome: z.enum(["CANDIDATES", "NO_CANDIDATES"]).meta({maxLength: 13}),
+    generationId: wireId,
+    source: taxonomySource,
+    taxonomyVersion: z.string().min(1).max(64),
+    languageTag: z.string().min(1).max(35),
+    candidates: z.array(CommerceCategoryCandidateSchema).max(10),
+  }),
+  z.strictObject({
+    outcome: z.enum(["UNAVAILABLE"]).meta({maxLength: 11}),
+    reasonCode: z.enum(["NOT_READY", "TEMPORARY_UNAVAILABLE"]).meta({maxLength: 21}),
+  }),
+]);
+export type CommerceCategoryResolution = z.infer<typeof CommerceCategoryResolutionSchema>;
+export const CommerceOptionalLookupUnavailableSchema = z.strictObject({
+  outcome: z.enum(["UNAVAILABLE"]).meta({maxLength: 11}),
+  reasonCode: z.enum(["TEMPORARY_UNAVAILABLE"]).meta({maxLength: 21}),
+});
+export type CommerceOptionalLookupUnavailable = z.infer<typeof CommerceOptionalLookupUnavailableSchema>;
+export const CommerceConversationToolContextSchema = z.strictObject({
+  purpose: z.enum(["CONVERSATION"]).meta({maxLength: 12}),
+  conversationId: ID,
+  inboundVersion: z.number().int().positive(),
+  grantId: ID.nullable(),
+});
+export type CommerceConversationToolContext = z.infer<typeof CommerceConversationToolContextSchema>;
+export const CommerceProductRecommendationSelectionSchema = z.strictObject({
+  productRecommendationVersion: z.enum(["1"]).meta({maxLength: 1}).optional(),
+  productRecommendations: z.array(z.strictObject({
+    scope: z.enum(["PRODUCT_ONLY", "ADD_TO_BASKET", "REPLACE_BASKET_LINE"]).meta({maxLength: 19}),
+    basketLineId: wireId.nullable(),
+    productId: wireId,
+    variantId: wireId.nullable(),
+    quantity: z.number().int().min(1).max(99),
+    promotionKind: z.enum(["NONE", "NATIVE_SALE", "DISCOUNT"]).meta({maxLength: 11}),
+    offerIds: z.array(wireId).max(3),
+  })).min(1).max(3).optional(),
+});
+export type CommerceProductRecommendationSelection = z.infer<typeof CommerceProductRecommendationSelectionSchema>;
 const limit = z.number().int().min(1).max(3).default(3);
 export const CommerceToolInputs = {
+  commerce_resolve_product_categories: z.strictObject({
+    query: z.string().min(1).max(200),
+    limit: z.number().int().min(1).max(10).default(5),
+  }),
   commerce_get_basket: z.strictObject({}),
   commerce_search_products: z.strictObject({
-    query: z.string().min(1).max(200),
+    query: z.string().min(1).max(200).nullable().default(null),
+    category: z.strictObject({
+      system: z.enum(["SHOPIFY_STANDARD_PRODUCT_TAXONOMY", "WOOCOMMERCE_PRODUCT_CATEGORY"]).meta({maxLength: 33}),
+      id: wireId,
+      taxonomyVersion: z.string().min(1).max(64).nullable(),
+    }).optional(),
     maximumPrice: MoneySchema.optional(),
     availableOnly: z.boolean().default(true),
     limit: z.number().int().min(1).max(20).default(10),
@@ -469,6 +537,7 @@ const alternatives = z.strictObject({
   truncated: z.boolean(),
 });
 export const CommerceToolOutputs = {
+  commerce_resolve_product_categories: CommerceCategoryResolutionSchema,
   commerce_get_basket: CommerceBasketSchema,
   commerce_search_products: z.strictObject({
     products: z.array(CommerceProductSchema).max(20),
@@ -478,15 +547,15 @@ export const CommerceToolOutputs = {
   commerce_get_product: z.strictObject({
     product: CommerceProductSchema.nullable(),
   }),
-  commerce_get_discount_options: z.strictObject({
+  commerce_get_discount_options: z.union([CommerceOptionalLookupUnavailableSchema, z.strictObject({
     mode: z.enum(["NONE", "FIXED", "AI_BEST_APPLICABLE"]),
     offers: z.array(CommerceOfferSchema).max(50),
     truncated: z.boolean(),
     cursor: z.string().max(2048).nullable().optional(),
-  }),
-  commerce_get_discount_details: z.strictObject({
+  })]),
+  commerce_get_discount_details: z.union([CommerceOptionalLookupUnavailableSchema, z.strictObject({
     details: CommerceDiscountDetailsSchema.nullable(),
-  }),
+  })]),
   commerce_evaluate_discount: CommerceEvidenceSchema,
   commerce_find_qualifying_products: alternatives,
   commerce_find_similar_products: alternatives,

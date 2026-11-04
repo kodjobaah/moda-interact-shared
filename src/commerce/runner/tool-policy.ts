@@ -1,5 +1,5 @@
 import { canonicalJson } from "../canonical-json.js";
-import type { GrantedTool, ToolDescriptor } from "../definitions.js";
+import { isBuiltInTool, type GrantedTool, type ToolDescriptor } from "../definitions.js";
 import { RunnerFailure } from "./failure.js";
 import type { CommerceTurnRuntime } from "./runtime.js";
 import type { PreparedCommerceTurn } from "./preflight.js";
@@ -14,9 +14,11 @@ export async function resolveAvailableTools(
   const available: ToolDescriptor[] = [];
   for (const granted of prepared.grant.grantedTools) {
     const tool = prepared.registered.get(granted.toolName);
-    const descriptor = prepared.manifest.capabilities
-      .map((capability) => capability.toolDescriptor)
-      .find((candidate) => candidate.toolId === granted.toolId);
+    const descriptor = isBuiltInTool(granted)
+      ? prepared.manifest.builtInTools.find(candidate => candidate.name === granted.toolName &&
+          candidate.contractHash === granted.contractHash && candidate.definitionVersion === granted.definitionVersion)
+      : prepared.manifest.capabilities.map(capability => capability.toolDescriptor)
+          .find(candidate => candidate.toolId === granted.toolId);
     if (!tool || !descriptor) continue;
     if (canonicalJson(tool.descriptor) !== canonicalJson(descriptor))
       throw new RunnerFailure("INCOMPATIBLE_VERSION", {
@@ -39,7 +41,11 @@ export function resolveToolCall(
   const tool = prepared.registered.get(name);
   if (!grant) return { denial: "INSUFFICIENT_TOOLS" };
   if (!tool) return { denial: "TOOL_UNAVAILABLE" };
-  if (!availableTools.some((descriptor) => descriptor.name === name))
-    return { denial: "TOOL_REVOKED" };
+  const pinned = availableTools.find(descriptor => descriptor.name === name);
+  if (!pinned) return { denial: "TOOL_REVOKED" };
+  if (canonicalJson(pinned) !== canonicalJson(tool.descriptor))
+    throw new RunnerFailure("INCOMPATIBLE_VERSION", {
+      stage: "tools.resolve", reasonCode: "TOOL_DESCRIPTOR_MISMATCH", toolName: name,
+    });
   return { grant, tool };
 }

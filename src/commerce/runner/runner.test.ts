@@ -913,6 +913,10 @@ test("Merchant Knowledge-like Tool data cannot authorize a later model-requested
     },
   };
   f.input.dependencies.tools = [f.input.dependencies.tools[0], refundTool];
+  // An ungranted adapter now fails preflight, independently of hostile runtime data.
+  assert.equal((await runCommerceTurn(f.input)).ok, false);
+  assert.equal(f.requests.length, 0);
+  f.input.dependencies.tools.pop();
   f.input.dependencies.model.invoke = async (request) => {
     modelStep += 1;
     if (modelStep === 1) return call();
@@ -956,6 +960,9 @@ test("OpenRouter adapter accepts canonical synthetic denial and runner forces re
       return { contractVersion: "commerce.v1", status: "OK", data: {}, renderedText: "" };
     },
   });
+  assert.equal((await runCommerceTurn(f.input)).ok, false);
+  assert.equal(f.requests.length, 0);
+  f.input.dependencies.tools.pop();
   f.input.dependencies.model = createOpenRouterInvoker({
     provider: "openai",
     providerModelId: "gpt-test",

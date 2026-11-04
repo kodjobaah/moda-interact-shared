@@ -1,3 +1,4 @@
+import { ToolDescriptorSchema } from "../definitions.js";
 import { satisfies } from "semver";
 import { ZodError } from "zod";
 
@@ -117,10 +118,16 @@ export function prepareCommerceTurn(input: RunCommerceTurnInput): PreparedCommer
     throw new RunnerFailure("INVALID_INPUT", { stage: "preflight.validate", reasonCode: "CONTEXT_INVALID" });
 
   const registered = new Map<string, RunnerTool>();
+  if (input.dependencies.tools.length > 32)
+    throw new RunnerFailure("INVALID_INPUT", {stage: "preflight.validate", reasonCode: "TOOL_REGISTRATION_INVALID"});
   for (const tool of input.dependencies.tools) {
-    if (registered.has(tool.descriptor.name))
+    const parsedDescriptor = ToolDescriptorSchema.safeParse(tool.descriptor);
+    if (!parsedDescriptor.success || !grant.grantedTools.some(granted => granted.toolName === tool.descriptor.name) ||
+        registered.has(tool.descriptor.name))
       throw new RunnerFailure("INVALID_INPUT", { stage: "preflight.validate", reasonCode: "TOOL_REGISTRATION_INVALID" });
     registered.set(tool.descriptor.name, tool);
   }
+  if (manifest.builtInTools.some(tool => !registered.has(tool.name)))
+    throw new RunnerFailure("INCOMPATIBLE_VERSION", {stage: "preflight.validate", reasonCode: "TOOL_REGISTRATION_INVALID"});
   return { turn, grant, manifest, response, finalSchema, budgets, instructions, registered };
 }

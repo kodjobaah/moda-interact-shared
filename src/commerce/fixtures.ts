@@ -10,8 +10,8 @@ import {
 } from "./response";
 import type { Digest } from "./canonical-json";
 import { responseContractCanonicalJson } from "./canonical-json";
-import type { ToolDescriptor, CommerceToolDefinition } from "./definitions";
-export const exampleTool: ToolDescriptor = {
+import type { PublishedToolDescriptor, CommerceToolDefinition } from "./definitions";
+export const exampleTool: PublishedToolDescriptor = {
   toolId: "tool-fixture",
   toolRevisionId: "revision-fixture",
   name: "never_seeded_catalogue_facts",
@@ -75,6 +75,7 @@ export function exampleManifest(
       ? [{ featureId: "feature-fixture", behaviourPrompt: "Synthetic Feature behavior." }]
       : [],
     selectedCapabilityKeys: capabilities.map((capability) => capability.key),
+    builtInTools: [],
     grantedTools: withTool
       ? [
           {
