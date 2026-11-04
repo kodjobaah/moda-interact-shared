@@ -74,9 +74,8 @@ test("malformed optional output and thrown bugs remain errors", async () => {
   f.input.dependencies.tools[1].execute = async () => {throw new Error("original-tool-bug-marker");};
   assert.equal((await runCommerceTurn(f.input)).ok, false);
 });
-test("name/version/hash/schema drift, extra registrations, missing descriptor and stale tenant fail closed", async () => {
+test("name/version/schema drift, extra registrations, missing descriptor and stale tenant fail closed", async () => {
   const changes: Array<(input: RunCommerceTurnInput) => void> = [
-    input => {input.manifest.builtInTools[0].contractHash = "0".repeat(64);},
     input => {input.dependencies.tools[1].descriptor.name = "ungranted_tool";},
     input => {input.dependencies.tools[1].descriptor.definitionVersion = "1.0.1";},
     input => {input.dependencies.tools[1].descriptor.inputSchema.properties = {};},

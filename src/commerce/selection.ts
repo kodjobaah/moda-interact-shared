@@ -89,7 +89,7 @@ export function deduplicateTools(
     ...[...byId.values()].map(value => value.tool),
     ...builtInTools.map(tool => ({
       kind: "BUILT_IN" as const, toolName: tool.name,
-      definitionVersion: tool.definitionVersion, contractHash: tool.contractHash,
+      definitionVersion: tool.definitionVersion,
     })),
   ]).sort((a, b) => a.toolName.localeCompare(b.toolName, "en"));
 }
@@ -127,7 +127,7 @@ export function currentlyGrantedTools(
       isBuiltInTool(t)
         ? isTrustedCommerceBuiltInGrant(t) && allowedBuiltInTools.some(descriptor =>
             isTrustedCommerceBuiltInDescriptor(descriptor) && descriptor.name === t.toolName &&
-            descriptor.definitionVersion === t.definitionVersion && descriptor.contractHash === t.contractHash)
+            descriptor.definitionVersion === t.definitionVersion)
         : enabledToolIds.has(t.toolId) && t.capabilityKeys.some((k) => eligibleCapabilityKeys.has(k)),
   );
 }
