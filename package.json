@@ -154,7 +154,8 @@
     "validate:arch023-shared-entrypoints": "npm run build && node scripts/validate-arch023-shared-entrypoints.mjs",
     "validate:arch024-model-entrypoints": "npm run build && node scripts/validate-arch024-model-entrypoints.mjs",
     "test:arch033-incidents:postgres": "node scripts/test-arch033-incidents-postgres.mjs",
-    "validate:arch047-whatsapp-template-events": "node scripts/validate-whatsapp-template-events-entrypoint.mjs"
+    "validate:arch047-whatsapp-template-events": "node scripts/validate-whatsapp-template-events-entrypoint.mjs",
+    "test:product-discovery-contracts": "tsx --test src/commerce/product-discovery-contracts.test.ts src/commerce/product-discovery-projection.test.ts src/commerce/runner/built-in-tools.test.ts src/commerce/runner/runner.test.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",

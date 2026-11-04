@@ -28,7 +28,7 @@ test("response schema rejects total-property overflow, duplicates, invalid bound
     },
     {
       type: "object",
-      properties: { x: { type: ["string", "null"], maxLength: 3 } },
+      properties: { x: { type: ["string", "number"], maxLength: 3 } },
       required: [],
       additionalProperties: false,
     },

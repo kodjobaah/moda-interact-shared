@@ -1,1 +1,1 @@
-export const runnerVersion = "1.0.0";
+export const runnerVersion = "1.1.0";

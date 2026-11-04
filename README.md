@@ -2382,3 +2382,70 @@ Type-only exports:
 - `RunnerTool`
 
 </details>
+
+
+## Product discovery and code-owned discount contracts
+
+The existing `/commerce` entrypoint exports `CommerceCategoryCandidateSchema`,
+`CommerceCategoryResolutionSchema`, `CommerceOptionalLookupUnavailableSchema`,
+`CommerceConversationToolContextSchema`, and
+`CommerceProductRecommendationSelectionSchema`, with matching inferred types.
+The product input/output dictionaries include category resolution and flat,
+category-aware search. Recommendation selection contains identifiers and quantity,
+not model-authored prices or savings; applicability and cross-field relationships
+remain service policy.
+
+`CommerceBuiltInToolDescriptorSchema`, `CommerceBuiltInToolGrantSchema`,
+`commerceDiscountBuiltInDescriptors`, and `commerceBuiltInToolContractPayload`
+define the two code-owned discount reads. Their checked-in SHA256 hashes cover
+the name, version, description, bounded input schema and actual generated output
+schema using canonical JSON. The helper returns canonical text; hashing is
+injected by the trusted Node adapter. Reading these exports needs no Node crypto
+or provider/database configuration.
+
+Grants and runner descriptors now explicitly distinguish published identities
+from `kind: "BUILT_IN"`. Built-ins have no fabricated tool/revision IDs or
+capability provenance. Manifest `builtInTools` defaults to an empty array, but
+retained grants must equal the exact canonical descriptor set as well as the
+published capability union. `deduplicateTools` accepts the optional built-in
+descriptor set; `currentlyGrantedTools` requires an explicit currently permitted
+canonical built-in set and otherwise denies built-ins. Hosts still check current
+tenant/turn/release/permission before and after asynchronous tool work.
+
+The runtime runner version is **1.1.0**. Optional lookup unavailability is data
+inside `status: "OK"`; hard errors, stale turns and required referrals retain
+their existing semantics. Details permit bounded nullable scalars and depth five;
+input depth stays three and details payloads stay at 16KiB.
+
+These inferred output/grant changes require the coordinated **4.0.0** publication
+and consumer migrations in the separate release task. This source change does
+not bump package metadata or publish to a registry.
+
+Run `npm run test:product-discovery-contracts` for the focused contracts/runner
+fixtures. To execute the actual Commerce-owned projector/publication integration,
+set `COMMERCE_CONTRACT_SOURCE_ROOT` to its explicit accepted source checkout.
+The test passes candidate schemas as function arguments to that existing
+projector; it neither changes nor links the consumer's installed package.
+The installed consumer still has the released operation registry: candidate operation
+metadata is checked against candidate Shared, and the installed publication pipeline
+is exercised with a registered operation and the actual generated input schema.
+This does not certify consumer adoption of the new operations before release.
+Without this test-only source prerequisite, that integration case is explicitly
+skipped rather than reported as executed.
+
+The discovery input dictionary also supports explicit `browse` (default `false`)
+and the published `commerce_get_shipping_information` operation
+(`shipping.getInformation`, version `1.0.0`). The named
+`CommerceShippingInformationInputSchema` / `CommerceShippingInformationSchema`
+and inferred types expose bounded native facts and independent product/policy outcomes.
+Policy HTML remains untrusted data; adapters enforce ownership, status relationships,
+verified hosts and the UTF-8 body budget.
+
+`CommerceResponseDispositionSchema` / `CommerceResponseDisposition` and
+`CommerceAnswerPresentationSelectionSchema` / `CommerceAnswerPresentationSelection`
+add optional identifier-only presentation fields. Merge their shape with recommendation
+and existing release details; Commerce owns explicit published instructions, and Background
+owns controlled composition. Product-bearing shipping observations latch that host path even
+without a selection; policy-only observations alone may retain ordinary grounded answers.
+Expected limitations never clear a terminal tool error. The default empty response contract,
+hard-referral envelope and two-tool discount built-in allowlist remain unchanged.

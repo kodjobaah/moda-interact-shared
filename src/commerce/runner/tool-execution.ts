@@ -1,5 +1,6 @@
+import { isBuiltInTool } from "../definitions.js";
 import { jsonBytes } from "../canonical-json.js";
-import { CommerceToolResultSchema, type CommerceEvidence } from "../schemas.js";
+import { CommerceToolResultSchema, CommerceToolOutputs, type CommerceEvidence } from "../schemas.js";
 import type { CommerceFinalResponse } from "../response.js";
 import { compileSubset } from "../subset.js";
 import { RunnerFailure } from "./failure.js";
@@ -37,7 +38,7 @@ export async function executeToolCalls(input: {
   const evidenceById = { ...input.evidenceById };
   let requiredReferral = input.requiredReferral;
 
-  for (const call of input.step.calls) {
+  toolCalls: for (const call of input.step.calls) {
     input.runtime.checkCancellationAndDeadline();
     const policy = resolveToolCall(call.name, input.prepared, input.availableTools);
     if ("denial" in policy) {
@@ -69,6 +70,7 @@ export async function executeToolCalls(input: {
       });
       continue;
     }
+    resolveToolCall(call.name, input.prepared, input.availableTools);
     const args = compileSubset(tool.descriptor.inputSchema, "input").safeParse(call.arguments);
     if (!args.success) throw new RunnerFailure("INVALID_INPUT", {
       stage: "tool.validate", reasonCode: "TOOL_INPUT_INVALID", toolName: call.name,
@@ -111,6 +113,26 @@ export async function executeToolCalls(input: {
         modelStep: input.modelStep, attempt, remoteCallNumber, ...schemaIssueMetadata(parsedResult.error),
       }, parsedResult.error);
       result = parsedResult.data;
+      if (result.status === "OK" && isBuiltInTool(grant)) {
+        const output = CommerceToolOutputs[grant.toolName].safeParse(result.data);
+        if (!output.success) throw new RunnerFailure("INVALID_INPUT", {
+          stage: "tool.result", reasonCode: "TOOL_RESULT_INVALID", toolName: call.name,
+          modelStep: input.modelStep, ...schemaIssueMetadata(output.error),
+        }, output.error);
+      }
+      if (result.status === "ERROR" && result.code === "STALE_TURN")
+        throw new RunnerFailure("STALE_TURN", {
+          stage: "tool.result", reasonCode: "TOOL_STALE_TURN", toolName: call.name, modelStep: input.modelStep,
+        });
+      if (!(await input.runtime.bounded(signal => tool.isAuthorized(grant, signal), 10000, {
+        stage: "tool.authorize", reasonCode: "TOOL_AUTHORIZATION_FAILED", toolName: call.name, modelStep: input.modelStep,
+      }))) {
+        requiredReferral = "TOOL_REVOKED";
+        runtimeMessages.push({tool: call.name, result: {contractVersion: "commerce.v1", status: "ERROR", code: "DENIED", retryable: false}});
+        safeLog(input.logger, "warn", "commerce.turn.tool.denied", {toolName: call.name, reasonCode: "TOOL_REVOKED"});
+        continue toolCalls;
+      }
+      resolveToolCall(call.name, input.prepared, input.availableTools);
       const durationMs = elapsedDuration(input.source, startedAt);
       safeLog(input.logger, "debug", "commerce.turn.tool.completed", {
         modelStep: input.modelStep,

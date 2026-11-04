@@ -22,7 +22,7 @@ import {
   responseContractCanonicalJson,
 } from "../canonical-json";
 import { deduplicateTools } from "../selection";
-import type { CommerceEvidence } from "../schemas";
+import { CommerceShippingInformationSchema, type CommerceEvidence } from "../schemas";
 import { createLogger, type LogRecord, type StructuredLogger } from "../../logging";
 import { createCommerceTurnGraph, COMMERCE_TURN_GRAPH_RECURSION_LIMIT } from "./graph/graph.js";
 import { initialCommerceTurnGraphState } from "./graph/state";
@@ -913,6 +913,10 @@ test("Merchant Knowledge-like Tool data cannot authorize a later model-requested
     },
   };
   f.input.dependencies.tools = [f.input.dependencies.tools[0], refundTool];
+  // An ungranted adapter now fails preflight, independently of hostile runtime data.
+  assert.equal((await runCommerceTurn(f.input)).ok, false);
+  assert.equal(f.requests.length, 0);
+  f.input.dependencies.tools.pop();
   f.input.dependencies.model.invoke = async (request) => {
     modelStep += 1;
     if (modelStep === 1) return call();
@@ -956,6 +960,9 @@ test("OpenRouter adapter accepts canonical synthetic denial and runner forces re
       return { contractVersion: "commerce.v1", status: "OK", data: {}, renderedText: "" };
     },
   });
+  assert.equal((await runCommerceTurn(f.input)).ok, false);
+  assert.equal(f.requests.length, 0);
+  f.input.dependencies.tools.pop();
   f.input.dependencies.model = createOpenRouterInvoker({
     provider: "openai",
     providerModelId: "gpt-test",
@@ -1246,4 +1253,83 @@ test("ARCH-029 operation timeout differs from whole-turn expiry", async () => {
       return true;
     });
   } finally { runtime.dispose(); }
+});
+
+// The published adapter supplies shipping DTOs; generic runner enforcement is independent of provider composition.
+function presentationFixture(sequence: ModelStep[], withTool = false) {
+  const f = fixture(sequence, withTool);
+  f.input.hostInstructions = ["Authorize truthful expected limitations with the pinned disposition; host composes controlled replies."];
+  f.input.manifest.responseContract = {
+    version: "response.v1", instructions: "Use the owned presentation fields for host-composed expected limitations.",
+    detailsSchema: {type: "object", additionalProperties: false, properties: {
+      responseDisposition: {type: "string", enum: ["STANDARD", "OUT_OF_SCOPE_REDIRECT", "SHIPPING_INFORMATION_UNVERIFIED"], maxLength: 31},
+      shippingInformationSelection: {type: "object", additionalProperties: false, required: ["productId", "variantId"], properties: {
+        productId: {type: ["string", "null"], minLength: 1, maxLength: 128},
+        variantId: {type: ["string", "null"], minLength: 1, maxLength: 128},
+      }},
+    }},
+  };
+  f.input.manifest.responseContractHash = digest(responseContractCanonicalJson(f.input.manifest.responseContract));
+  return f;
+}
+const presentedAnswer = (responseDisposition: string) => ({...exampleFinal, answerKind: "ANSWER", referralReason: null,
+  replyText: "The host will compose the verified store response.", details: {responseDisposition}});
+function shippingResult(status: "AVAILABLE" | "NOT_CONFIGURED" | "SCOPE_NOT_GRANTED" | "UNSUPPORTED") {
+  return CommerceShippingInformationSchema.parse({provider: "SHOPIFY", observedAt: "2026-11-04T00:00:00.000Z",
+    product: {status: "NOT_REQUESTED", productId: null, variantId: null, requiresShipping: null,
+      virtual: null, weight: null, dimensions: null, shippingClassId: null, shippingClassSlug: null},
+    policy: {status, trust: "UNTRUSTED_REFERENCE", title: status === "AVAILABLE" ? "Shipping" : null,
+      bodyStatus: status === "AVAILABLE" ? "EMPTY" : "NOT_AVAILABLE", bodyHtml: null,
+      url: status === "AVAILABLE" ? "https://shop.example.test/policy" : null, updatedAt: null},
+  });
+}
+test("presentation: expected shipping outcomes remain normal answers under a host-pinned contract", async () => {
+  for (const status of ["AVAILABLE", "NOT_CONFIGURED", "SCOPE_NOT_GRANTED", "UNSUPPORTED"] as const) {
+    const f = presentationFixture([call(), final(presentedAnswer("SHIPPING_INFORMATION_UNVERIFIED"))], true);
+    f.input.dependencies.tools[0].execute = async () => ({contractVersion: "commerce.v1", status: "OK",
+      data: shippingResult(status), renderedText: "Bounded native shipping information."});
+    const result = await runCommerceTurn(f.input);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    if (result.ok) assert.equal(result.result.answerKind, "ANSWER");
+  }
+});
+test("presentation: both soft dispositions survive ordinary host-authorized finalization", async () => {
+  for (const disposition of ["OUT_OF_SCOPE_REDIRECT", "SHIPPING_INFORMATION_UNVERIFIED"]) {
+    const f = presentationFixture([final(presentedAnswer(disposition))]);
+    assert.equal((await runCommerceTurn(f.input)).ok, true);
+    const instructions = f.requests[0].instructions.join("\n");
+    assert.ok(instructions.includes(RUNTIME_DATA_AUTHORITY_INSTRUCTION));
+    assert.match(instructions, /trusted host instructions may authorize a normal ANSWER/);
+    assert.match(instructions, /failed authorized provider request remains a terminal error/);
+    assert.match(instructions, /product-bearing shipping observation/);
+    assert.match(instructions, /null\/null policy-only shipping observation alone may retain/);
+    assert.match(instructions, /generic runner does not implement that host composer/);
+  }
+});
+test("presentation: later successful shipping cannot erase a terminal error with a soft disposition", async () => {
+  for (const disposition of ["OUT_OF_SCOPE_REDIRECT", "SHIPPING_INFORMATION_UNVERIFIED"]) {
+    const f = presentationFixture([call(), call(), final(presentedAnswer(disposition))], true);
+    let executions = 0;
+    f.input.dependencies.tools[0].execute = async () => ++executions === 1
+      ? {contractVersion: "commerce.v1", status: "ERROR", code: "UNAVAILABLE", retryable: false}
+      : {contractVersion: "commerce.v1", status: "OK", data: shippingResult("SCOPE_NOT_GRANTED"), renderedText: "Policy scope absent."};
+    expectFailure(await runCommerceTurn(f.input), "INVALID_FINAL", "FINAL_REFERRAL_REQUIRED");
+    assert.equal(executions, 2);
+  }
+});
+test("presentation: hard referral rejects disposition details and evidence; plain text after error stays a referral", async () => {
+  for (const patch of [{details: {responseDisposition: "SHIPPING_INFORMATION_UNVERIFIED"}}, {evidenceIds: ["invented"]}]) {
+    const f = presentationFixture([final({...exampleFinal, ...patch})]);
+    expectFailure(await runCommerceTurn(f.input), "INVALID_FINAL", "FINAL_SCHEMA_INVALID");
+  }
+  const f = presentationFixture([call(), {calls: [], text: "Here is a soft answer.", outputTokens: 10}], true);
+  f.input.dependencies.tools[0].execute = async () => ({contractVersion: "commerce.v1", status: "ERROR", code: "UNAVAILABLE", retryable: false});
+  const result = await runCommerceTurn(f.input);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  if (result.ok) {
+    assert.equal(result.result.answerKind, "REFER_TO_STORE");
+    assert.deepEqual(result.result.details, {});
+    assert.deepEqual(result.result.evidenceIds, []);
+    assert.notEqual(result.result.replyText, "Here is a soft answer.");
+  }
 });

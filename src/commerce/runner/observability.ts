@@ -1,3 +1,4 @@
+import { runnerVersion } from "./version.js";
 import type { LogFields, StructuredLogger } from "../../logging/index.js";
 import type { PreparedCommerceTurn } from "./preflight.js";
 import type { RunCommerceTurnInput, ModelResponseSummary } from "./types.js";
@@ -28,7 +29,7 @@ export function createTurnLogger(
   try {
     const fields: Record<string, unknown> = {
       component: "commerce-turn-runner",
-      runnerVersion: "1.0.0",
+      runnerVersion,
       shopId: prepared.turn.shopId,
       conversationId: prepared.turn.conversationId,
       inboundVersion: prepared.turn.inboundVersion,

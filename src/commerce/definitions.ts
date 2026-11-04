@@ -32,7 +32,7 @@ export const ToolNameSchema = z
   .string()
   .regex(/^[a-z][a-z0-9_]{0,127}$/)
   .refine((n) => n !== "finalResponse");
-export const GrantedToolSchema = z.strictObject({
+export const PublishedGrantedToolSchema = z.strictObject({
   toolId: IdSchema,
   toolRevisionId: IdSchema,
   toolName: ToolNameSchema,
@@ -43,14 +43,7 @@ export const GrantedToolSchema = z.strictObject({
     .max(32)
     .refine((v) => distinct(v) && v.join("\0") === [...v].sort().join("\0")),
 });
-export const GrantedToolsSchema = z
-  .array(GrantedToolSchema)
-  .max(32)
-  .refine(
-    (v) =>
-      distinct(v.map((x) => x.toolId)) && distinct(v.map((x) => x.toolName)),
-  );
-export const ToolDescriptorSchema = z.strictObject({
+export const PublishedToolDescriptorSchema = z.strictObject({
   toolId: IdSchema,
   toolRevisionId: IdSchema,
   name: ToolNameSchema,
@@ -58,6 +51,37 @@ export const ToolDescriptorSchema = z.strictObject({
   description: z.string().min(1).max(4096),
   inputSchema: InputSchemaSchema,
 });
+export const CommerceBuiltInToolNameSchema = z.enum([
+  "commerce_get_discount_options", "commerce_get_discount_details",
+]).meta({maxLength: 29});
+export const CommerceBuiltInToolGrantSchema = z.strictObject({
+  kind: z.enum(["BUILT_IN"]).meta({maxLength: 8}),
+  toolName: CommerceBuiltInToolNameSchema,
+  definitionVersion: z.enum(["1.0.0"]).meta({maxLength: 5}),
+  contractHash: HashSchema,
+});
+export const CommerceBuiltInToolDescriptorSchema = z.strictObject({
+  kind: z.enum(["BUILT_IN"]).meta({maxLength: 8}),
+  name: CommerceBuiltInToolNameSchema,
+  definitionVersion: z.enum(["1.0.0"]).meta({maxLength: 5}),
+  contractHash: HashSchema,
+  description: z.string().min(1).max(4096),
+  inputSchema: InputSchemaSchema,
+});
+export type PublishedGrantedTool = z.infer<typeof PublishedGrantedToolSchema>;
+export type PublishedToolDescriptor = z.infer<typeof PublishedToolDescriptorSchema>;
+export type CommerceBuiltInToolGrant = z.infer<typeof CommerceBuiltInToolGrantSchema>;
+export type CommerceBuiltInToolDescriptor = z.infer<typeof CommerceBuiltInToolDescriptorSchema>;
+export const GrantedToolSchema = z.union([PublishedGrantedToolSchema, CommerceBuiltInToolGrantSchema]);
+export const ToolDescriptorSchema = z.union([PublishedToolDescriptorSchema, CommerceBuiltInToolDescriptorSchema]);
+export const GrantedToolsSchema = z.array(GrantedToolSchema).max(32).refine(values => {
+  const published = values.filter((value): value is PublishedGrantedTool => !("kind" in value));
+  return distinct(values.map(value => value.toolName)) && distinct(published.map(value => value.toolId));
+});
+export const isBuiltInTool = <T extends GrantedTool | ToolDescriptor>(
+  value: T,
+): value is Extract<T, {kind: "BUILT_IN"}> => "kind" in value && value.kind === "BUILT_IN";
+
 const MappingSchema = z.union([
   z.strictObject({
     input: z.string().refine(safeName),
@@ -69,6 +93,10 @@ const MappingsSchema = z
   .record(z.string().refine(safeName), MappingSchema)
   .refine((v) => Object.keys(v).length <= 32);
 export const POLICY_OPERATIONS = [
+  "taxonomy.resolveCategories",
+  "products.search",
+  "products.get",
+  "shipping.getInformation",
   "recovery.getBasket",
   "shopify.searchProducts",
   "discounts.getOptions",

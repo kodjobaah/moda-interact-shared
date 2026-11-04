@@ -44,7 +44,7 @@ export function validateSubset(
   mode: "input" | "details",
 ): value is SubsetSchema {
   let propertyCount = 0;
-  const maxDepth = mode === "input" ? 3 : 4;
+  const maxDepth = mode === "input" ? 3 : 5;
   function walk(raw: unknown, depth: number): boolean {
     if (
       depth > maxDepth ||
@@ -63,7 +63,8 @@ export function validateSubset(
     const nullable = Array.isArray(s.type);
     if (
       nullable &&
-      (mode !== "input" || s.type.length !== 2 || s.type[1] !== "null")
+      (s.type.length !== 2 || s.type[1] !== "null" ||
+        (mode === "details" && ["object", "array"].includes(s.type[0])))
     )
       return false;
     const type = typeof s.type === "string" ? s.type : s.type[0];

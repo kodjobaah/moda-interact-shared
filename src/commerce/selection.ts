@@ -3,8 +3,10 @@ import {
   type CommerceManifest,
   CommerceManifestSchema,
   type CommerceConversationGrant,
+  CommerceConversationGrantSchema,
 } from "./schemas";
-import { type GrantedTool, type ToolDescriptor } from "./definitions";
+import { GrantedToolsSchema, PublishedToolDescriptorSchema, type GrantedTool, type PublishedGrantedTool, type PublishedToolDescriptor, type CommerceBuiltInToolDescriptor, isBuiltInTool } from "./definitions";
+import { isTrustedCommerceBuiltInDescriptor, isTrustedCommerceBuiltInGrant } from "./built-in-tools";
 import { canonicalJson } from "./canonical-json";
 export type FeatureFacts = {
   id: string;
@@ -50,12 +52,13 @@ export function selectCapabilities(
   return selected.map((c) => c.key);
 }
 export function deduplicateTools(
-  capabilities: Array<{ key: string; toolDescriptor: ToolDescriptor }>,
+  capabilities: Array<{ key: string; toolDescriptor: PublishedToolDescriptor }>,
+  builtInTools: readonly CommerceBuiltInToolDescriptor[] = [],
 ): GrantedTool[] {
-  const byId = new Map<string, { tool: GrantedTool; descriptor: string }>();
+  const byId = new Map<string, { tool: PublishedGrantedTool; descriptor: string }>();
   const names = new Map<string, string>();
   for (const cap of capabilities) {
-    const d = cap.toolDescriptor;
+    const d = PublishedToolDescriptorSchema.parse(cap.toolDescriptor);
     const previous = byId.get(d.toolId);
     const descriptor = canonicalJson(d);
     if (
@@ -80,26 +83,33 @@ export function deduplicateTools(
         },
       });
   }
-  return [...byId.values()]
-    .map((v) => v.tool)
-    .sort((a, b) => a.toolName.localeCompare(b.toolName, "en"));
+  if (builtInTools.some(tool => !isTrustedCommerceBuiltInDescriptor(tool)))
+    throw new TypeError("Untrusted built-in descriptor");
+  return GrantedToolsSchema.parse([
+    ...[...byId.values()].map(value => value.tool),
+    ...builtInTools.map(tool => ({
+      kind: "BUILT_IN" as const, toolName: tool.name,
+      definitionVersion: tool.definitionVersion, contractHash: tool.contractHash,
+    })),
+  ]).sort((a, b) => a.toolName.localeCompare(b.toolName, "en"));
 }
 export function manifestMatchesGrant(
   manifest: CommerceManifest,
   grant: CommerceConversationGrant,
 ) {
+  if (!CommerceManifestSchema.safeParse(manifest).success || !CommerceConversationGrantSchema.safeParse(grant).success) return false;
   return (
     manifest.releaseId === grant.releaseId &&
     canonicalJson(manifest.selectedCapabilityKeys) ===
       canonicalJson(grant.selectedCapabilityKeys) &&
     canonicalJson(
       [...manifest.grantedTools].sort((a, b) =>
-        a.toolId.localeCompare(b.toolId),
+        a.toolName.localeCompare(b.toolName),
       ),
     ) ===
       canonicalJson(
         [...grant.grantedTools].sort((a, b) =>
-          a.toolId.localeCompare(b.toolId),
+          a.toolName.localeCompare(b.toolName),
         ),
       )
   );
@@ -110,10 +120,14 @@ export function currentlyGrantedTools(
   grant: CommerceConversationGrant,
   eligibleCapabilityKeys: ReadonlySet<string>,
   enabledToolIds: ReadonlySet<string>,
+  allowedBuiltInTools: readonly CommerceBuiltInToolDescriptor[] = [],
 ) {
   return grant.grantedTools.filter(
     (t) =>
-      enabledToolIds.has(t.toolId) &&
-      t.capabilityKeys.some((k) => eligibleCapabilityKeys.has(k)),
+      isBuiltInTool(t)
+        ? isTrustedCommerceBuiltInGrant(t) && allowedBuiltInTools.some(descriptor =>
+            isTrustedCommerceBuiltInDescriptor(descriptor) && descriptor.name === t.toolName &&
+            descriptor.definitionVersion === t.definitionVersion && descriptor.contractHash === t.contractHash)
+        : enabledToolIds.has(t.toolId) && t.capabilityKeys.some((k) => eligibleCapabilityKeys.has(k)),
   );
 }
