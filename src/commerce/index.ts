@@ -2,6 +2,7 @@ export * from "./canonical-json";
 export * from "./subset";
 export * from "./primitives";
 export * from "./definitions";
+export * from "./discount-capability-contracts";
 export * from "./schemas";
 export * from "./response";
 export * from "./selection";

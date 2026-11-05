@@ -4,6 +4,16 @@ Public entry points are `@modainteract/moda-interact-shared/commerce` and
 `@modainteract/moda-interact-shared/commerce/runner`. They are provider-neutral.
 Existing WhatsApp, billing and recovery-policy exports are unchanged.
 
+`DISCOUNT_POLICY_OPERATION_DESCRIPTORS` is the canonical Shared mapping for
+`commerce_get_discount_options` → `discounts.getOptions@1.0.0` and
+`commerce_get_discount_details` → `discounts.getDetails@1.0.0`. It references
+the existing `CommerceToolInputs` and `CommerceToolOutputs` validators, so
+Commerce authoring and runtime consumers can reuse the same argument/result
+contracts, including their discount timestamp syntax. Policy operation versions
+are distinct from immutable published tool definition versions. The historical
+2.0.0 built-in descriptors remain available for compatible consumers; they do
+not establish membership in a published capability release.
+
 ## External read-only HTTP contracts
 
 The commerce entry point also exports the strict C21 external-tool contracts:
