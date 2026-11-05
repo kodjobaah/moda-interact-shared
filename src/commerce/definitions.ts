@@ -98,6 +98,7 @@ export const POLICY_OPERATIONS = [
   "recovery.getBasket",
   "shopify.searchProducts",
   "discounts.getOptions",
+  "discounts.getDetails",
   "discounts.evaluate",
   "products.findQualifying",
   "products.findSimilar",
