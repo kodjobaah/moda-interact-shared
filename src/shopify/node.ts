@@ -5,6 +5,7 @@ export {
   ShopifyOfflineTokenError,
   createShopifyOfflineTokenProvider,
   type ShopifyOfflineTokenErrorCode,
+  type ShopifyOfflineRefreshEvent,
   type ShopifyOfflineDatabase,
   type ShopifyOfflineTransaction,
   type ShopifyOfflineSessionDelegate,
