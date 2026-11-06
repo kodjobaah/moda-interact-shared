@@ -240,7 +240,7 @@ async function readBoundedBody(response: Response, signal: AbortSignal): Promise
       size += value.byteLength;
       if (size > RESPONSE_LIMIT) {
         await reader.cancel().catch(() => undefined);
-        fail("REFRESH_RESPONSE_INVALID");
+        fail("REFRESH_OUTCOME_UNKNOWN");
       }
       chunks.push(value);
     }
@@ -262,22 +262,27 @@ export function createShopifyOfflineTokenProvider(input: Readonly<{
 }>): ShopifyOfflineTokenProvider {
   const now = input.now ?? Date.now;
 
-  async function resolveShop(shopId: string): Promise<PersistedShop> {
+  async function resolveShop(shopId: string, deadline: ReturnType<typeof createDeadline>): Promise<PersistedShop> {
+    deadline.check();
     if (typeof shopId !== "string" || !shopId.trim()) fail("SESSION_MISSING");
     let shop: PersistedShop | null;
-    try { shop = await input.prisma.shop.findUnique({ where: { id: shopId }, select: { id: true, domain: true, platform: true, status: true } }); }
-    catch { fail("PERSISTENCE_UNAVAILABLE"); }
+    try {
+      shop = await deadline.wait(input.prisma.shop.findUnique({ where: { id: shopId }, select: { id: true, domain: true, platform: true, status: true } }));
+    } catch (error) {
+      deadline.check();
+      throw mapDatabaseError(error);
+    }
+    deadline.check();
     if (!shop) fail("SESSION_MISSING");
     if (shop.platform !== "SHOPIFY" || shop.status !== "ACTIVE") fail("INVALID_SESSION");
     if (!shop.domain) fail("SESSION_IDENTITY_CONFLICT");
     return shop;
   }
 
-  async function runLocked<T>(shop: PersistedShop, shopId: string, signal: AbortSignal | undefined, work: (context: LockedSessionContext) => Promise<T>, outcome: { remoteSucceeded: boolean } = { remoteSucceeded: false }): Promise<T> {
-    const deadline = createDeadline(signal);
+  async function runLocked<T>(shop: PersistedShop, shopId: string, deadline: ReturnType<typeof createDeadline>, work: (context: LockedSessionContext) => Promise<T>, outcome: { remoteSucceeded: boolean } = { remoteSucceeded: false }): Promise<T> {
     try {
       deadline.check();
-      const result = await input.prisma.$transaction(async (tx) => {
+      const result = await deadline.wait(input.prisma.$transaction(async (tx) => {
         await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '5s'");
         await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '18s'");
         await tx.$queryRawUnsafe("SELECT pg_advisory_xact_lock(hashtextextended($1, 0)) IS NULL", `moda:shopify-offline:v1:${shop.domain}`);
@@ -304,24 +309,28 @@ export function createShopifyOfflineTokenProvider(input: Readonly<{
         catch (error) { deadline.check(); throw new CallbackFailure(error); }
         deadline.check();
         return value;
-      }, TX_OPTIONS);
+      }, TX_OPTIONS));
       return result;
     } catch (error) {
       if (error instanceof CallbackFailure) throw error.value;
-      if (signal?.aborted) fail("CANCELLED");
+      if (deadline.signal.aborted) deadline.check();
       if (outcome.remoteSucceeded && (error instanceof ShopifyOfflineTokenError
         ? error.code === "LOCK_TIMEOUT" || error.code === "DEADLINE" || error.code === "PERSISTENCE_UNAVAILABLE"
         : true)) fail("REFRESH_OUTCOME_UNKNOWN");
       if (error instanceof ShopifyOfflineTokenError) throw error;
       deadline.check();
       throw mapDatabaseError(error);
-    } finally { deadline.dispose(); }
+    }
   }
 
   async function getSession(shopId: string, options?: Readonly<{ signal?: AbortSignal }>): Promise<OfflineCredentialSnapshot> {
-    const shop = await resolveShop(shopId);
-    const outcome = { remoteSucceeded: false };
-    return runLocked(shop, shopId, options?.signal, async (context) => {
+    const deadline = createDeadline(options?.signal);
+    try {
+      deadline.check();
+      const shop = await resolveShop(shopId, deadline);
+      deadline.check();
+      const outcome = { remoteSucceeded: false };
+      return await runLocked(shop, shopId, deadline, async (context) => {
       let row = await context.transaction.session.findUnique({ where: { id: context.sessionId }, select: SESSION_SELECT });
       if (!row) fail("SESSION_IDENTITY_CONFLICT");
       const currentTime = now();
@@ -366,7 +375,6 @@ export function createShopifyOfflineTokenProvider(input: Readonly<{
       catch (error) {
         clearTimeout(refreshTimeout);
         context.signal.removeEventListener("abort", onAbort);
-        if (error instanceof ShopifyOfflineTokenError && error.code === "REFRESH_RESPONSE_INVALID") throw error;
         if (options?.signal?.aborted) fail("CANCELLED");
         if (context.signal.aborted) fail("REFRESH_OUTCOME_UNKNOWN");
         fail("REFRESH_OUTCOME_UNKNOWN");
@@ -375,15 +383,15 @@ export function createShopifyOfflineTokenProvider(input: Readonly<{
         context.signal.removeEventListener("abort", onAbort);
       }
       let payload: unknown;
-      try { payload = JSON.parse(raw) as unknown; } catch { fail("REFRESH_RESPONSE_INVALID"); }
+      try { payload = JSON.parse(raw) as unknown; } catch { fail("REFRESH_OUTCOME_UNKNOWN"); }
       if (!isRecord(payload) || !validToken(payload.access_token) || !validToken(payload.refresh_token)
         || !Number.isSafeInteger(payload.expires_in) || (payload.expires_in as number) <= 0 || (payload.expires_in as number) > 86_400
         || !Number.isSafeInteger(payload.refresh_token_expires_in) || (payload.refresh_token_expires_in as number) <= 0 || (payload.refresh_token_expires_in as number) > 7_776_000
         || (payload.expires_in as number) <= 320
-        || (payload.scope !== undefined && !validScope(payload.scope))) fail("REFRESH_RESPONSE_INVALID");
+        || (payload.scope !== undefined && !validScope(payload.scope))) fail("REFRESH_OUTCOME_UNKNOWN");
       const expires = requestStartedAt + (payload.expires_in as number) * 1000;
       const refreshTokenExpires = requestStartedAt + (payload.refresh_token_expires_in as number) * 1000;
-      if (!Number.isFinite(expires) || !Number.isFinite(refreshTokenExpires) || Number.isNaN(new Date(expires).getTime()) || Number.isNaN(new Date(refreshTokenExpires).getTime())) fail("REFRESH_RESPONSE_INVALID");
+      if (!Number.isFinite(expires) || !Number.isFinite(refreshTokenExpires) || Number.isNaN(new Date(expires).getTime()) || Number.isNaN(new Date(refreshTokenExpires).getTime())) fail("REFRESH_OUTCOME_UNKNOWN");
       const scope = payload.scope === undefined ? row.scope : payload.scope as string;
       try {
         row = await context.transaction.session.update({ where: { id: row.id }, data: {
@@ -393,12 +401,24 @@ export function createShopifyOfflineTokenProvider(input: Readonly<{
       } catch { outcome.remoteSucceeded = true; throw new ShopifyOfflineTokenError("REFRESH_OUTCOME_UNKNOWN"); }
       outcome.remoteSucceeded = true;
       return snapshot(row, shopId, context.shop);
-    }, outcome);
+      }, outcome);
+    } catch (error) {
+      deadline.check();
+      throw error;
+    } finally { deadline.dispose(); }
   }
 
   async function withSessionLock<T>(shopId: string, work: (context: LockedSessionContext) => Promise<T>, options?: Readonly<{ signal?: AbortSignal }>): Promise<T> {
-    const shop = await resolveShop(shopId);
-    return runLocked(shop, shopId, options?.signal, work);
+    const deadline = createDeadline(options?.signal);
+    try {
+      deadline.check();
+      const shop = await resolveShop(shopId, deadline);
+      deadline.check();
+      return await runLocked(shop, shopId, deadline, work);
+    } catch (error) {
+      deadline.check();
+      throw error;
+    } finally { deadline.dispose(); }
   }
 
   async function withSdkInstallationSessionLock<T>(integrationDomain: string, work: (context: SdkInstallationSessionContext) => Promise<T>): Promise<T> {

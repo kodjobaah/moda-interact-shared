@@ -24,6 +24,7 @@ function fixture(options: Readonly<{
   otherShop?: ShopifyOfflineShopRecord | null;
   rootShop?: ShopifyOfflineShopRecord | null;
   rootFailure?: boolean;
+  rootLookup?: () => Promise<ShopifyOfflineShopRecord | null>;
   lockFailure?: boolean;
   statementFailure?: boolean;
   readOAuth?: () => Promise<Readonly<{ apiKey: string; apiSecret: string }>>;
@@ -56,7 +57,7 @@ function fixture(options: Readonly<{
   };
   const prisma: ShopifyOfflineDatabase = {
     $transaction: async (work) => work(tx),
-    shop: { findUnique: async () => { calls.stages.push("root.shop.findUnique"); if (options.rootFailure) throw new Error("database credential canary"); return options.rootShop === undefined ? shop : options.rootShop; } },
+    shop: { findUnique: async () => { calls.stages.push("root.shop.findUnique"); if (options.rootFailure) throw new Error("database credential canary"); if (options.rootLookup) return options.rootLookup(); return options.rootShop === undefined ? shop : options.rootShop; } },
   };
   const fetcher: typeof fetch = async (url) => {
     calls.stages.push("fetch");
@@ -114,13 +115,23 @@ test("unknown selected shop, foreign provider, inactive shop and ambiguous sessi
   assert.equal(duplicate.calls.urls.length, 0);
 });
 
-test("expired refresh token and invalid refresh response make no unsafe persistence", async () => {
+test("expired refresh token makes no provider call; malformed successful response is an unknown outcome", async () => {
   const expired = fixture({ rows: [{ ...baseSession(), refreshTokenExpires: new Date(fixedNow - 1) }] });
   await assert.rejects(expired.provider.getSession("shop-1"), (error: unknown) => error instanceof ShopifyOfflineTokenError && error.code === "REFRESH_TOKEN_EXPIRED");
   assert.equal(expired.calls.urls.length, 0);
-  const invalid = fixture({ response: async () => Response.json({ access_token: "bad\nsecret", refresh_token: "new", expires_in: 3600, refresh_token_expires_in: 3600 }) });
-  await assert.rejects(invalid.provider.getSession("shop-1"), (error: unknown) => error instanceof ShopifyOfflineTokenError && error.code === "REFRESH_RESPONSE_INVALID");
-  assert.equal(invalid.calls.updates.length, 0);
+  const invalidResponses = [
+    async () => new Response("{ malformed json"),
+    async () => Response.json({ access_token: "bad\nsecret", refresh_token: "new", expires_in: 3600, refresh_token_expires_in: 3600 }),
+    async () => Response.json({ access_token: "new-access", refresh_token: "new-refresh", expires_in: 30, refresh_token_expires_in: 3600 }),
+    async () => new Response(new Uint8Array(16_385)),
+  ];
+  for (const response of invalidResponses) {
+    const invalid = fixture({ response });
+    await assert.rejects(invalid.provider.getSession("shop-1"), (error: unknown) => error instanceof ShopifyOfflineTokenError && error.code === "REFRESH_OUTCOME_UNKNOWN" && error.retryable);
+    assert.equal(invalid.calls.updates.length, 0);
+    assert.equal(invalid.getRow().accessToken, "old-access");
+    assert.equal(invalid.getRow().refreshToken, "old-refresh");
+  }
 });
 
 test("provider 4xx rejection is safe and does not expose provider response body", async () => {
@@ -147,12 +158,6 @@ test("OAuth failures, missing shops, lock timeouts and pre-aborted callers map t
   await assert.rejects(cancelled.provider.withSessionLock("shop-1", async () => undefined, { signal: controller.signal }), (error: unknown) => error instanceof ShopifyOfflineTokenError && error.code === "CANCELLED");
 });
 
-test("a response exceeding the streamed body bound is rejected before persistence", async () => {
-  const f = fixture({ response: async () => new Response(new Uint8Array(16_385)) });
-  await assert.rejects(f.provider.getSession("shop-1"), (error: unknown) => error instanceof ShopifyOfflineTokenError && error.code === "REFRESH_RESPONSE_INVALID");
-  assert.equal(f.calls.updates.length, 0);
-});
-
 test("a fresh access token outside the 320 second refresh margin is returned without OAuth I/O", async () => {
   const f = fixture({ rows: [{ ...baseSession(), expires: new Date(fixedNow + 320_001) }] });
   const result = await f.provider.getSession("shop-1");
@@ -177,6 +182,23 @@ test("session-lock callback failures pass through unchanged for the SDK composit
 test("the provider enforces the 15 second callback deadline", { timeout: 18_000 }, async () => {
   const f = fixture({ readOAuth: () => new Promise(() => undefined) });
   await assert.rejects(f.provider.getSession("shop-1"), (error: unknown) => error instanceof ShopifyOfflineTokenError && error.code === "DEADLINE" && error.retryable);
+});
+
+test("the selected-shop lookup uses the same 15 second deadline before opening a transaction", { timeout: 18_000 }, async () => {
+  const f = fixture({ rootLookup: () => new Promise(() => undefined) });
+  const started = Date.now();
+  await assert.rejects(f.provider.getSession("shop-1"), (error: unknown) => error instanceof ShopifyOfflineTokenError && error.code === "DEADLINE" && error.retryable);
+  assert.ok(Date.now() - started < 16_000);
+  assert.deepEqual(f.calls.stages, ["root.shop.findUnique"]);
+});
+
+test("an already-aborted caller does not perform the selected-shop lookup", async () => {
+  const f = fixture();
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(f.provider.getSession("shop-1", { signal: controller.signal }), (error: unknown) => error instanceof ShopifyOfflineTokenError && error.code === "CANCELLED");
+  await assert.rejects(f.provider.withSessionLock("shop-1", async () => undefined, { signal: controller.signal }), (error: unknown) => error instanceof ShopifyOfflineTokenError && error.code === "CANCELLED");
+  assert.deepEqual(f.calls.stages, []);
 });
 
 test("persist failure after remote success becomes an unknown outcome without returning a token", async () => {
