@@ -2,6 +2,7 @@ import { isBuiltInTool } from "../definitions.js";
 import { jsonBytes } from "../canonical-json.js";
 import { CommerceToolResultSchema, CommerceToolOutputs, type CommerceEvidence } from "../schemas.js";
 import type { CommerceFinalResponse } from "../response.js";
+import { compileCommercePurposeOutputSchema } from "../purpose-output.js";
 import { compileSubset } from "../subset.js";
 import { RunnerFailure } from "./failure.js";
 import { schemaIssueMetadata } from "./diagnostics.js";
@@ -114,7 +115,7 @@ export async function executeToolCalls(input: {
       }, parsedResult.error);
       result = parsedResult.data;
       const purposeMember = input.prepared.executionPurpose && input.prepared.manifest.purposeProfile?.capabilities.find(member => member.name === call.name);
-      if (purposeMember && result.status === "OK" && !compileSubset(purposeMember.outputSchema, "details").safeParse(result.data).success)
+      if (purposeMember && result.status === "OK" && !compileCommercePurposeOutputSchema(purposeMember.outputSchema).safeParse(result.data).success)
         throw new RunnerFailure("INVALID_INPUT", { stage: "tool.result", reasonCode: "TOOL_RESULT_INVALID", toolName: call.name, modelStep: input.modelStep });
       if (result.status === "OK" && isBuiltInTool(grant)) {
         const output = CommerceToolOutputs[grant.toolName].safeParse(result.data);
