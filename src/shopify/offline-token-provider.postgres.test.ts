@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
-import { createShopifyOfflineTokenProvider, ShopifyOfflineTokenError } from "./offline-token-provider.js";
+import { createShopifyOfflineTokenProvider, ShopifyOfflineTokenError, type ShopifyOfflineRefreshEvent } from "./offline-token-provider.js";
 
 const prismaClientPath = process.env.ARCH061_PRISMA_CLIENT_PATH;
 const databaseUrl = process.env.DATABASE_URL;
@@ -47,8 +47,14 @@ test("two independent Prisma clients serialize refresh, bound waits, isolate sho
   const shopBId = `arch061-b-${suffix}`;
   const expiry = new Date(Date.now() - 1000);
   const refreshExpiry = new Date(Date.now() + 86_400_000);
+  const events: ShopifyOfflineRefreshEvent[] = [];
+  const committedReads: Promise<any>[] = [];
   const makeProvider = (prisma: any, fetcher: typeof fetch) => createShopifyOfflineTokenProvider({
     prisma, fetch: fetcher, now: Date.now,
+    onEvent: (event) => {
+      events.push(event);
+      if (event.event === "shopify.offline_refresh.committed") committedReads.push(clientB.session.findUnique({ where: { id: `offline-real-${event.shopId}` }, select: { accessToken: true, refreshToken: true, expires: true, refreshTokenExpires: true } }));
+    },
     readOAuth: async () => ({ apiKey: "postgres-test-key", apiSecret: "postgres-test-secret" }),
   });
   const seed = async (client: any, id: string, domain: string) => {
@@ -89,6 +95,13 @@ test("two independent Prisma clients serialize refresh, bound waits, isolate sho
     try { [resultA, resultB] = await Promise.all([first, second]); }
     catch { assert.fail(`provider failed after safe stages: ${stages.join(",")}`); }
     assert.equal(fetchCount, 1, "one normal refresh is shared by both requests");
+    assert.deepEqual(events.map((e) => e.event), ["shopify.offline_refresh.started", "shopify.offline_refresh.committed"]);
+    assert.equal(events[0]!.operationId, events[1]!.operationId);
+    const observed = (await Promise.all(committedReads))[0];
+    assert.equal(observed.accessToken, "committed-access");
+    assert.equal(observed.refreshToken, "committed-refresh");
+    assert.ok(observed.expires.getTime() > Date.now() + 320_000);
+    assert.ok(observed.refreshTokenExpires.getTime() > Date.now());
     assert.equal(resultA.accessToken, "committed-access");
     assert.equal(resultB.accessToken, "committed-access");
     const persisted = (await clientA.$queryRawUnsafe('SELECT "accessToken", "refreshToken" FROM shopify."Session" WHERE "id" = $1', `offline-real-${shopAId}`))[0];
@@ -137,18 +150,38 @@ test("two independent Prisma clients serialize refresh, bound waits, isolate sho
       const refresh = recoveryFetches.length === 1 ? "must-rollback-refresh" : "recovered-refresh";
       return Response.json({ access_token: access, refresh_token: refresh, expires_in: 3600, refresh_token_expires_in: 86400 });
     };
+    const eventsBeforeRollback = events.length;
     await assert.rejects(makeProvider(rollbackClient, recoveryFetch).getSession(shopBId), (error: unknown) => error instanceof ShopifyOfflineTokenError && error.code === "REFRESH_OUTCOME_UNKNOWN");
+    assert.deepEqual(events.slice(eventsBeforeRollback).map((e) => e.outcome), ["STARTED", "UNKNOWN"]);
     const afterRollback = (await clientA.$queryRawUnsafe('SELECT "accessToken", "refreshToken" FROM shopify."Session" WHERE "id" = $1', `offline-real-${shopBId}`))[0];
     assert.equal(afterRollback.accessToken, "old-access");
     assert.equal(afterRollback.refreshToken, "old-refresh");
+    const commitFailClient = new Proxy(clientA, { get(target, property, receiver) {
+      if (property !== "$transaction") return Reflect.get(target, property, receiver);
+      return (work: (tx: any) => Promise<unknown>, options: unknown) => target.$transaction(async (tx: any) => {
+        await tx.$executeRawUnsafe('SET CONSTRAINTS ALL DEFERRED');
+        const result = await work(tx);
+        await tx.$executeRawUnsafe('INSERT INTO public.arch063_commit_probe (id) VALUES (1), (1)');
+        return result;
+      }, options);
+    } });
+    await clientA.$executeRawUnsafe('CREATE TABLE public.arch063_commit_probe (id INTEGER UNIQUE DEFERRABLE INITIALLY DEFERRED)');
+    const eventsBeforeCommitFailure = events.length;
+    await assert.rejects(makeProvider(commitFailClient, recoveryFetch).getSession(shopBId), (error: unknown) => error instanceof ShopifyOfflineTokenError && error.code === "REFRESH_OUTCOME_UNKNOWN");
+    assert.deepEqual(events.slice(eventsBeforeCommitFailure).map((e) => e.outcome), ["STARTED", "UNKNOWN"]);
+    assert.equal(events.at(-1)!.reasonCode, "REFRESH_OUTCOME_UNKNOWN");
+    const afterCommitFailure = await clientB.session.findUnique({ where: { id: `offline-real-${shopBId}` }, select: { accessToken: true, refreshToken: true } });
+    assert.equal(afterCommitFailure.accessToken, "old-access");
+    assert.equal(afterCommitFailure.refreshToken, "old-refresh");
     const recovered = await makeProvider(clientB, recoveryFetch).getSession(shopBId);
     assert.equal(recovered.accessToken, "recovered-access");
     const afterRecovery = (await clientA.$queryRawUnsafe('SELECT "accessToken", "refreshToken" FROM shopify."Session" WHERE "id" = $1', `offline-real-${shopBId}`))[0];
     assert.equal(afterRecovery.accessToken, "recovered-access");
     assert.equal(afterRecovery.refreshToken, "recovered-refresh");
-    assert.equal(recoveryFetches.length, 2);
+    assert.equal(recoveryFetches.length, 3);
     assert.ok(recoveryFetches.every((body) => body.includes("old-refresh")), "the next request rereads and uses the durable pre-failure refresh token");
   } finally {
+    await clientA.$executeRawUnsafe('DROP TABLE IF EXISTS public.arch063_commit_probe').catch(() => undefined);
     await clientA.$executeRawUnsafe('DELETE FROM shopify."Session" WHERE "shop" IN ($1, $2)', domainA, domainB).catch(() => undefined);
     await clientA.$executeRawUnsafe('DELETE FROM commerce."Shop" WHERE "id" IN ($1, $2)', shopAId, shopBId).catch(() => undefined);
     await Promise.all([clientA.$disconnect(), clientB.$disconnect()]);

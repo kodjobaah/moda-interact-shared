@@ -1,10 +1,23 @@
 import { Buffer } from "node:buffer";
+import { randomUUID } from "node:crypto";
+import { performance } from "node:perf_hooks";
 
 export type ShopifyOfflineTokenErrorCode =
   | "SESSION_MISSING" | "SESSION_IDENTITY_CONFLICT" | "INVALID_SESSION"
   | "REFRESH_TOKEN_EXPIRED" | "OAUTH_CONFIG_UNAVAILABLE" | "LOCK_TIMEOUT"
   | "CANCELLED" | "DEADLINE" | "REFRESH_REJECTED"
   | "REFRESH_RESPONSE_INVALID" | "REFRESH_OUTCOME_UNKNOWN" | "PERSISTENCE_UNAVAILABLE";
+
+/** Bounded refresh lifecycle metadata. Never includes provider credentials or errors. */
+export type ShopifyOfflineRefreshEvent = Readonly<{
+  event: "shopify.offline_refresh.started" | "shopify.offline_refresh.committed" | "shopify.offline_refresh.failed";
+  operationId: string;
+  shopId: string | null;
+  source: "SHARED" | "SDK";
+  durationMs: number;
+  outcome: "STARTED" | "COMMITTED" | "REJECTED" | "UNKNOWN" | "CANCELLED" | "UNAVAILABLE";
+  reasonCode: ShopifyOfflineTokenErrorCode | null;
+}>;
 
 const ERROR_MESSAGES: Record<ShopifyOfflineTokenErrorCode, string> = {
   SESSION_MISSING: "Shopify offline session is unavailable.",
@@ -259,8 +272,15 @@ export function createShopifyOfflineTokenProvider(input: Readonly<{
   readOAuth: () => Promise<Readonly<{ apiKey: string; apiSecret: string }>>;
   fetch: typeof fetch;
   now?: () => number;
+  onEvent?: (event: ShopifyOfflineRefreshEvent) => void;
 }>): ShopifyOfflineTokenProvider {
   const now = input.now ?? Date.now;
+  function notify(event: ShopifyOfflineRefreshEvent): void {
+    try {
+      // Promise resolution also isolates rejected promises/thenables from adapters.
+      void Promise.resolve(input.onEvent?.(Object.freeze(event))).catch(() => undefined);
+    } catch { /* Observers never affect credential or transaction outcomes. */ }
+  }
 
   async function resolveShop(shopId: string, deadline: ReturnType<typeof createDeadline>): Promise<PersistedShop> {
     deadline.check();
@@ -325,12 +345,18 @@ export function createShopifyOfflineTokenProvider(input: Readonly<{
 
   async function getSession(shopId: string, options?: Readonly<{ signal?: AbortSignal }>): Promise<OfflineCredentialSnapshot> {
     const deadline = createDeadline(options?.signal);
+    let attempt: { operationId: string; shopId: string; startedAt: number } | undefined;
+    const outcome = { remoteSucceeded: false };
+    function emit(event: ShopifyOfflineRefreshEvent["event"], result: ShopifyOfflineRefreshEvent["outcome"], reasonCode: ShopifyOfflineTokenErrorCode | null): void {
+      if (!attempt) return;
+      notify({ event, operationId: attempt.operationId, shopId: attempt.shopId, source: "SHARED",
+        durationMs: Math.min(60_000, Math.max(0, Math.round(performance.now() - attempt.startedAt))), outcome: result, reasonCode });
+    }
     try {
       deadline.check();
       const shop = await resolveShop(shopId, deadline);
       deadline.check();
-      const outcome = { remoteSucceeded: false };
-      return await runLocked(shop, shopId, deadline, async (context) => {
+      const result = await runLocked(shop, shopId, deadline, async (context) => {
       let row = await context.transaction.session.findUnique({ where: { id: context.sessionId }, select: SESSION_SELECT });
       if (!row) fail("SESSION_IDENTITY_CONFLICT");
       const currentTime = now();
@@ -357,6 +383,8 @@ export function createShopifyOfflineTokenProvider(input: Readonly<{
       let response: Response;
       try {
         const form = new URLSearchParams({ client_id: credentials.apiKey, client_secret: credentials.apiSecret, grant_type: "refresh_token", refresh_token: row.refreshToken });
+        attempt = { operationId: randomUUID(), shopId: context.shopId, startedAt: performance.now() };
+        emit("shopify.offline_refresh.started", "STARTED", null);
         response = await input.fetch(`https://${context.shop}/admin/oauth/access_token`, {
           method: "POST", redirect: "error", headers: { "content-type": "application/x-www-form-urlencoded" }, body: form, signal: refreshController.signal,
         });
@@ -402,9 +430,17 @@ export function createShopifyOfflineTokenProvider(input: Readonly<{
       outcome.remoteSucceeded = true;
       return snapshot(row, shopId, context.shop);
       }, outcome);
+      emit("shopify.offline_refresh.committed", "COMMITTED", null);
+      return result;
     } catch (error) {
-      deadline.check();
-      throw error;
+      let failure = error;
+      try { deadline.check(); } catch (deadlineError) { failure = deadlineError; }
+      const code = failure instanceof ShopifyOfflineTokenError ? failure.code : "PERSISTENCE_UNAVAILABLE";
+      const ambiguous = outcome.remoteSucceeded && code !== "REFRESH_REJECTED" && code !== "CANCELLED";
+      const reason = ambiguous ? "REFRESH_OUTCOME_UNKNOWN" : code;
+      emit("shopify.offline_refresh.failed", reason === "REFRESH_REJECTED" ? "REJECTED"
+        : reason === "CANCELLED" ? "CANCELLED" : reason === "REFRESH_OUTCOME_UNKNOWN" ? "UNKNOWN" : "UNAVAILABLE", reason);
+      throw failure;
     } finally { deadline.dispose(); }
   }
 
