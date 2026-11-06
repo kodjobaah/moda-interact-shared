@@ -1,6 +1,41 @@
 import { ShopifyWhatsAppConsentSyncJobV1Schema, type ShopifyWhatsAppConsentSyncJobV1 } from "./whatsapp-consent-sync.schema.js";
 import { createHash } from "node:crypto";
 
+export {
+  ShopifyOfflineTokenError,
+  createShopifyOfflineTokenProvider,
+  type ShopifyOfflineTokenErrorCode,
+  type ShopifyOfflineDatabase,
+  type ShopifyOfflineTransaction,
+  type ShopifyOfflineSessionDelegate,
+  type ShopifyOfflineSessionRecord,
+  type ShopifyOfflineSessionWhere,
+  type ShopifyOfflineSessionScalarWhere,
+  type ShopifyOfflineSessionUniqueWhere,
+  type ShopifyOfflineSessionSelect,
+  type ShopifyOfflineSessionData,
+  type ShopifyOfflineSessionCreateData,
+  type ShopifyOfflineStringFilter,
+  type ShopifyOfflineBooleanFilter,
+  type ShopifyOfflineNullableStringFilter,
+  type ShopifyOfflineNullableBooleanFilter,
+  type ShopifyOfflineDateFilter,
+  type ShopifyOfflineBigIntFilter,
+  type ShopifyOfflineShopRecord,
+  type OfflineCredentialSnapshot,
+  type LockedSessionContext,
+  type SdkInstallationSessionContext,
+  type ShopifyOfflineTokenProvider,
+} from "./offline-token-provider.js";
+export {
+  ShopifyOAuthConfigurationError,
+  readShopifyOAuthConfiguration,
+  type ShopifyOAuthConfigurationErrorCode,
+  type ShopifyOAuthConfigurationPrisma,
+  type ShopifyOAuthConfigurationRow,
+  type ShopifyOAuthCredentials,
+} from "./oauth-configuration.js";
+
 function createShopifyWebhookJobDigest(prefix: string, first: string, second: string): string {
   if (typeof first !== "string" || first.length === 0) {
     throw new Error(`${prefix}: first input must be a non-empty string`);
