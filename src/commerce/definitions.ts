@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CommercePurposeOutputSchemaSchema } from "./purpose-output";
 import { gt } from "semver";
 import {
   boundedJson,
@@ -41,7 +42,7 @@ export const CommercePurposeProfileSchema = z.strictObject({
   capabilities: z.array(z.strictObject({
     capabilityId: IdSchema, toolId: IdSchema, revisionId: IdSchema,
     name: ToolNameSchema, position: z.number().int().nonnegative(),
-    inputSchema: InputSchemaSchema, outputSchema: DetailsSchemaSchema,
+    inputSchema: InputSchemaSchema, outputSchema: CommercePurposeOutputSchemaSchema,
   })).min(1, { message: "PROFILE_EMPTY" }).max(32),
 }).superRefine((profile, ctx) => {
   const members = profile.capabilities;
