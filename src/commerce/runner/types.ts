@@ -39,6 +39,8 @@ export type RunnerTool = {
   extractEvidence?: (result: CommerceToolResult) => unknown[];
 };
 export type RunCommerceTurnInput = {
+  /** Trusted service context only; never copied from model or tool arguments. */
+  executionPurpose?: import("../definitions.js").CommerceExecutionPurpose;
   turn: CommerceTurnIdentity;
   grant: CommerceConversationGrant;
   manifest: CommerceManifest;

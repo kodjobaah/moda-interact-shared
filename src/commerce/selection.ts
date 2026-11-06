@@ -100,6 +100,7 @@ export function manifestMatchesGrant(
   if (!CommerceManifestSchema.safeParse(manifest).success || !CommerceConversationGrantSchema.safeParse(grant).success) return false;
   return (
     manifest.releaseId === grant.releaseId &&
+    canonicalJson(manifest.purposeProfile ?? null) === canonicalJson(grant.purposeProfile ?? null) &&
     canonicalJson(manifest.selectedCapabilityKeys) ===
       canonicalJson(grant.selectedCapabilityKeys) &&
     canonicalJson(

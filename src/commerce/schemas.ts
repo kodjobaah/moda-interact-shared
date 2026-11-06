@@ -11,7 +11,7 @@ import {
   distinct,
   boundedJson,
 } from "./primitives";
-import { GrantedToolsSchema, PublishedToolDescriptorSchema, CommerceBuiltInToolDescriptorSchema, isBuiltInTool, type PublishedGrantedTool } from "./definitions";
+import { CommercePurposeProfileSchema, GrantedToolsSchema, PublishedToolDescriptorSchema, CommerceBuiltInToolDescriptorSchema, isBuiltInTool, type PublishedGrantedTool } from "./definitions";
 import { isTrustedCommerceBuiltInDescriptor, isTrustedCommerceBuiltInGrant } from "./built-in-tools";
 import { CommerceResponseContractSchema } from "./response";
 import { canonicalJson, jsonBytes } from "./canonical-json";
@@ -34,12 +34,15 @@ export const CommerceConversationGrantSchema = z
       .array(ID)
       .max(32)
       .refine(distinct),
+    purposeProfile: CommercePurposeProfileSchema.optional(),
     grantedTools: GrantedToolsSchema,
     runnerVersion: SemverSchema,
     createdAt: DateSchema,
     expiresAt: DateSchema.nullable(),
   })
   .superRefine((v, c) => {
+    if (v.purposeProfile && (v.purposeProfile.releaseId !== v.releaseId || v.purposeProfile.capabilities.some(member => !v.grantedTools.some(tool => !isBuiltInTool(tool) && tool.toolId === member.toolId && tool.toolRevisionId === member.revisionId && tool.toolName === member.name))))
+      c.addIssue({ code: "custom", message: "Purpose profile grant mismatch" });
     if (v.expiresAt && Date.parse(v.expiresAt) <= Date.parse(v.createdAt))
       c.addIssue({ code: "custom", message: "Invalid grant retention date" });
     if (
@@ -84,6 +87,7 @@ export const CommerceManifestSchema = z
       .max(32),
     selectedCapabilityKeys: z.array(ID).max(32).refine(distinct),
     builtInTools: z.array(CommerceBuiltInToolDescriptorSchema).max(2).default([]),
+    purposeProfile: CommercePurposeProfileSchema.optional(),
     grantedTools: GrantedToolsSchema,
     responseContract: CommerceResponseContractSchema,
     responseContractHash: HashSchema,
@@ -91,6 +95,8 @@ export const CommerceManifestSchema = z
   .superRefine((v, c) => {
     if (jsonBytes(v) > 262144)
       c.addIssue({ code: "custom", message: "Manifest exceeds output limit" });
+    if (v.purposeProfile && (v.purposeProfile.releaseId !== v.releaseId || v.purposeProfile.capabilities.some(member => !v.capabilities.some(capability => capability.capabilityId === member.capabilityId && capability.toolDescriptor.toolId === member.toolId && capability.toolDescriptor.toolRevisionId === member.revisionId && capability.toolDescriptor.name === member.name && canonicalJson(capability.toolDescriptor.inputSchema) === canonicalJson(member.inputSchema)))))
+      c.addIssue({ code: "custom", message: "Purpose profile release membership mismatch" });
     const keys = v.capabilities.map((x) => x.key);
     const capabilityIds = v.capabilities.map((x) => x.capabilityId);
     const representedFeatures = [...new Set(v.capabilities.map((x) => x.featureId))];

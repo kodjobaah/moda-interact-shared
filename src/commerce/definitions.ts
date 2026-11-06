@@ -32,6 +32,35 @@ export const ToolNameSchema = z
   .string()
   .regex(/^[a-z][a-z0-9_]{0,127}$/)
   .refine((n) => n !== "finalResponse");
+export const CommerceExecutionPurposeSchema = z.literal("INITIAL_RECOVERY_OUTREACH");
+export const CommercePurposeProfileSchema = z.strictObject({
+  purpose: CommerceExecutionPurposeSchema,
+  featureId: IdSchema,
+  releaseId: IdSchema,
+  behaviourPrompt: z.string().refine(value => new TextEncoder().encode(value).length <= 32768),
+  capabilities: z.array(z.strictObject({
+    capabilityId: IdSchema, toolId: IdSchema, revisionId: IdSchema,
+    name: ToolNameSchema, position: z.number().int().nonnegative(),
+    inputSchema: InputSchemaSchema, outputSchema: DetailsSchemaSchema,
+  })).min(1, { message: "PROFILE_EMPTY" }).max(32),
+}).superRefine((profile, ctx) => {
+  const members = profile.capabilities;
+  if (!distinct(members.map(member => member.name)) || !distinct(members.map(member => member.capabilityId)) ||
+      members.some((member, index) => index > 0 && member.position <= members[index - 1].position))
+    ctx.addIssue({ code: "custom", message: "Invalid purpose profile membership/order" });
+}).transform(profile => {
+  const snapshot = structuredClone(profile);
+  const freeze = (value: unknown): void => {
+    if (value && typeof value === "object") { Object.values(value).forEach(freeze); Object.freeze(value); }
+  };
+  freeze(snapshot);
+  return snapshot;
+});
+/** New outreach callers must resolve a present validated snapshot; legacy conversation parsing remains optional. */
+export function requireCommercePurposeProfile(raw: unknown) { return CommercePurposeProfileSchema.parse(raw); }
+export type CommerceExecutionPurpose = z.infer<typeof CommerceExecutionPurposeSchema>;
+export type CommercePurposeProfile = z.infer<typeof CommercePurposeProfileSchema>;
+
 export const PublishedGrantedToolSchema = z.strictObject({
   toolId: IdSchema,
   toolRevisionId: IdSchema,

@@ -113,6 +113,9 @@ export async function executeToolCalls(input: {
         modelStep: input.modelStep, attempt, remoteCallNumber, ...schemaIssueMetadata(parsedResult.error),
       }, parsedResult.error);
       result = parsedResult.data;
+      const purposeMember = input.prepared.executionPurpose && input.prepared.manifest.purposeProfile?.capabilities.find(member => member.name === call.name);
+      if (purposeMember && result.status === "OK" && !compileSubset(purposeMember.outputSchema, "details").safeParse(result.data).success)
+        throw new RunnerFailure("INVALID_INPUT", { stage: "tool.result", reasonCode: "TOOL_RESULT_INVALID", toolName: call.name, modelStep: input.modelStep });
       if (result.status === "OK" && isBuiltInTool(grant)) {
         const output = CommerceToolOutputs[grant.toolName].safeParse(result.data);
         if (!output.success) throw new RunnerFailure("INVALID_INPUT", {
