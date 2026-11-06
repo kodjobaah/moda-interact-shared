@@ -13,6 +13,8 @@ export async function resolveAvailableTools(
 ): Promise<ToolDescriptor[]> {
   const available: ToolDescriptor[] = [];
   for (const granted of prepared.grant.grantedTools) {
+    if (prepared.executionPurpose && prepared.manifest.purposeProfile && !prepared.manifest.purposeProfile.capabilities.some(member =>
+      !isBuiltInTool(granted) && member.toolId === granted.toolId && member.revisionId === granted.toolRevisionId && member.name === granted.toolName)) continue;
     const tool = prepared.registered.get(granted.toolName);
     const descriptor = isBuiltInTool(granted)
       ? prepared.manifest.builtInTools.find(candidate => candidate.name === granted.toolName &&
@@ -29,6 +31,10 @@ export async function resolveAvailableTools(
     }))
       available.push(descriptor);
   }
+  if (prepared.executionPurpose && prepared.manifest.purposeProfile) {
+    const positions = new Map(prepared.manifest.purposeProfile.capabilities.map(member => [member.name, member.position]));
+    available.sort((left, right) => positions.get(left.name)! - positions.get(right.name)!);
+  }
   return available;
 }
 
@@ -40,6 +46,7 @@ export function resolveToolCall(
   const grant = prepared.grant.grantedTools.find((entry) => entry.toolName === name);
   const tool = prepared.registered.get(name);
   if (!grant) return { denial: "INSUFFICIENT_TOOLS" };
+  if (prepared.executionPurpose && !prepared.manifest.purposeProfile?.capabilities.some(member => !isBuiltInTool(grant) && member.toolId === grant.toolId && member.revisionId === grant.toolRevisionId && member.name === name)) return { denial: "INSUFFICIENT_TOOLS" };
   if (!tool) return { denial: "TOOL_UNAVAILABLE" };
   const pinned = availableTools.find(descriptor => descriptor.name === name);
   if (!pinned) return { denial: "TOOL_REVOKED" };

@@ -26,6 +26,7 @@ export type CommerceTurnBudgets = {
 };
 
 export type PreparedCommerceTurn = {
+  executionPurpose?: RunCommerceTurnInput["executionPurpose"];
   turn: ReturnType<typeof CommerceTurnIdentitySchema.parse>;
   grant: ReturnType<typeof CommerceConversationGrantSchema.parse>;
   manifest: NonNullable<ReturnType<typeof CommerceManifestSchema.safeParse>["data"]>;
@@ -59,6 +60,8 @@ export function prepareCommerceTurn(input: RunCommerceTurnInput): PreparedCommer
     stage: "preflight.validate", reasonCode: "MANIFEST_INVALID", ...schemaIssueMetadata(parsedManifest.error),
   }, parsedManifest.error);
   const manifest = parsedManifest.data;
+  if (input.executionPurpose !== undefined && (input.executionPurpose !== "INITIAL_RECOVERY_OUTREACH" || manifest.purposeProfile?.purpose !== input.executionPurpose))
+    throw new RunnerFailure("DENIED", { stage: "preflight.contract", reasonCode: "GRANT_MISMATCH" });
   if (
     !manifestMatchesGrant(manifest, grant) ||
     turn.shopId !== grant.shopId ||
@@ -112,7 +115,7 @@ export function prepareCommerceTurn(input: RunCommerceTurnInput): PreparedCommer
   const instructions = composeTrustedInstructions(
     input.hostInstructions,
     response.instructions,
-    manifest.featureBehaviours.map((feature) => feature.behaviourPrompt),
+    input.executionPurpose ? [manifest.purposeProfile!.behaviourPrompt] : manifest.featureBehaviours.map((feature) => feature.behaviourPrompt),
   );
   if (instructions.join("").length > 64000)
     throw new RunnerFailure("INVALID_INPUT", { stage: "preflight.validate", reasonCode: "CONTEXT_INVALID" });
@@ -129,5 +132,5 @@ export function prepareCommerceTurn(input: RunCommerceTurnInput): PreparedCommer
   }
   if (manifest.builtInTools.some(tool => !registered.has(tool.name)))
     throw new RunnerFailure("INCOMPATIBLE_VERSION", {stage: "preflight.validate", reasonCode: "TOOL_REGISTRATION_INVALID"});
-  return { turn, grant, manifest, response, finalSchema, budgets, instructions, registered };
+  return { ...(input.executionPurpose ? { executionPurpose: input.executionPurpose } : {}), turn, grant, manifest, response, finalSchema, budgets, instructions, registered };
 }
