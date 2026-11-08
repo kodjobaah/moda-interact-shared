@@ -1357,3 +1357,59 @@ test("ARCH066 successful fresh product search replaces deleted reference and pub
  const result=await runCommerceTurn(f.input);assert.equal(result.ok,true);if(result.ok){assert.equal(result.productContextUpdate?.references.length,2);assert.ok(result.productContextUpdate?.references.some(r=>r.productId==="2"));assert.ok(!JSON.stringify(result.productContextUpdate).includes("unitPrice"));}
  assert.ok(JSON.stringify(f.requests[0]?.context).includes("UNTRUSTED_REFERENCE_DATA"));
 });
+
+function productResultFixture(name: "commerce_search_products" | "commerce_get_product", product: unknown) {
+  const f = fixture([call(name), final({...exampleFinal, answerKind: "ANSWER", referralReason: null})], true);
+  f.input.platform = "WOOCOMMERCE";
+  f.input.manifest.capabilities[0]!.toolDescriptor.name = name;
+  f.input.manifest.grantedTools[0]!.toolName = name;
+  f.input.grant = exampleGrant(f.input.manifest);
+  f.input.dependencies.tools[0]!.descriptor.name = name;
+  const payload = name === "commerce_search_products" ? {products: [product], cursor: null, truncated: false} : {product};
+  f.input.dependencies.tools[0]!.execute = async () => ({contractVersion: "commerce.v1", status: "OK", data: payload, renderedText: "Read product"});
+  return {...f, payload};
+}
+const optionBoundaryProduct = () => ({
+  productId: "7", variantId: "8", title: "Native shirt", url: null, available: true,
+  unitPrice: null, currency: null, productType: null, vendor: null, observedAt: new Date(now).toISOString(),
+});
+for (const name of ["commerce_search_products", "commerce_get_product"] as const) {
+  test(`ARCH066 normalized ${name} product reaches model and evidence boundary`, async () => {
+    const product = {...optionBoundaryProduct(), options: {status: "AVAILABLE", items: [
+      {name: " Size\t", values: [" M ", "M", "bad\u0000", "x".repeat(129), ...Array.from({length: 65}, (_, i) => `value${i}`)], usedForVariants: true},
+      {name: "y".repeat(129), values: ["bad"], usedForVariants: true},
+      ...Array.from({length: 17}, (_, i) => ({name: `Native ${i}`, values: ["Fine"], usedForVariants: false})),
+    ]}, selectedOptions: [{name: " Size\n", value: " M "}, {name: "Size", value: "M"}, {name: "bad\u0000", value: "bad"}]};
+    const f = productResultFixture(name, product);
+    let evidenceInput: unknown;
+    f.input.dependencies.tools[0]!.extractEvidence = result => {evidenceInput = result; return [];};
+    const result = await runCommerceTurn(f.input);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const message = f.requests[1]!.messages[0] as {result: {renderedText: string; data: {products?: typeof product[]; product?: typeof product}}};
+    const normalized = message.result.data.products?.[0] ?? message.result.data.product!;
+    assert.equal(normalized.options.status, "PARTIAL");
+    assert.equal(normalized.options.items[0]!.name, "Size");
+    assert.ok(normalized.options.items.length <= 16);
+    assert.ok(normalized.options.items.every(item => item.values.length <= 64 && item.values.every(value => value.length <= 128 && !value.includes("\u0000"))));
+    assert.deepEqual(normalized.selectedOptions, [{name: "Size", value: "M"}]);
+    assert.equal(message.result.renderedText, "Read product");
+    assert.deepEqual(evidenceInput, message.result);
+    assert.equal(product.options.status, "AVAILABLE"); // Provider object is never rewritten.
+    assert.equal(result.ok && result.productContextUpdate?.references[0]?.productId, "7");
+  });
+  test(`ARCH066 ${name} preserves legacy product and contradictory status is partial`, async () => {
+    for (const options of [undefined, {status: "NOT_PROVIDED", items: [{name: "Size", values: ["M"], usedForVariants: true}]}]) {
+      const f = productResultFixture(name, {...optionBoundaryProduct(), ...(options ? {options} : {})});
+      assert.equal((await runCommerceTurn(f.input)).ok, true);
+      const message = f.requests[1]!.messages[0] as {result: {data: {products?: Array<Record<string, unknown>>; product?: Record<string, unknown>}}};
+      const product = message.result.data.products?.[0] ?? message.result.data.product!;
+      if (options) assert.equal((product.options as {status: string}).status, "PARTIAL");
+      else {assert.ok(!Object.hasOwn(product, "options")); assert.ok(!Object.hasOwn(product, "selectedOptions"));}
+    }
+  });
+  test(`ARCH066 ${name} malformed non-option product remains host-invalid`, async () => {
+    const f = productResultFixture(name, {...optionBoundaryProduct(), title: 42});
+    expectFailure(await runCommerceTurn(f.input), "INVALID_INPUT", "TOOL_RESULT_INVALID");
+    assert.equal(f.requests.length, 1);
+  });
+}

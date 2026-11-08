@@ -118,16 +118,33 @@ export async function executeToolCalls(input: {
         modelStep: input.modelStep, attempt, remoteCallNumber, ...schemaIssueMetadata(parsedResult.error),
       }, parsedResult.error);
       result = parsedResult.data;
-      const purposeMember = input.prepared.executionPurpose && input.prepared.manifest.purposeProfile?.capabilities.find(member => member.name === call.name);
-      if (purposeMember && result.status === "OK" && !compileCommercePurposeOutputSchema(purposeMember.outputSchema).safeParse(result.data).success)
-        throw new RunnerFailure("INVALID_INPUT", { stage: "tool.result", reasonCode: "TOOL_RESULT_INVALID", toolName: call.name, modelStep: input.modelStep });
       if (result.status === "OK" && isBuiltInTool(grant)) {
         const output = CommerceToolOutputs[grant.toolName].safeParse(result.data);
         if (!output.success) throw new RunnerFailure("INVALID_INPUT", {
           stage: "tool.result", reasonCode: "TOOL_RESULT_INVALID", toolName: call.name,
           modelStep: input.modelStep, ...schemaIssueMetadata(output.error),
         }, output.error);
+        // Keep schema transformations: downstream policy, evidence and model
+        // messages must consume the same validated bounded value.
+        result = { ...result, data: output.data };
       }
+      if (result.status === "OK" && ["commerce_search_products", "commerce_get_product"].includes(call.name)) {
+        const data = result.data;
+        if (!data || typeof data !== "object" || Array.isArray(data))
+          throw new RunnerFailure("INVALID_INPUT", {stage:"tool.result",reasonCode:"TOOL_RESULT_INVALID",toolName:call.name});
+        const payload = data as Record<string, unknown>;
+        const parsed = call.name === "commerce_search_products"
+          ? CommerceProductSchema.array().max(20).safeParse(payload.products)
+          : CommerceProductSchema.nullable().safeParse(payload.product);
+        if (!parsed.success) throw new RunnerFailure("INVALID_INPUT", {
+          stage:"tool.result", reasonCode:"TOOL_RESULT_INVALID", toolName:call.name,
+          modelStep:input.modelStep, ...schemaIssueMetadata(parsed.error),
+        }, parsed.error);
+        result = { ...result, data: { ...payload, [call.name === "commerce_search_products" ? "products" : "product"]: parsed.data } };
+      }
+      const purposeMember = input.prepared.executionPurpose && input.prepared.manifest.purposeProfile?.capabilities.find(member => member.name === call.name);
+      if (purposeMember && result.status === "OK" && !compileCommercePurposeOutputSchema(purposeMember.outputSchema).safeParse(result.data).success)
+        throw new RunnerFailure("INVALID_INPUT", { stage: "tool.result", reasonCode: "TOOL_RESULT_INVALID", toolName: call.name, modelStep: input.modelStep });
       if (result.status === "ERROR" && result.code === "STALE_TURN")
         throw new RunnerFailure("STALE_TURN", {
           stage: "tool.result", reasonCode: "TOOL_STALE_TURN", toolName: call.name, modelStep: input.modelStep,
@@ -186,11 +203,6 @@ export async function executeToolCalls(input: {
       modelStep: input.modelStep,
       logger: input.logger,
     })) evidenceById[evidence.evidenceId] = evidence;
-    if(result.status === "OK" && ["commerce_search_products","commerce_get_product"].includes(call.name)) {
-      const data=result.data as {products?:unknown[];product?:unknown};
-      const products=call.name === "commerce_search_products"?data.products:data.product?[data.product]:[];
-      if(!Array.isArray(products)||products.some(p=>!CommerceProductSchema.safeParse(p).success)) throw new RunnerFailure("INVALID_INPUT",{stage:"tool.result",reasonCode:"TOOL_RESULT_INVALID",toolName:call.name});
-    }
     runtimeMessages.push({ tool: call.name, result });
   }
 
