@@ -1,15 +1,28 @@
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,rmSync,readFileSync} from 'node:fs';
+import {mkdtempSync,writeFileSync,rmSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {execFileSync} from 'node:child_process';
-import {pathToFileURL} from 'node:url';
 const root=process.cwd(),temp=mkdtempSync(join(tmpdir(),'moda-outreach-pack-'));
 try{
- const packed=JSON.parse(execFileSync('npm',['pack','--ignore-scripts','--json','--pack-destination',temp],{cwd:root,encoding:'utf8'}))[0];
- for(const file of ['dist/commerce/outreach/index.js','dist/commerce/outreach/index.d.ts'])assert.ok(packed.files.some(f=>f.path===file));
+ const suppliedTarball=process.argv[2];
+ let tarball;
+ if(suppliedTarball){
+  tarball=resolve(suppliedTarball);
+ }else{
+  const packed=JSON.parse(execFileSync('npm',['pack','--ignore-scripts','--json','--pack-destination',temp],{cwd:root,encoding:'utf8'}))[0];
+  tarball=join(temp,packed.filename);
+ }
+ const files=new Set(execFileSync('tar',['-tzf',tarball],{encoding:'utf8'}).trim().split('\n').map(path=>path.replace(/^package\//,'')));
+ const manifest=JSON.parse(execFileSync('tar',['-xOf',tarball,'package/package.json'],{encoding:'utf8'}));
+ assert.equal(manifest.name,'@modainteract/moda-interact-shared');
+ for(const target of Object.values(manifest.exports).flatMap(value=>typeof value==='string'?[value]:Object.values(value))){
+  assert.ok(files.has(target.replace(/^\.\//,'')),`Missing packed public export: ${target}`);
+ }
+ for(const file of ['dist/commerce/outreach/index.js','dist/commerce/outreach/index.d.ts'])assert.ok(files.has(file));
  writeFileSync(join(temp,'package.json'),JSON.stringify({private:true,type:'module'}));
- execFileSync('npm',['install','--ignore-scripts','--no-audit','--no-fund','--package-lock=false',join(temp,packed.filename)],{cwd:temp,stdio:'pipe'});
+ execFileSync('npm',['install','--ignore-scripts','--no-audit','--no-fund','--package-lock=false',tarball],{cwd:temp,stdio:'pipe'});
+ console.log(`Validating installed ${manifest.name}@${manifest.version} from ${suppliedTarball?'supplied immutable tarball':'local pack'}; all public export targets present`);
  const packageRoot=join(temp,'node_modules/@modainteract/moda-interact-shared');
  const declarations=readFileSync(join(packageRoot,'dist/commerce/outreach/index.d.ts'),'utf8');
  assert.ok(!/moda-interact-background|moda-interact-commerce|@prisma\/client/.test(declarations));
