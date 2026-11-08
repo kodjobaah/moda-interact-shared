@@ -1,3 +1,4 @@
+import { mergeConversationProductContext, type CommerceProductObservation } from "../product-context.js";
 import { RunnerFailure, mapRunnerFailure } from "./failure.js";
 import { createCommerceTurnGraph, commerceTurnGraphRecursionLimit } from "./graph/graph.js";
 import { initialCommerceTurnGraphState } from "./graph/state.js";
@@ -73,6 +74,18 @@ export async function runCommerceTurn(input: RunCommerceTurnInput): Promise<RunC
     });
     return {
       ok: true,
+      ...(() => {
+        if(!input.platform) return {};
+        const observations: CommerceProductObservation[] = [];
+        for(const message of state.runtimeMessages) {
+          if(!["commerce_search_products","commerce_get_product"].includes(message.tool)) continue;
+          const result=message.result as {status?:string;data?:{products?:CommerceProductObservation["products"];product?:CommerceProductObservation["products"][number]}};
+          if(result.status !== "OK" || !result.data) continue;
+          observations.push({toolName:message.tool,products:result.data.products ?? (result.data.product?[result.data.product]:[]),observedAt:new Date(input.dependencies.now()).toISOString()});
+        }
+        const context=mergeConversationProductContext(prepared.productContext,observations,{shopId:prepared.turn.shopId,conversationId:prepared.turn.conversationId,platform:input.platform,now:input.dependencies.now()});
+        return context.references.length?{productContextUpdate:context}:{};
+      })(),
       result: state.finalResult,
       usage: { modelSteps, remoteCalls },
     };

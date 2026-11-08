@@ -1,3 +1,4 @@
+import { CommerceProductSchema } from "../schemas.js";
 import { isBuiltInTool } from "../definitions.js";
 import { jsonBytes } from "../canonical-json.js";
 import { CommerceToolResultSchema, CommerceToolOutputs, type CommerceEvidence } from "../schemas.js";
@@ -43,7 +44,7 @@ export async function executeToolCalls(input: {
     input.runtime.checkCancellationAndDeadline();
     const policy = resolveToolCall(call.name, input.prepared, input.availableTools);
     if ("denial" in policy) {
-      requiredReferral = policy.denial;
+      requiredReferral = requiredReferral === "TOOL_REVOKED" ? requiredReferral : policy.denial;
       safeLog(input.logger, "warn", "commerce.turn.tool.denied", {
         modelStep: input.modelStep,
         toolName: call.name,
@@ -73,10 +74,13 @@ export async function executeToolCalls(input: {
     }
     resolveToolCall(call.name, input.prepared, input.availableTools);
     const args = compileSubset(tool.descriptor.inputSchema, "input").safeParse(call.arguments);
-    if (!args.success) throw new RunnerFailure("INVALID_INPUT", {
-      stage: "tool.validate", reasonCode: "TOOL_INPUT_INVALID", toolName: call.name,
-      modelStep: input.modelStep, ...schemaIssueMetadata(args.error),
-    }, args.error);
+    if (!args.success) {
+      if(remoteCalls >= input.prepared.budgets.remoteCalls) throw new RunnerFailure("BUDGET_EXHAUSTED",{stage:"tool.validate",reasonCode:"TOOL_CALL_BUDGET_EXHAUSTED"});
+      remoteCalls++; input.onRemoteCall?.(remoteCalls);
+      runtimeMessages.push({tool:call.name,result:{contractVersion:"commerce.v1",status:"ERROR",code:"INVALID_INPUT",retryable:false}});
+      safeLog(input.logger,"warn","commerce.turn.tool.invalid_input",{toolName:call.name,reasonCode:"TOOL_INPUT_INVALID",...schemaIssueMetadata(args.error)});
+      continue;
+    }
 
     let result: ReturnType<typeof CommerceToolResultSchema.parse> | undefined;
     for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -114,16 +118,33 @@ export async function executeToolCalls(input: {
         modelStep: input.modelStep, attempt, remoteCallNumber, ...schemaIssueMetadata(parsedResult.error),
       }, parsedResult.error);
       result = parsedResult.data;
-      const purposeMember = input.prepared.executionPurpose && input.prepared.manifest.purposeProfile?.capabilities.find(member => member.name === call.name);
-      if (purposeMember && result.status === "OK" && !compileCommercePurposeOutputSchema(purposeMember.outputSchema).safeParse(result.data).success)
-        throw new RunnerFailure("INVALID_INPUT", { stage: "tool.result", reasonCode: "TOOL_RESULT_INVALID", toolName: call.name, modelStep: input.modelStep });
       if (result.status === "OK" && isBuiltInTool(grant)) {
         const output = CommerceToolOutputs[grant.toolName].safeParse(result.data);
         if (!output.success) throw new RunnerFailure("INVALID_INPUT", {
           stage: "tool.result", reasonCode: "TOOL_RESULT_INVALID", toolName: call.name,
           modelStep: input.modelStep, ...schemaIssueMetadata(output.error),
         }, output.error);
+        // Keep schema transformations: downstream policy, evidence and model
+        // messages must consume the same validated bounded value.
+        result = { ...result, data: output.data };
       }
+      if (result.status === "OK" && ["commerce_search_products", "commerce_get_product"].includes(call.name)) {
+        const data = result.data;
+        if (!data || typeof data !== "object" || Array.isArray(data))
+          throw new RunnerFailure("INVALID_INPUT", {stage:"tool.result",reasonCode:"TOOL_RESULT_INVALID",toolName:call.name});
+        const payload = data as Record<string, unknown>;
+        const parsed = call.name === "commerce_search_products"
+          ? CommerceProductSchema.array().max(20).safeParse(payload.products)
+          : CommerceProductSchema.nullable().safeParse(payload.product);
+        if (!parsed.success) throw new RunnerFailure("INVALID_INPUT", {
+          stage:"tool.result", reasonCode:"TOOL_RESULT_INVALID", toolName:call.name,
+          modelStep:input.modelStep, ...schemaIssueMetadata(parsed.error),
+        }, parsed.error);
+        result = { ...result, data: { ...payload, [call.name === "commerce_search_products" ? "products" : "product"]: parsed.data } };
+      }
+      const purposeMember = input.prepared.executionPurpose && input.prepared.manifest.purposeProfile?.capabilities.find(member => member.name === call.name);
+      if (purposeMember && result.status === "OK" && !compileCommercePurposeOutputSchema(purposeMember.outputSchema).safeParse(result.data).success)
+        throw new RunnerFailure("INVALID_INPUT", { stage: "tool.result", reasonCode: "TOOL_RESULT_INVALID", toolName: call.name, modelStep: input.modelStep });
       if (result.status === "ERROR" && result.code === "STALE_TURN")
         throw new RunnerFailure("STALE_TURN", {
           stage: "tool.result", reasonCode: "TOOL_STALE_TURN", toolName: call.name, modelStep: input.modelStep,
@@ -147,6 +168,8 @@ export async function executeToolCalls(input: {
         durationMs,
         remoteCallNumber,
       });
+      if(result.status === "ERROR" && !["INVALID_INPUT","NOT_FOUND"].includes(result.code))
+        requiredReferral = result.code === "DENIED" || requiredReferral === "TOOL_REVOKED" ? "TOOL_REVOKED" : "TOOL_UNAVAILABLE";
       if (
         attempt === 1 && result.status === "ERROR" && result.retryable &&
         (result.code === "UNAVAILABLE" || result.code === "THROTTLED")
@@ -168,7 +191,7 @@ export async function executeToolCalls(input: {
       if (result.code === "STALE_TURN") throw new RunnerFailure("STALE_TURN", {
         stage: "tool.result", reasonCode: "TOOL_STALE_TURN", toolName: call.name, modelStep: input.modelStep,
       });
-      requiredReferral = result.code === "DENIED" ? "TOOL_REVOKED" : "TOOL_UNAVAILABLE";
+      if (!["INVALID_INPUT","NOT_FOUND"].includes(result.code)) requiredReferral = result.code === "DENIED" || requiredReferral === "TOOL_REVOKED" ? "TOOL_REVOKED" : "TOOL_UNAVAILABLE";
     }
     for (const evidence of collectVerifiedEvidence({
       source: input.source,

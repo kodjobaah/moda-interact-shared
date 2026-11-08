@@ -4,6 +4,7 @@ type Explanation = Readonly<{ message: string; action: string }>;
 
 /** Fixed operator-facing explanations. No provider-supplied or customer-supplied text is interpolated. */
 const explanations = {
+  MODEL_OUTPUT_TOKENS_EXHAUSTED: ["The provider exhausted output tokens without visible text or tool calls.", "Inspect token usage and provider response; do not fabricate a reply or retry silently."],
   CANCELLED_BY_CALLER: ["The calling service cancelled this conversation turn.", "Inspect caller cancellation and superseded-message handling."],
   TURN_DEADLINE_EXCEEDED: ["The conversation turn exceeded its overall deadline.", "Inspect elapsed time across the model and tool calls."],
   OPERATION_TIMEOUT: ["One model or tool operation exceeded its per-operation time limit.", "Inspect the operation stage, provider latency and timeout configuration."],

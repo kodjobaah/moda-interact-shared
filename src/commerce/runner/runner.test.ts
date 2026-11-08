@@ -1038,7 +1038,7 @@ test("invalid empty route includes safe provider diagnostics without raw reasoni
   f.input.budgets = { outputTokens: 800 };
   f.input.dependencies.logger = createLogger({ serviceName: "test-host", environment: "test", sink: (record) => records.push(record) });
   const result = await runCommerceTurn(f.input);
-  expectFailure(result, "INVALID_FINAL", "MODEL_CALL_ROUTE_INVALID");
+  expectFailure(result, "BUDGET_EXHAUSTED", "MODEL_OUTPUT_TOKENS_EXHAUSTED");
   const invalid = records.find((record) => record.event === "commerce.turn.model.invalid");
   assert.equal(invalid?.data?.providerFinishReason, "length");
   assert.equal(invalid?.data?.providerReasoningTokens, 798);
@@ -1300,7 +1300,7 @@ test("presentation: both soft dispositions survive ordinary host-authorized fina
     const instructions = f.requests[0].instructions.join("\n");
     assert.ok(instructions.includes(RUNTIME_DATA_AUTHORITY_INSTRUCTION));
     assert.match(instructions, /trusted host instructions may authorize a normal ANSWER/);
-    assert.match(instructions, /failed authorized provider request remains a terminal error/);
+    assert.match(instructions, /DENIED, UNAVAILABLE, THROTTLED and DEADLINE retain mandatory referral/);
     assert.match(instructions, /product-bearing shipping observation/);
     assert.match(instructions, /null\/null policy-only shipping observation alone may retain/);
     assert.match(instructions, /generic runner does not implement that host composer/);
@@ -1333,3 +1333,83 @@ test("presentation: hard referral rejects disposition details and evidence; plai
     assert.notEqual(result.result.replyText, "Here is a soft answer.");
   }
 });
+
+for (const code of ["NOT_FOUND", "INVALID_INPUT", "DENIED", "UNAVAILABLE"] as const) test(`ARCH066 recovery policy ${code}`, async () => {
+ const f=fixture([call(),call(),final({...exampleFinal,answerKind:"ANSWER",referralReason:null})],true);let n=0;
+ f.input.dependencies.tools[0]!.execute=async()=>++n===1?{contractVersion:"commerce.v1",status:"ERROR",code,retryable:false}:{contractVersion:"commerce.v1",status:"OK",data:{source:"SHOPIFY_STOREFRONT",values:{title:"Coat"}},renderedText:"Coat"};
+ const result=await runCommerceTurn(f.input);
+ if(code === "NOT_FOUND"||code === "INVALID_INPUT")assert.equal(result.ok,true);else expectFailure(result,"INVALID_FINAL","FINAL_REFERRAL_REQUIRED");
+});
+test("ARCH066 product context identity rejects before model IO",async()=>{
+ const f=fixture([final()]);f.input.platform="WOOCOMMERCE";f.input.productContext={schemaVersion:1,shopId:"foreign",conversationId:f.input.turn.conversationId,platform:"WOOCOMMERCE",references:[],updatedAt:new Date(now).toISOString()};
+ expectFailure(await runCommerceTurn(f.input),"INVALID_INPUT","CONTEXT_INVALID");assert.equal(f.counts().model,0);
+});
+test("ARCH066 invalid arguments are correctable and consume call budget",async()=>{
+ const invalid={...call(),calls:[{name:exampleTool.name,arguments:{wrong:true}}]};const f=fixture([invalid,call(),final()],true);const result=await runCommerceTurn(f.input);assert.equal(result.ok,true);if(result.ok)assert.equal(result.usage.remoteCalls,2);assert.equal(f.counts().tools,1);
+});
+
+test("ARCH066 successful fresh product search replaces deleted reference and publishes no prices",async()=>{
+ const f=fixture([call("commerce_search_products"),final({...exampleFinal,answerKind:"ANSWER",referralReason:null})],true);
+ f.input.platform="WOOCOMMERCE";
+ f.input.manifest.capabilities[0]!.toolDescriptor.name="commerce_search_products";f.input.manifest.grantedTools[0]!.toolName="commerce_search_products";f.input.grant=exampleGrant(f.input.manifest);f.input.dependencies.tools[0]!.descriptor.name="commerce_search_products";
+ f.input.productContext={schemaVersion:1,shopId:f.input.turn.shopId,conversationId:f.input.turn.conversationId,platform:"WOOCOMMERCE",references:[{productId:"1",variantId:null,title:"Deleted",observedAt:new Date(now).toISOString()}],updatedAt:new Date(now).toISOString()};
+ f.input.dependencies.tools[0]!.execute=async()=>({contractVersion:"commerce.v1",status:"OK",renderedText:"Current product",data:{products:[{productId:"2",variantId:null,title:"Current",url:null,available:true,unitPrice:null,currency:null,productType:null,vendor:null,observedAt:new Date(now).toISOString()}]}});
+ const result=await runCommerceTurn(f.input);assert.equal(result.ok,true);if(result.ok){assert.equal(result.productContextUpdate?.references.length,2);assert.ok(result.productContextUpdate?.references.some(r=>r.productId==="2"));assert.ok(!JSON.stringify(result.productContextUpdate).includes("unitPrice"));}
+ assert.ok(JSON.stringify(f.requests[0]?.context).includes("UNTRUSTED_REFERENCE_DATA"));
+});
+
+function productResultFixture(name: "commerce_search_products" | "commerce_get_product", product: unknown) {
+  const f = fixture([call(name), final({...exampleFinal, answerKind: "ANSWER", referralReason: null})], true);
+  f.input.platform = "WOOCOMMERCE";
+  f.input.manifest.capabilities[0]!.toolDescriptor.name = name;
+  f.input.manifest.grantedTools[0]!.toolName = name;
+  f.input.grant = exampleGrant(f.input.manifest);
+  f.input.dependencies.tools[0]!.descriptor.name = name;
+  const payload = name === "commerce_search_products" ? {products: [product], cursor: null, truncated: false} : {product};
+  f.input.dependencies.tools[0]!.execute = async () => ({contractVersion: "commerce.v1", status: "OK", data: payload, renderedText: "Read product"});
+  return {...f, payload};
+}
+const optionBoundaryProduct = () => ({
+  productId: "7", variantId: "8", title: "Native shirt", url: null, available: true,
+  unitPrice: null, currency: null, productType: null, vendor: null, observedAt: new Date(now).toISOString(),
+});
+for (const name of ["commerce_search_products", "commerce_get_product"] as const) {
+  test(`ARCH066 normalized ${name} product reaches model and evidence boundary`, async () => {
+    const product = {...optionBoundaryProduct(), options: {status: "AVAILABLE", items: [
+      {name: " Size\t", values: [" M ", "M", "bad\u0000", "x".repeat(129), ...Array.from({length: 65}, (_, i) => `value${i}`)], usedForVariants: true},
+      {name: "y".repeat(129), values: ["bad"], usedForVariants: true},
+      ...Array.from({length: 17}, (_, i) => ({name: `Native ${i}`, values: ["Fine"], usedForVariants: false})),
+    ]}, selectedOptions: [{name: " Size\n", value: " M "}, {name: "Size", value: "M"}, {name: "bad\u0000", value: "bad"}]};
+    const f = productResultFixture(name, product);
+    let evidenceInput: unknown;
+    f.input.dependencies.tools[0]!.extractEvidence = result => {evidenceInput = result; return [];};
+    const result = await runCommerceTurn(f.input);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const message = f.requests[1]!.messages[0] as {result: {renderedText: string; data: {products?: typeof product[]; product?: typeof product}}};
+    const normalized = message.result.data.products?.[0] ?? message.result.data.product!;
+    assert.equal(normalized.options.status, "PARTIAL");
+    assert.equal(normalized.options.items[0]!.name, "Size");
+    assert.ok(normalized.options.items.length <= 16);
+    assert.ok(normalized.options.items.every(item => item.values.length <= 64 && item.values.every(value => value.length <= 128 && !value.includes("\u0000"))));
+    assert.deepEqual(normalized.selectedOptions, [{name: "Size", value: "M"}]);
+    assert.equal(message.result.renderedText, "Read product");
+    assert.deepEqual(evidenceInput, message.result);
+    assert.equal(product.options.status, "AVAILABLE"); // Provider object is never rewritten.
+    assert.equal(result.ok && result.productContextUpdate?.references[0]?.productId, "7");
+  });
+  test(`ARCH066 ${name} preserves legacy product and contradictory status is partial`, async () => {
+    for (const options of [undefined, {status: "NOT_PROVIDED", items: [{name: "Size", values: ["M"], usedForVariants: true}]}]) {
+      const f = productResultFixture(name, {...optionBoundaryProduct(), ...(options ? {options} : {})});
+      assert.equal((await runCommerceTurn(f.input)).ok, true);
+      const message = f.requests[1]!.messages[0] as {result: {data: {products?: Array<Record<string, unknown>>; product?: Record<string, unknown>}}};
+      const product = message.result.data.products?.[0] ?? message.result.data.product!;
+      if (options) assert.equal((product.options as {status: string}).status, "PARTIAL");
+      else {assert.ok(!Object.hasOwn(product, "options")); assert.ok(!Object.hasOwn(product, "selectedOptions"));}
+    }
+  });
+  test(`ARCH066 ${name} malformed non-option product remains host-invalid`, async () => {
+    const f = productResultFixture(name, {...optionBoundaryProduct(), title: 42});
+    expectFailure(await runCommerceTurn(f.input), "INVALID_INPUT", "TOOL_RESULT_INVALID");
+    assert.equal(f.requests.length, 1);
+  });
+}

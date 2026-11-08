@@ -69,6 +69,7 @@ export function routeModelStep(step: ModelStep): "toolCalls" | "finalResponse" |
   }
   if (step.calls.length === 0) {
     if (step.text?.trim()) return "textResponse";
+    if(step.providerSummary?.finishReason === "length") throw new RunnerFailure("BUDGET_EXHAUSTED", {stage:"model.route",reasonCode:"MODEL_OUTPUT_TOKENS_EXHAUSTED"});
     throw new RunnerFailure("INVALID_FINAL", { stage: "model.route", reasonCode: "MODEL_CALL_ROUTE_INVALID" });
   }
   return "toolCalls";

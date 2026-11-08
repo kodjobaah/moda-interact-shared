@@ -1,3 +1,4 @@
+import { mergeConversationProductContext, type CommerceConversationProductContext } from "../product-context.js";
 import { ToolDescriptorSchema } from "../definitions.js";
 import { satisfies } from "semver";
 import { ZodError } from "zod";
@@ -26,6 +27,7 @@ export type CommerceTurnBudgets = {
 };
 
 export type PreparedCommerceTurn = {
+  productContext: CommerceConversationProductContext | null;
   executionPurpose?: RunCommerceTurnInput["executionPurpose"];
   turn: ReturnType<typeof CommerceTurnIdentitySchema.parse>;
   grant: ReturnType<typeof CommerceConversationGrantSchema.parse>;
@@ -112,6 +114,11 @@ export function prepareCommerceTurn(input: RunCommerceTurnInput): PreparedCommer
     Array.from(canonicalJson(input.history)).length > 32000 ||
     jsonBytes(input.context) + jsonBytes(input.history) > 131072
   ) throw new RunnerFailure("INVALID_INPUT", { stage: "preflight.validate", reasonCode: "CONTEXT_INVALID" });
+  let productContext: CommerceConversationProductContext | null = null;
+  try {
+    if(input.productContext && !input.platform) throw new Error("platform required");
+    if(input.platform) productContext = mergeConversationProductContext(input.productContext ?? null, [], {shopId:turn.shopId,conversationId:turn.conversationId,platform:input.platform,now:input.dependencies.now()});
+  } catch(error) { throw new RunnerFailure("INVALID_INPUT", {stage:"preflight.validate",reasonCode:"CONTEXT_INVALID"},error); }
   const instructions = composeTrustedInstructions(
     input.hostInstructions,
     response.instructions,
@@ -132,5 +139,5 @@ export function prepareCommerceTurn(input: RunCommerceTurnInput): PreparedCommer
   }
   if (manifest.builtInTools.some(tool => !registered.has(tool.name)))
     throw new RunnerFailure("INCOMPATIBLE_VERSION", {stage: "preflight.validate", reasonCode: "TOOL_REGISTRATION_INVALID"});
-  return { ...(input.executionPurpose ? { executionPurpose: input.executionPurpose } : {}), turn, grant, manifest, response, finalSchema, budgets, instructions, registered };
+  return { productContext, ...(input.executionPurpose ? { executionPurpose: input.executionPurpose } : {}), turn, grant, manifest, response, finalSchema, budgets, instructions, registered };
 }
