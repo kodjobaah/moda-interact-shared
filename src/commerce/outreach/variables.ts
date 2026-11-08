@@ -35,6 +35,12 @@ export class PreparedVariableResolver {
             throw new BindingUnavailable('MEDIA_NOT_READY');
         return m.httpsUrl;
     }
+    private brandMedia(role: 'logo' | 'squareLogo' | 'coverImage'): string {
+        const media = this.input.preparedBrandMedia?.[role];
+        if (!media) throw new BindingUnavailable('MEDIA_NOT_READY');
+        boundedText(media.httpsUrl, 2048);
+        return media.httpsUrl;
+    }
     resolve(key: SemanticKey): string {
         const i = this.input, d = this.sendable;
         switch (key) {
@@ -60,11 +66,18 @@ export class PreparedVariableResolver {
                 if (d.presentation !== 'NO_OFFER')
                     return boundedText(d.members.map(m => m.description).join(', '), 200);
                 break;
-            // This input exposes only the host's prepared shop name/category and media, not arbitrary brand records.
-            case 'shopBrand.brandName': return boundedText(i.variables.shopName, 200);
-            case 'shopBrand.logoUrl': return this.imageHeader('LOGO');
-            case 'shopBrand.squareLogoUrl': return this.imageHeader('SQUARE_LOGO');
-            case 'shopBrand.coverImageUrl': return this.imageHeader('COVER_IMAGE');
+            case 'shopBrand.brandName': return boundedText(i.preparedBrand?.brandName, 200);
+            case 'shopBrand.logoAltText': return boundedText(i.preparedBrand?.logoAltText, 200);
+            case 'shopBrand.squareLogoAltText': return boundedText(i.preparedBrand?.squareLogoAltText, 200);
+            case 'shopBrand.logoWidth':
+            case 'shopBrand.logoHeight': {
+                const value = key === 'shopBrand.logoWidth' ? i.preparedBrand?.logoWidth : i.preparedBrand?.logoHeight;
+                if (value === null || value === undefined) throw new BindingUnavailable('BINDING_VALUE_UNAVAILABLE');
+                return boundedText(String(value), 200);
+            }
+            case 'shopBrand.logoUrl': return this.brandMedia('logo');
+            case 'shopBrand.squareLogoUrl': return this.brandMedia('squareLogo');
+            case 'shopBrand.coverImageUrl': return this.brandMedia('coverImage');
         }
         throw new BindingUnavailable('BINDING_VALUE_UNAVAILABLE');
     }

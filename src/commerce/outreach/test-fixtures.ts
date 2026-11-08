@@ -32,3 +32,11 @@ import type { CommerceDiscountDetails } from '../schemas.js';
 export function details(id = 'offer-1'): CommerceDiscountDetails {
     return { offer: { offerId: id, title: 'Save ten percent', method: 'CODE', code: 'SAVE10', startsAt: null, endsAt: null, support: 'SUPPORTED', reasonCodes: [] }, providerDiscountId: 'provider-' + id, facts: { provider: 'SHOPIFY', completeness: 'COMPLETE', observedAt: at, providerStatus: 'ACTIVE', unavailableAt: null, discountKind: 'PERCENTAGE', discountValue: '10', discountCurrency: 'USD', targeting: { kind: 'PRODUCTS', includedProductIds: ['gid://shopify/Product/1'], includedVariantIds: [], includedCategoryIds: [], includedCollectionIds: [], excludedProductIds: [], excludedVariantIds: [], excludedCategoryIds: [], excludedCollectionIds: [] }, minimumSubtotal: '24', maximumSubtotal: null, subtotalRequirementCurrency: 'USD', minimumQuantity: null, usageLimit: 10, usageCount: 0, perCustomerLimit: 0, customerScope: 'ALL', excludesSaleItems: false, individualUse: null, combination: { discountClasses: ['PRODUCT'], shopifyPlus: null, combinesWith: { orderDiscounts: true, productDiscounts: true, shippingDiscounts: true }, discountTags: [], allowedSameLineProductTags: [] }, unrepresentedConditions: [] } };
 }
+
+export function preparedBrandFixture(): import('./template-contracts.js').PreparedOutreachBrand {
+    return {shopId:'shop-1',brandName:'Saved brand',logoAltText:'Saved logo alt',logoWidth:100,logoHeight:200,squareLogoAltText:'Saved square alt'};
+}
+export function preparedBrandMediaFixture(): import('./template-contracts.js').PreparedOutreachBrandMedia {
+    const media = (role: 'LOGO' | 'SQUARE_LOGO' | 'COVER_IMAGE', path: string) => ({shopId:'shop-1',role,status:'READY' as const,kind:'R2_DERIVATIVE' as const,httpsUrl:`https://assets.example/${path}.webp`});
+    return {logo:media('LOGO','logo'),squareLogo:media('SQUARE_LOGO','square'),coverImage:media('COVER_IMAGE','cover')};
+}

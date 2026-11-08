@@ -17,7 +17,24 @@ export const AssignedVariantSchema = z.strictObject({ id: hostId, shopId: hostId
 const ProjectionSchema = z.strictObject({ variant: AssignedVariantSchema, canonicalLanguageTag: text, selectionSource: z.enum(['exact', 'base', 'merchant-fallback', 'platform-fallback']) });
 export const PreparedProjectionSchema = ProjectionSchema.extend({ textFallback: ProjectionSchema.nullable().optional() });
 export const ReadyMediaSchema = z.strictObject({ shopId: hostId, role: z.enum(['LOGO', 'SQUARE_LOGO', 'COVER_IMAGE', 'CHECKOUT_PRODUCT']), status: z.literal('READY'), kind: z.literal('R2_DERIVATIVE'), httpsUrl: https });
-export const InitialOutreachRenderInputSchema = z.strictObject({ schemaVersion: z.literal(1), evaluation: ReadyEvaluationSchema, preparedProjection: PreparedProjectionSchema.nullable(), variables: z.strictObject({ shopName: z.string().max(200).nullable(), customerFirstName: z.string().max(200).nullable(), checkoutUrl: https, shopCategory: z.string().max(200).nullable() }), headerMedia: ReadyMediaSchema.nullable() });
+export const PreparedOutreachBrandSchema = z.strictObject({
+  shopId: hostId,
+  brandName: z.string().max(200).nullable(),
+  logoAltText: z.string().max(200).nullable(),
+  logoWidth: z.number().int().min(1).max(10000).nullable(),
+  logoHeight: z.number().int().min(1).max(10000).nullable(),
+  squareLogoAltText: z.string().max(200).nullable(),
+});
+export const PreparedOutreachBrandMediaItemSchema = ReadyMediaSchema;
+export const PreparedOutreachBrandMediaSchema = z.strictObject({
+  logo: PreparedOutreachBrandMediaItemSchema.nullable(),
+  squareLogo: PreparedOutreachBrandMediaItemSchema.nullable(),
+  coverImage: PreparedOutreachBrandMediaItemSchema.nullable(),
+});
+export type PreparedOutreachBrand = z.infer<typeof PreparedOutreachBrandSchema>;
+export type PreparedOutreachBrandMediaItem = z.infer<typeof PreparedOutreachBrandMediaItemSchema>;
+export type PreparedOutreachBrandMedia = z.infer<typeof PreparedOutreachBrandMediaSchema>;
+export const InitialOutreachRenderInputSchema = z.strictObject({ schemaVersion: z.literal(1), evaluation: ReadyEvaluationSchema, preparedProjection: PreparedProjectionSchema.nullable(), variables: z.strictObject({ shopName: z.string().max(200).nullable(), customerFirstName: z.string().max(200).nullable(), checkoutUrl: https, shopCategory: z.string().max(200).nullable() }), headerMedia: ReadyMediaSchema.nullable(), preparedBrand: PreparedOutreachBrandSchema.nullable().optional(), preparedBrandMedia: PreparedOutreachBrandMediaSchema.nullable().optional() });
 export const RenderReasonSchema = z.enum(['INVALID_REQUEST', 'INVALID_LANGUAGE', 'SHOP_UNAVAILABLE', 'SENDER_UNAVAILABLE', 'SENDER_MISMATCH', 'NO_LANGUAGE', 'NO_APPROVED_ASSIGNMENT', 'LEGACY_ASSIGNMENT', 'AMBIGUOUS_ASSIGNMENT', 'REGISTRATION_UNAVAILABLE', 'PROVIDER_UNAVAILABLE', 'PROVIDER_DRIFT', 'IDENTITY_MISMATCH', 'DEFINITION_UNAVAILABLE', 'LOCALE_UNAVAILABLE', 'BINDINGS_INVALID', 'BINDING_FINGERPRINT_MISMATCH', 'BINDING_VALUE_UNAVAILABLE', 'CHECKOUT_UNAVAILABLE', 'CHECKOUT_UNTRUSTED', 'MEDIA_NOT_READY', 'PROMOTION_PRODUCT_URL_UNAVAILABLE', 'MESSAGE_TOO_LARGE']);
 const TextParameterSchema = z.strictObject({ type: z.literal('text'), text: z.string().max(4096) });
 export const PreparedComponentSchema = z.union([

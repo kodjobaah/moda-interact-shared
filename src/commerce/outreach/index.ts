@@ -6,3 +6,6 @@ export { evaluateInitialOutreach, evaluateInitialOutreachPreview } from './evalu
 export { fingerprintInitialOutreachBasket } from './reconcile.js';
 export { renderInitialOutreachPreview } from './render.js';
 export { selectRecoveryAssignment } from './selection.js';
+
+export { PreparedOutreachBrandSchema, PreparedOutreachBrandMediaSchema, PreparedOutreachBrandMediaItemSchema } from './template-contracts.js';
+export type { PreparedOutreachBrand, PreparedOutreachBrandMedia, PreparedOutreachBrandMediaItem } from './template-contracts.js';

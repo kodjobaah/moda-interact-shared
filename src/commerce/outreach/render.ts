@@ -4,10 +4,22 @@ import { prepareFrozenComponents } from './bindings.js';
 import { selectSendableOutreachOffer } from './sendable-offer.js';
 import { BindingUnavailable, PreparedVariableResolver } from './variables.js';
 export function renderInitialOutreachPreview(raw: InitialOutreachRenderInput): InitialOutreachRenderResult {
-    const parsed = InitialOutreachRenderInputSchema.safeParse(raw);
+    let parsed: ReturnType<typeof InitialOutreachRenderInputSchema.safeParse>;
+    try { parsed = InitialOutreachRenderInputSchema.safeParse(raw); }
+    catch { return { kind: 'refused', reasonCode: 'INVALID_REQUEST' }; }
     if (!parsed.success)
         return { kind: 'refused', reasonCode: 'INVALID_REQUEST' };
     const input = parsed.data;
+    if (input.preparedBrand && input.preparedBrand.shopId !== input.evaluation.shopId)
+        return { kind: 'refused', reasonCode: 'IDENTITY_MISMATCH' };
+    for (const [key, role] of [['logo', 'LOGO'], ['squareLogo', 'SQUARE_LOGO'], ['coverImage', 'COVER_IMAGE']] as const) {
+        const media = input.preparedBrandMedia?.[key];
+        if (media) {
+            const url = new URL(media.httpsUrl);
+            if (media.shopId !== input.evaluation.shopId || media.role !== role || url.hash || media.httpsUrl.includes('#') || !url.hostname.includes('.'))
+                return { kind: 'refused', reasonCode: 'MEDIA_NOT_READY' };
+        }
+    }
     let projection = input.preparedProjection;
     if (!projection)
         return { kind: 'refused', reasonCode: 'NO_APPROVED_ASSIGNMENT' };
