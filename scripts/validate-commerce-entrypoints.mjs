@@ -16,7 +16,7 @@ assert.equal(promptValidation.valid,true);
 const promptContext=c.createStoreCategoryPromptContext({availableConditionKeys:['shoes'],selectedConditionKeys:['shoes']});
 const promptRendered=c.renderStoreCategoryPromptTemplate({source:'Base {% if mappings.shoes %}shoe{% endif %}',context:promptContext});
 assert.deepEqual(promptRendered,{ok:true,promptText:'Base shoe',referencedConditionKeys:['shoes']});
-for (const name of ['CommerceShippingInformationInputSchema','CommerceShippingInformationSchema','CommerceResponseDispositionSchema','CommerceAnswerPresentationSelectionSchema','CommerceCategoryCandidateSchema','CommerceCategoryResolutionSchema','CommerceOptionalLookupUnavailableSchema','CommerceTurnIdentitySchema','CommerceResolveAssertionSchema','CommerceExecuteAssertionSchema','CommerceAssertionSchema','CommerceConversationGrantSchema','CommerceOutreachToolContextSchema','CommerceBuiltInToolDescriptorSchema','CommerceBuiltInToolGrantSchema','CommerceProductRecommendationSelectionSchema','commerceDiscountBuiltInDescriptors']) assert(name in c, name);
+for (const name of ['CommerceShippingInformationInputSchema','CommerceShippingInformationSchema','CommerceResponseDispositionSchema','CommerceAnswerPresentationSelectionSchema','CommerceCategoryCandidateSchema','CommerceCategoryResolutionSchema','CommerceOptionalLookupUnavailableSchema','CommerceTurnIdentitySchema','CommerceConversationScopeSchema','CommerceAllowedConversationScopesSchema','commerceConversationScope','commerceTurnMatchesGrant','commerceToolAllowsConversationScope','CommerceResolveAssertionSchema','CommerceExecuteAssertionSchema','CommerceAssertionSchema','CommerceConversationGrantSchema','CommerceOutreachToolContextSchema','CommerceBuiltInToolDescriptorSchema','CommerceBuiltInToolGrantSchema','CommerceProductRecommendationSelectionSchema','commerceDiscountBuiltInDescriptors']) assert(name in c, name);
 for (const name of ['CommerceConversationToolContextSchema','CommerceConversationToolContext']) assert.equal(name in c, false, name);
 assert.equal('commerceBuiltInToolContractPayload' in c, false);
 for (const descriptor of c.commerceDiscountBuiltInDescriptors) {
@@ -34,6 +34,11 @@ assert.equal(c.CommerceToolInputs.commerce_search_products.parse({}).browse,fals
 assert(c.CommerceAnswerPresentationSelectionSchema.safeParse({responseDisposition:'STANDARD',shippingInformationSelection:{productId:null,variantId:null}}).success);
 const manifest=c.exampleManifest(digest);
 assert(c.CommerceManifestSchema.safeParse(manifest).success);
+const standaloneTurn={contractVersion:'commerce.v1',conversationScope:'STANDALONE',shopId:c.exampleTurn.shopId,conversationId:c.exampleTurn.conversationId,inboundVersion:1};
+assert(c.CommerceTurnIdentitySchema.safeParse(standaloneTurn).success);
+assert.equal(c.CommerceTurnIdentitySchema.safeParse({...standaloneTurn,checkoutRecoveryId:undefined}).success,false);
+assert.equal(c.commerceTurnMatchesGrant(standaloneTurn,c.exampleGrant(manifest)),false);
+assert(c.commerceTurnMatchesGrant(standaloneTurn,{...c.exampleGrant(manifest),conversationScope:'STANDALONE'}));
 const result=await runCommerceTurn({turn:c.exampleTurn,grant:c.exampleGrant(manifest),manifest,hostInstructions:[],context:{},history:[],language:{tag:null,source:null},signal:new AbortController().signal,dependencies:{digest,now:()=>Date.now(),tools:[],model:{invoke:async()=>({calls:[{name:'finalResponse',arguments:c.exampleFinal}],outputTokens:30})}}});
 assert(result.ok);assert.equal(runnerVersion,'1.1.0');
 const oversized={name:'oversize_tool',definitionVersion:'1.0.0',description:'Fixture',inputSchema:{},execution:{x:'x'.repeat(40000)},responseTemplate:{x:'x'.repeat(40000)}};

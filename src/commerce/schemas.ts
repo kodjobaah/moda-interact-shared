@@ -17,20 +17,18 @@ import { CommercePurposeProfileSchema, GrantedToolsSchema, PublishedToolDescript
 import { isTrustedCommerceBuiltInDescriptor, isTrustedCommerceBuiltInGrant } from "./built-in-tools";
 import { CommerceResponseContractSchema } from "./response";
 import { canonicalJson, jsonBytes } from "./canonical-json";
-export const CommerceTurnIdentitySchema = z.strictObject({
-  contractVersion: V,
-  shopId: ID,
-  checkoutRecoveryId: ID,
-  conversationId: ID,
-  inboundVersion: z.number().int().positive(),
-});
-export type CommerceTurnIdentity = z.infer<typeof CommerceTurnIdentitySchema>;
+import { CommerceTurnIdentitySchema, CommerceConversationScopeSchema } from "./turn-identity";
+export { CommerceTurnIdentitySchema, CommerceConversationScopeSchema, CommerceAllowedConversationScopesSchema,
+  CommerceResolveAssertionSchema, CommerceExecuteAssertionSchema, CommerceAssertionSchema,
+  commerceConversationScope, type CommerceTurnIdentity, type CommerceConversationScope } from "./turn-identity";
 export const CommerceConversationGrantSchema = z
   .strictObject({
     id: ID,
     shopId: ID,
     conversationId: ID,
     initialInboundVersion: z.number().int().positive(),
+    conversationScope: CommerceConversationScopeSchema.optional(),
+    checkoutRecoveryId: ID.optional(),
     releaseId: ID,
     selectedCapabilityKeys: z
       .array(ID)
@@ -43,6 +41,11 @@ export const CommerceConversationGrantSchema = z
     expiresAt: DateSchema.nullable(),
   })
   .superRefine((v, c) => {
+    const hasRecovery = Object.hasOwn(v, "checkoutRecoveryId");
+    if ((v.conversationScope === "STANDALONE" && hasRecovery)
+      || (v.conversationScope === "RECOVERY" && !v.checkoutRecoveryId)
+      || (v.conversationScope === undefined && (hasRecovery || Object.hasOwn(v, "conversationScope"))))
+      c.addIssue({ code: "custom", message: "Invalid conversation grant ownership scope" });
     if (v.purposeProfile && (v.purposeProfile.releaseId !== v.releaseId || v.purposeProfile.capabilities.some(member => !v.grantedTools.some(tool => !isBuiltInTool(tool) && tool.toolId === member.toolId && tool.toolRevisionId === member.revisionId && tool.toolName === member.name))))
       c.addIssue({ code: "custom", message: "Purpose profile grant mismatch" });
     if (v.expiresAt && Date.parse(v.expiresAt) <= Date.parse(v.createdAt))
@@ -141,6 +144,7 @@ export const CommerceManifestSchema = z
             toolName: d.name,
             definitionVersion: d.definitionVersion,
             capabilityKeys: [cap.key],
+            ...(d.allowedConversationScopes ? { allowedConversationScopes: d.allowedConversationScopes } : {}),
           },
         });
     }
@@ -158,6 +162,7 @@ export const CommerceManifestSchema = z
           expected.toolRevisionId !== t.toolRevisionId ||
           expected.toolName !== t.toolName ||
           expected.definitionVersion !== t.definitionVersion ||
+          canonicalJson(expected.allowedConversationScopes ?? null) !== canonicalJson(t.allowedConversationScopes ?? null) ||
           JSON.stringify([...new Set(expected.capabilityKeys)].sort()) !==
             JSON.stringify(t.capabilityKeys)
         );
@@ -178,16 +183,6 @@ export const CommerceReleaseIdentitySchema = z.strictObject({
     .max(128)
     .refine((v) => !!validRange(v)),
 });
-export const CommerceResolveAssertionSchema = CommerceTurnIdentitySchema.extend(
-  { purpose: z.literal("resolve") },
-);
-export const CommerceExecuteAssertionSchema = CommerceTurnIdentitySchema.extend(
-  { purpose: z.literal("execute"), grantId: ID, releaseId: ID },
-);
-export const CommerceAssertionSchema = z.discriminatedUnion("purpose", [
-  CommerceResolveAssertionSchema,
-  CommerceExecuteAssertionSchema,
-]);
 const qty = z.number().int().min(1).max(999);
 export const CommerceProposalSchema = z
   .strictObject({

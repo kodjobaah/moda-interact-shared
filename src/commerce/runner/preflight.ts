@@ -11,8 +11,9 @@ import {
   CommerceConversationGrantSchema,
   CommerceManifestSchema,
   CommerceTurnIdentitySchema,
+  commerceConversationScope,
 } from "../schemas.js";
-import { manifestMatchesGrant } from "../selection.js";
+import { commerceTurnMatchesGrant, manifestMatchesGrant } from "../selection.js";
 import { composeTrustedInstructions } from "./instructions.js";
 import { RunnerFailure } from "./failure.js";
 import { schemaIssueMetadata, type RunnerDiagnosticReason } from "./diagnostics.js";
@@ -62,13 +63,11 @@ export function prepareCommerceTurn(input: RunCommerceTurnInput): PreparedCommer
     stage: "preflight.validate", reasonCode: "MANIFEST_INVALID", ...schemaIssueMetadata(parsedManifest.error),
   }, parsedManifest.error);
   const manifest = parsedManifest.data;
-  if (input.executionPurpose !== undefined && (input.executionPurpose !== "INITIAL_RECOVERY_OUTREACH" || manifest.purposeProfile?.purpose !== input.executionPurpose))
+  if (input.executionPurpose !== undefined && (commerceConversationScope(turn) === "STANDALONE" || input.executionPurpose !== "INITIAL_RECOVERY_OUTREACH" || manifest.purposeProfile?.purpose !== input.executionPurpose))
     throw new RunnerFailure("DENIED", { stage: "preflight.contract", reasonCode: "GRANT_MISMATCH" });
   if (
     !manifestMatchesGrant(manifest, grant) ||
-    turn.shopId !== grant.shopId ||
-    turn.conversationId !== grant.conversationId ||
-    turn.inboundVersion < grant.initialInboundVersion
+    !commerceTurnMatchesGrant(turn, grant, input.dependencies.now())
   ) throw new RunnerFailure("DENIED", { stage: "preflight.contract", reasonCode: "GRANT_MISMATCH" });
   if (!satisfies(runnerVersion, manifest.runnerCompatibility))
     throw new RunnerFailure("INCOMPATIBLE_VERSION", {

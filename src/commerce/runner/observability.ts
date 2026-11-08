@@ -36,7 +36,7 @@ export function createTurnLogger(
       grantId: prepared.grant.id,
       releaseId: prepared.grant.releaseId,
     };
-    if (prepared.turn.checkoutRecoveryId !== undefined)
+    if ("checkoutRecoveryId" in prepared.turn)
       fields.checkoutRecoveryId = prepared.turn.checkoutRecoveryId;
     return input.dependencies.logger?.child(fields) ?? createRootTurnLogger(input);
   } catch {

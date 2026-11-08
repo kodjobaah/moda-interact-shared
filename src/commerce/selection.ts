@@ -1,11 +1,12 @@
 import { IdSchema } from "./primitives";
+import { CommerceTurnIdentitySchema, commerceConversationScope, type CommerceTurnIdentity } from "./turn-identity";
 import {
   type CommerceManifest,
   CommerceManifestSchema,
   type CommerceConversationGrant,
   CommerceConversationGrantSchema,
 } from "./schemas";
-import { GrantedToolsSchema, PublishedToolDescriptorSchema, type GrantedTool, type PublishedGrantedTool, type PublishedToolDescriptor, type CommerceBuiltInToolDescriptor, isBuiltInTool } from "./definitions";
+import { GrantedToolsSchema, PublishedToolDescriptorSchema, type GrantedTool, type ToolDescriptor, type PublishedGrantedTool, type PublishedToolDescriptor, type CommerceBuiltInToolDescriptor, isBuiltInTool } from "./definitions";
 import { isTrustedCommerceBuiltInDescriptor, isTrustedCommerceBuiltInGrant } from "./built-in-tools";
 import { canonicalJson } from "./canonical-json";
 export type FeatureFacts = {
@@ -80,6 +81,7 @@ export function deduplicateTools(
           toolName: d.name,
           definitionVersion: d.definitionVersion,
           capabilityKeys: [cap.key],
+          ...(d.allowedConversationScopes ? { allowedConversationScopes: [...d.allowedConversationScopes] } : {}),
         },
       });
   }
@@ -131,4 +133,25 @@ export function currentlyGrantedTools(
             descriptor.definitionVersion === t.definitionVersion)
         : enabledToolIds.has(t.toolId) && t.capabilityKeys.some((k) => eligibleCapabilityKeys.has(k)),
   );
+}
+
+/** Existing grant expiry/replay fields remain authoritative. This only binds
+ * canonical ownership; service actor/consent/lease/current-version checks remain external. */
+export function commerceTurnMatchesGrant(rawTurn: unknown, rawGrant: unknown, now?: number): boolean {
+  const turnResult = CommerceTurnIdentitySchema.safeParse(rawTurn);
+  const grantResult = CommerceConversationGrantSchema.safeParse(rawGrant);
+  if (!turnResult.success || !grantResult.success) return false;
+  const turn = turnResult.data, grant = grantResult.data;
+  const scope = commerceConversationScope(turn);
+  if (turn.shopId !== grant.shopId || turn.conversationId !== grant.conversationId
+    || turn.inboundVersion < grant.initialInboundVersion
+    || scope !== (grant.conversationScope ?? "RECOVERY")) return false;
+  if (grant.conversationScope === "RECOVERY" && (!("checkoutRecoveryId" in turn) || turn.checkoutRecoveryId !== grant.checkoutRecoveryId)) return false;
+  if (now !== undefined && (!Number.isFinite(now) || (grant.expiresAt !== null && Date.parse(grant.expiresAt) <= now))) return false;
+  return true;
+}
+/** No marker means historical RECOVERY-only. Both list and call must enforce. */
+export function commerceToolAllowsConversationScope(tool: GrantedTool | ToolDescriptor, turn: CommerceTurnIdentity): boolean {
+  const scopes = "allowedConversationScopes" in tool ? tool.allowedConversationScopes : undefined;
+  return scopes ? scopes.includes(commerceConversationScope(turn)) : commerceConversationScope(turn) === "RECOVERY";
 }

@@ -1,3 +1,4 @@
+import { commerceToolAllowsConversationScope } from "../selection.js";
 import { canonicalJson } from "../canonical-json.js";
 import { isBuiltInTool, type GrantedTool, type ToolDescriptor } from "../definitions.js";
 import { RunnerFailure } from "./failure.js";
@@ -22,6 +23,7 @@ export async function resolveAvailableTools(
       : prepared.manifest.capabilities.map(capability => capability.toolDescriptor)
           .find(candidate => candidate.toolId === granted.toolId);
     if (!tool || !descriptor) continue;
+    if (!commerceToolAllowsConversationScope(granted, prepared.turn) || !commerceToolAllowsConversationScope(descriptor, prepared.turn)) continue;
     if (canonicalJson(tool.descriptor) !== canonicalJson(descriptor))
       throw new RunnerFailure("INCOMPATIBLE_VERSION", {
         stage: "tools.resolve", reasonCode: "TOOL_DESCRIPTOR_MISMATCH", toolName: granted.toolName,
@@ -45,11 +47,11 @@ export function resolveToolCall(
 ): { grant: GrantedTool; tool: RunnerTool } | { denial: ToolDenialReason } {
   const grant = prepared.grant.grantedTools.find((entry) => entry.toolName === name);
   const tool = prepared.registered.get(name);
-  if (!grant) return { denial: "INSUFFICIENT_TOOLS" };
+  if (!grant || !commerceToolAllowsConversationScope(grant, prepared.turn)) return { denial: "INSUFFICIENT_TOOLS" };
   if (prepared.executionPurpose && !prepared.manifest.purposeProfile?.capabilities.some(member => !isBuiltInTool(grant) && member.toolId === grant.toolId && member.revisionId === grant.toolRevisionId && member.name === name)) return { denial: "INSUFFICIENT_TOOLS" };
   if (!tool) return { denial: "TOOL_UNAVAILABLE" };
   const pinned = availableTools.find(descriptor => descriptor.name === name);
-  if (!pinned) return { denial: "TOOL_REVOKED" };
+  if (!pinned || !commerceToolAllowsConversationScope(pinned, prepared.turn)) return { denial: "TOOL_REVOKED" };
   if (canonicalJson(pinned) !== canonicalJson(tool.descriptor))
     throw new RunnerFailure("INCOMPATIBLE_VERSION", {
       stage: "tools.resolve", reasonCode: "TOOL_DESCRIPTOR_MISMATCH", toolName: name,

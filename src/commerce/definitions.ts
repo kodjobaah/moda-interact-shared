@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CommerceAllowedConversationScopesSchema } from "./turn-identity";
 import { CommercePurposeOutputSchemaSchema } from "./purpose-output";
 import { gt } from "semver";
 import {
@@ -63,6 +64,7 @@ export type CommerceExecutionPurpose = z.infer<typeof CommerceExecutionPurposeSc
 export type CommercePurposeProfile = z.infer<typeof CommercePurposeProfileSchema>;
 
 export const PublishedGrantedToolSchema = z.strictObject({
+  allowedConversationScopes: CommerceAllowedConversationScopesSchema.optional(),
   toolId: IdSchema,
   toolRevisionId: IdSchema,
   toolName: ToolNameSchema,
@@ -74,6 +76,7 @@ export const PublishedGrantedToolSchema = z.strictObject({
     .refine((v) => distinct(v) && v.join("\0") === [...v].sort().join("\0")),
 });
 export const PublishedToolDescriptorSchema = z.strictObject({
+  allowedConversationScopes: CommerceAllowedConversationScopesSchema.optional(),
   toolId: IdSchema,
   toolRevisionId: IdSchema,
   name: ToolNameSchema,

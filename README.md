@@ -2469,3 +2469,53 @@ owns controlled composition. Product-bearing shipping observations latch that ho
 without a selection; policy-only observations alone may retain ordinary grounded answers.
 Expected limitations never clear a terminal tool error. The default empty response contract,
 hard-referral envelope and two-tool discount built-in allowlist remain unchanged.
+
+## ARCH-066 standalone conversation identity migration
+
+The canonical turn ownership discriminator is `conversationScope: "RECOVERY" |
+"STANDALONE"`. Existing recovery turn payloads with no discriminator retain their
+exact parsed representation and still require `checkoutRecoveryId`. Explicit
+RECOVERY turns also require that ID. A STANDALONE turn carries existing
+`contractVersion`, `shopId`, `conversationId`, and positive `inboundVersion` and
+must omit `checkoutRecoveryId` entirely (including null/undefined properties).
+Shared does not invent an actor ID: authenticated actor/customer ownership stays
+with the caller's established private ingress and canonical Conversation/Shop
+relations. An ID passing syntax validation is not proof of ownership.
+
+New standalone grants explicitly set `conversationScope: "STANDALONE"` and omit
+recovery ID. New scoped RECOVERY grants bind the actual `checkoutRecoveryId`.
+Legacy unscoped grants remain recovery-only; they cannot authorize standalone.
+Existing tenant/conversation/release IDs, initial inbound version, grant retention
+fields, and host assertion authentication/replay checks remain authoritative.
+Canonical assertion serialization must include the complete validated scope and
+identity via the existing `canonicalJson`; never select only legacy fields before
+signing or verifying. No alternative signature, hash or fake recovery ID exists.
+
+Tool descriptors and their pinned grants may explicitly specify
+`allowedConversationScopes` (one or two unique RECOVERY/STANDALONE values).
+Absent metadata means RECOVERY-only. Standalone therefore admits only explicitly
+marked tools whose current host adapter is independently authorized. Producers
+must mark actual implemented standalone-safe read adapters using trusted service
+policy; arbitrary UI/model text cannot approve a recovery action. Manifest/grant
+binding and descriptor equality include this metadata. Initial recovery outreach
+is prohibited in standalone scope. Shared never creates checkout facts or calls
+provider APIs to supply missing recovery context.
+
+Deploy the new Shared readers and migrate authenticated host/MCP grant/assertion
+writers together before enabling standalone traffic. Old strict readers reject
+new scope/marker fields; standalone must remain disabled on an old reader rather
+than be disguised as recovery. New readers accept historical recovery records
+without rewriting their signed bytes. New standalone writes require explicit
+scope-bound grants and trusted per-tool scope metadata; missing/mixed/forged
+identities fail closed. Host consent, entitlement, customer ownership, live-budget
+admission, current version/lease and delivery/send fences remain separate gates.
+No service deployment or package publication is performed by this source task.
+
+Turn and assertion schemas are now strict ownership unions. Consumers that
+previously extended the raw turn object should import the canonical resolve and
+execute assertion schemas directly instead of copying a local shape or relying
+on object-only `.extend()`. Existing serialized recovery payloads remain accepted
+unchanged. Legacy unscoped recovery grants historically bind shop/conversation
+and the inbound floor, not a recovery ID; only new scoped RECOVERY grants add the
+exact recovery-ID binding. The runner also closes the prior retention gap by
+checking grant expiry against its existing injected clock before model/tool work.
