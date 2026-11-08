@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     "incidents/index": "src/incidents/index.ts",
+    "commerce/outreach/index": "src/commerce/outreach/index.ts",
     "commerce/index": "src/commerce/index.ts",
     "commerce/presentation/index": "src/commerce/presentation/index.ts",
     "commerce/runner/index": "src/commerce/runner/index.ts",

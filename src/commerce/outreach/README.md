@@ -1,0 +1,16 @@
+# Initial checkout outreach
+
+This server-side public subpath contains the read-only ARCH-066 evaluator and frozen initial-template renderer. `evaluateInitialOutreachPreview` is the same function as `evaluateInitialOutreach`. Hosts authenticate calls and provide the clock, cancellation and admitted execution limits. They retain final send fences, recovery fingerprints, attempt IDs, approved same-shop URLs, WABA admission, saved registration freshness checks and all writes/delivery.
+
+Source relocation reference: Background `d7e78bdb5e75248b9a15e2c84d07dcdc89027c19`:
+
+- `commerce/recommendations/{eligibility,combinations,money}`: eligibility, combination and decimal arithmetic retained locally, without service imports.
+- `agents/initial-outreach-offer.{types,graph,instructions}`: strict result/choice schemas, authority instructions and bounded selection state loop. The checkout-only contract removes alternative-product search/promotion; injected ports replace MCP/model service resolution. Nested price/eligibility/group data has real validation.
+- `services/recovery-pricing/price-comparison`: ordered canonical SHA256 basket content and decimal comparison, excluding host attempt/recovery identity. Historical price and live merchandise subtotal remain distinct; no assertion of payable checkout repricing.
+- `services/recovery-template-preparation/{recovery-template-selection,recovery-template-bindings,initial-checkout-items-policy,recovery-template-items-summary,recovery-template-brand}`: existing selection, frozen projection digest/token/slot checks, item summary and bounded variable rules. Binding evaluation is synchronous over prepared values/media, with no database/media callbacks. Missing brand-only fields remain unavailable rather than invented.
+
+Frozen projection dates are serialized UTC strings. `preparedProjection` preserves the selected variant/registration field names, language and selection source; an optional host-prepared `textFallback` projection is subject to the same selection, status, locale and hash checks. A missing assignment is null. `headerMedia` contains only a host-authorized READY R2 derivative. No network request or derivative generation occurs in the renderer. Rendered text includes the frozen text header, substituted body and footer; the substituted body is checked independently against 4096 UTF16 units. Provider parameters preserve the original frozen order.
+
+Every tool attempt and model invocation consumes the shared remote-call allowance; reused duplicate product observations consume none. Ready NONE reads every distinct product pair twice in first-occurrence order, retaining every original line quantity/order. Current fact comparison excludes observation timestamps alone; changed identity, availability, prices, membership or descriptive facts cannot silently replace earlier evidence. Selected discounts are reread and re-evaluated before ready. Port failures never expose provider bodies. No automatic retries occur.
+
+Public artifact gate: build, then `npm run validate:commerce-outreach`; it packs locally, installs that tarball in a temporary project and checks public JavaScript and declaration imports. This task does not publish the package. SHARED-005 owns the immutable combined release.
