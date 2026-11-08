@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import vm from 'node:vm';
+const shared=await import('@modainteract/moda-interact-shared/commerce/presentation');
+assert.equal(shared.normalizeCommerceReplyText('**Hello**'),'Hello');
+const bundled=await build({entryPoints:['dist/commerce/presentation/index.js'],bundle:true,platform:'browser',format:'iife',globalName:'Presentation',write:false,metafile:true});
+assert.ok(!Object.keys(bundled.metafile.inputs).some(path=>/node:|prisma|\/logging\/|\/observability\/|langchain/.test(path)));
+const context=vm.createContext({Intl,URL,TextEncoder,TextDecoder,structuredClone,console});
+vm.runInContext(bundled.outputFiles[0].text,context,{timeout:10000});
+assert.equal(vm.runInContext('Presentation.normalizeCommerceReplyText("**Browser**")',context),'Browser');
+assert.equal(vm.runInContext('Presentation.renderProductOptionFacts([],"fr")',context),'Les détails des options sont indisponibles.');
+console.log('Commerce presentation Node and browser-like entrypoints passed');

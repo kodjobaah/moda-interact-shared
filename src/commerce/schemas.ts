@@ -536,10 +536,11 @@ export const CommerceProductRecommendationSelectionSchema = z.strictObject({
 });
 export type CommerceProductRecommendationSelection = z.infer<typeof CommerceProductRecommendationSelectionSchema>;
 export const CommerceResponseDispositionSchema = z.enum([
-  "STANDARD", "OUT_OF_SCOPE_REDIRECT", "SHIPPING_INFORMATION_UNVERIFIED",
+  "STANDARD", "OUT_OF_SCOPE_REDIRECT", "SHIPPING_INFORMATION_UNVERIFIED", "PRODUCT_OPTIONS",
 ]).meta({maxLength: 31});
 export type CommerceResponseDisposition = z.infer<typeof CommerceResponseDispositionSchema>;
 export const CommerceAnswerPresentationSelectionSchema = z.strictObject({
+  productOptionSelections: z.array(z.strictObject({productId: wireId, variantId: wireId.nullable()})).max(3).optional(),
   responseDisposition: CommerceResponseDispositionSchema.optional(),
   shippingInformationSelection: z.strictObject({
     productId: wireId.nullable(),
