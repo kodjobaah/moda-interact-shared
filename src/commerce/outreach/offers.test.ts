@@ -87,3 +87,30 @@ test('nested price/eligibility/combination payloads strictly rejected', () => {
     assert.equal(EligibilitySchema.safeParse({ offerId: '1', verdict: 'SUPPORTED', eligibleLineKeys: ['1'], reasonCodes: [], extra: true }).success, false);
     assert.equal(GroupSchema.safeParse({ verdict: 'SUPPORTED', offerIds: ['1'], reasonCodes: [{}] }).success, false);
 });
+test('mixed selected offers all retain eligibility and final detail revalidation', async () => {
+    const i = fixture();
+    i.policy = { mode: 'FIXED', authorisedDiscountIds: ['code-1', 'automatic-1', 'code-2'] };
+    const byId = new Map(i.policy.authorisedDiscountIds.map(id => {
+        const d = details(id);
+        d.offer.method = id.startsWith('automatic') ? 'AUTOMATIC' : 'CODE';
+        d.offer.code = d.offer.method === 'CODE' ? 'SAVE-' + id : null;
+        d.facts.combination.discountClasses = ['ORDER'];
+        return [id, d] as const;
+    }));
+    const p = ports(i, call => {
+        if (call.name === 'commerce_get_product') return { product: product(i) };
+        if (call.name === 'commerce_get_discount_details') return { details: byId.get(call.arguments.offerId) };
+        throw new Error('FIXED must not list options');
+    });
+    const r = await evaluateInitialOutreach(i, p.value);
+    assert.equal(r.kind, 'ready');
+    if (r.kind === 'ready' && r.offerDecision.kind === 'CHECKOUT_DISCOUNT') {
+        assert.equal(r.offerDecision.members.length, 3);
+        assert.ok(r.offerDecision.members.every(member => member.eligibility.verdict === 'SUPPORTED'));
+    } else assert.fail('expected all compatible selected offers');
+    for (const id of i.policy.authorisedDiscountIds) {
+        assert.equal(p.calls.filter(call => call.name === 'commerce_get_discount_details' && call.arguments.offerId === id).length, 2);
+    }
+    assert.equal(p.calls.length, 8);
+    assert.equal(p.modelCalls, 0);
+});

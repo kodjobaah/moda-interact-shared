@@ -112,3 +112,47 @@ test('exact 4096 UTF16 body admitted; 4097 refused; header and footer preview te
         assert.deepEqual(r.parameters[0], { type: 'header', parameters: [{ type: 'text', text: 'Test customer' }] });
     }
 });
+// Fixed expected groups from Background's sendable method projection: largest
+// method group wins; a tie preserves the first observed method.
+for (const golden of [
+    {methods:['CODE','AUTOMATIC'], selected:[0], presentation:'CODE_OFFER'},
+    {methods:['AUTOMATIC','CODE'], selected:[0], presentation:'AUTOMATIC_OFFER'},
+    {methods:['CODE','AUTOMATIC','CODE'], selected:[0,2], presentation:'CODE_OFFER'},
+    {methods:['AUTOMATIC','CODE','AUTOMATIC'], selected:[0,2], presentation:'AUTOMATIC_OFFER'},
+    {methods:['CODE'], selected:[0], presentation:'CODE_OFFER'},
+    {methods:['CODE','CODE'], selected:[0,1], presentation:'CODE_OFFER'},
+    {methods:['CODE','CODE','CODE'], selected:[0,1,2], presentation:'CODE_OFFER'},
+    {methods:['AUTOMATIC'], selected:[0], presentation:'AUTOMATIC_OFFER'},
+    {methods:['AUTOMATIC','AUTOMATIC'], selected:[0,1], presentation:'AUTOMATIC_OFFER'},
+] as const) {
+    test(`sendable method golden: ${golden.methods.join('+')}`, async () => {
+        const i = await input();
+        const members = golden.methods.map((method, n) => ({offerId:`offer-${n}`,providerDiscountId:`provider-${n}`,method,code:method==='CODE'?`SAVE${n}`:null,description:`Offer ${n}`,eligibility:{offerId:`offer-${n}`,verdict:'SUPPORTED' as const,eligibleLineKeys:['line-1'],reasonCodes:[]}}));
+        i.evaluation.offerDecision={kind:'CHECKOUT_DISCOUNT',offerSet:{schemaVersion:'moda.outreach.checkout-offers.v1',offers:members.map(({offerId,providerDiscountId,method,code})=>({offerId,providerDiscountId,method,code}))},members,group:{verdict:'SUPPORTED',offerIds:members.map(m=>m.offerId),reasonCodes:[]},discoveryIncomplete:false};
+        const selected = golden.selected.map(n=>members[n]!);
+        const v=i.preparedProjection!.variant, registration=v.metaRegistration!;
+        v.purpose=`INITIAL_${golden.presentation}`;
+        registration.locale.definition.offerType=golden.presentation;
+        const bindings=registration.parameterBindingsSnapshot.body;
+        const values=['Test customer','Merchant','2 × Custom label'];
+        if(golden.presentation==='CODE_OFFER') {
+            bindings.push({position:4,variable:selected.length>1?'offer.codes':'offer.code'});
+            values.push(selected.map(m=>m.code).join(', '));
+        }
+        bindings.push({position:bindings.length+1,variable:'offer.description'});
+        values.push(selected.map(m=>m.description).join(', '));
+        const body=registration.componentsSnapshot[0]!;
+        if(!('text' in body))throw new Error('body');
+        body.text=bindings.map(b=>`{{${b.position}}}`).join(' | ');
+        rehash(i);
+        const original=structuredClone(i.evaluation);
+        const r=renderInitialOutreachPreview(i);
+        assert.equal(r.kind,'ready');
+        if(r.kind==='ready') {
+            assert.equal(r.purpose,`INITIAL_${golden.presentation}`);
+            assert.equal(r.renderedText,values.join(' | '));
+            assert.deepEqual(r.parameters,[{type:'body',parameters:values.map(text=>({type:'text',text}))},{type:'button',sub_type:'url',index:'0',parameters:[{type:'text',text:'https%3A%2F%2Fshop.example%2Fcheckout%2F1'}]}]);
+        }
+        assert.deepEqual(i.evaluation,original);
+    });
+}

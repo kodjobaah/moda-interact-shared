@@ -1,6 +1,7 @@
 import { InitialOutreachRenderInputSchema, InitialOutreachRenderResultSchema, type InitialOutreachRenderInput, type InitialOutreachRenderResult } from './template-contracts.js';
 import { selectRecoveryAssignment, purposeFor } from './selection.js';
 import { prepareFrozenComponents } from './bindings.js';
+import { selectSendableOutreachOffer } from './sendable-offer.js';
 import { BindingUnavailable, PreparedVariableResolver } from './variables.js';
 export function renderInitialOutreachPreview(raw: InitialOutreachRenderInput): InitialOutreachRenderResult {
     const parsed = InitialOutreachRenderInputSchema.safeParse(raw);
@@ -10,8 +11,8 @@ export function renderInitialOutreachPreview(raw: InitialOutreachRenderInput): I
     let projection = input.preparedProjection;
     if (!projection)
         return { kind: 'refused', reasonCode: 'NO_APPROVED_ASSIGNMENT' };
-    const decision = input.evaluation.offerDecision;
-    const offer = decision.kind === 'NO_VERIFIED_OFFER' ? 'NO_OFFER' : decision.members.some(m => m.method === 'CODE') ? 'CODE_OFFER' : 'AUTOMATIC_OFFER';
+    const sendable = selectSendableOutreachOffer(input.evaluation.offerDecision);
+    const offer = sendable.presentation;
     const purpose = purposeFor('INITIAL', offer);
     let image = projection.variant.metaRegistration?.componentsSnapshot.some(c => c.type === 'HEADER' && 'format' in c && c.format === 'IMAGE');
     if (image && !input.headerMedia) {
@@ -21,12 +22,12 @@ export function renderInitialOutreachPreview(raw: InitialOutreachRenderInput): I
         image = false;
     }
     const v = projection.variant;
-    const selected = selectRecoveryAssignment({ shop: { id: input.evaluation.shopId, status: 'ACTIVE', defaultLanguageTag: projection.canonicalLanguageTag }, shopId: input.evaluation.shopId, senderWabaId: v.providerAccountId, purpose, variants: [v], stage: 'INITIAL', promotionTarget: 'CHECKOUT', offer, offerCount: decision.kind === 'CHECKOUT_DISCOUNT' ? decision.members.length : 0, conversationLanguageTag: projection.canonicalLanguageTag, merchantLanguageTag: projection.canonicalLanguageTag, platformFallbackEnabled: false, platformFallbackLanguageTag: null, headerFormat: image ? 'IMAGE' : 'TEXT', logger: { warn() { } } });
+    const selected = selectRecoveryAssignment({ shop: { id: input.evaluation.shopId, status: 'ACTIVE', defaultLanguageTag: projection.canonicalLanguageTag }, shopId: input.evaluation.shopId, senderWabaId: v.providerAccountId, purpose, variants: [v], stage: 'INITIAL', promotionTarget: 'CHECKOUT', offer, offerCount: sendable.members.length, conversationLanguageTag: projection.canonicalLanguageTag, merchantLanguageTag: projection.canonicalLanguageTag, platformFallbackEnabled: false, platformFallbackLanguageTag: null, headerFormat: image ? 'IMAGE' : 'TEXT', logger: { warn() { } } });
     if (selected.outcome === 'unavailable')
         return { kind: 'refused', reasonCode: selected.reason };
     const registration = v.metaRegistration!;
     try {
-        const prepared = prepareFrozenComponents({ registration, variables: new PreparedVariableResolver(input, projection.canonicalLanguageTag) });
+        const prepared = prepareFrozenComponents({ registration, variables: new PreparedVariableResolver(input, projection.canonicalLanguageTag, sendable) });
         const body = registration.componentsSnapshot.find(c => c.type === 'BODY');
         if (!body || !('text' in body))
             throw new BindingUnavailable('BINDINGS_INVALID');

@@ -48,12 +48,12 @@ export async function evaluateInitialOutreach(raw: InitialOutreachEvaluationInpu
     }
     const start = ports.now().getTime(), expires = start + input.limits.deadlineMs;
     function check() {
-        if (ports.signal.aborted)
-            throw new OutreachRefusal('CANCELLED');
-        if (!Number.isFinite(start) || !Number.isFinite(ports.now().getTime()))
-            throw new OutreachRefusal('INVALID_RESULT');
-        if (ports.now().getTime() >= expires)
-            throw new OutreachRefusal('DEADLINE');
+        if (ports.signal.aborted) throw new OutreachRefusal('CANCELLED');
+        const now = ports.now().getTime();
+        // The clock is a host callback too: cancellation can arrive during it.
+        if (ports.signal.aborted) throw new OutreachRefusal('CANCELLED');
+        if (!Number.isFinite(start) || !Number.isFinite(now)) throw new OutreachRefusal('INVALID_RESULT');
+        if (now >= expires) throw new OutreachRefusal('DEADLINE');
     }
     function log(reasonCode: string | null = null, toolName: string | null = null, durationMs = 0) {
         try {
@@ -267,6 +267,8 @@ export async function evaluateInitialOutreach(raw: InitialOutreachEvaluationInpu
             throw new OutreachRefusal('RESULT_TOO_LARGE');
         const parsed = InitialOutreachEvaluationResultSchema.parse(result);
         log();
+        // Fence after construction, validation and the last host callback. No callbacks follow.
+        check();
         return parsed;
     }
     catch (e) {

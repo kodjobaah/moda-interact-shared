@@ -1,3 +1,4 @@
+import type { SendableOutreachOffer } from './sendable-offer.js';
 import type { z } from 'zod';
 import { SemanticKeySchema } from './template-contracts.js';
 import type { InitialOutreachRenderInput } from './template-contracts.js';
@@ -20,7 +21,7 @@ function boundedText(v: unknown, limit: number): string {
     return v.trim();
 }
 export class PreparedVariableResolver {
-    constructor(private input: InitialOutreachRenderInput, private languageTag: string) { }
+    constructor(private input: InitialOutreachRenderInput, private languageTag: string, private sendable: SendableOutreachOffer) { }
     encodeCheckoutButtonSuffix(_prefix: string): string { return encodeURIComponent(this.input.variables.checkoutUrl); }
     encodePromotionButtonSuffix(_prefix: string): never { throw new BindingUnavailable('PROMOTION_PRODUCT_URL_UNAVAILABLE'); }
     checkStaticButtonUrl(value: string): void {
@@ -35,7 +36,7 @@ export class PreparedVariableResolver {
         return m.httpsUrl;
     }
     resolve(key: SemanticKey): string {
-        const i = this.input, d = i.evaluation.offerDecision;
+        const i = this.input, d = this.sendable;
         switch (key) {
             case 'customer.firstName': return boundedText(i.variables.customerFirstName, 200);
             case 'shop.name': return boundedText(i.variables.shopName, 200);
@@ -48,16 +49,16 @@ export class PreparedVariableResolver {
                 return boundedText(formatCheckoutItemsSummary(items, this.languageTag), 500);
             }
             case 'offer.code':
-                if (d.kind === 'CHECKOUT_DISCOUNT' && d.members.length === 1 && d.members[0]?.method === 'CODE')
+                if (d.presentation === 'CODE_OFFER' && d.members.length === 1 && d.members[0]?.method === 'CODE')
                     return boundedText(d.members[0].code, 100);
                 break;
             case 'offer.codes':
-                if (d.kind === 'CHECKOUT_DISCOUNT' && d.members.every(m => m.method === 'CODE'))
+                if (d.presentation === 'CODE_OFFER' && d.members.every(m => m.method === 'CODE'))
                     return d.members.map(m => boundedText(m.code, 100)).join(', ');
                 break;
             case 'offer.description':
-                if (d.kind === 'CHECKOUT_DISCOUNT')
-                    return boundedText(d.members.map(m => m.description).join('; '), 200);
+                if (d.presentation !== 'NO_OFFER')
+                    return boundedText(d.members.map(m => m.description).join(', '), 200);
                 break;
             // This input exposes only the host's prepared shop name/category and media, not arbitrary brand records.
             case 'shopBrand.brandName': return boundedText(i.variables.shopName, 200);

@@ -125,3 +125,38 @@ test('fresh observation timestamps alone do not change product facts; revocation
  let clock=0;p.value.now=()=>new Date(Date.parse(at)+(clock++===0?0:1));let r=await evaluateInitialOutreach(i,p.value);assert.equal(r.kind,'ready');
  const denied=ports(i,(_,n)=>{if(n===2)throw Object.assign(new Error('revoked'),{code:'DENIED'});return {product:product(i)};});r=await evaluateInitialOutreach(i,denied.value);assert.equal(r.kind==='refused'&&r.reasonCode,'DENIED');assert.equal(denied.calls.length,2);
 });
+for (const boundary of ['evaluatedAt expiry', 'COMPLETE expiry', 'COMPLETE cancellation', 'final clock cancellation', 'just before expiry'] as const) {
+    test(`final ready boundary: ${boundary}`, async () => {
+        const i = fixture(), p = ports(i);
+        const expires = Date.parse(at) + i.limits.deadlineMs;
+        let clock = Date.parse(at), completing = false;
+        p.value.now = () => {
+            if (completing && boundary === 'final clock cancellation') p.controller.abort();
+            const date = new Date(clock);
+            date.toISOString = () => {
+                if (boundary === 'evaluatedAt expiry') clock = expires;
+                if (boundary === 'just before expiry') clock = expires - 1;
+                return new Date(clock).toISOString();
+            };
+            return date;
+        };
+        p.value.log = event => {
+            if (event.stage !== 'COMPLETE') return;
+            completing = true;
+            if (boundary === 'COMPLETE expiry') clock = expires;
+            if (boundary === 'COMPLETE cancellation') p.controller.abort();
+        };
+        const r = await evaluateInitialOutreach(i, p.value);
+        if (boundary === 'just before expiry') {
+            assert.equal(r.kind, 'ready');
+            if (r.kind === 'ready') assert.equal(Date.parse(r.evaluatedAt), expires - 1);
+        } else {
+            assert.equal(r.kind, 'refused');
+            if (r.kind === 'refused') assert.equal(r.reasonCode, boundary.includes('cancellation') ? 'CANCELLED' : 'DEADLINE');
+        }
+        assert.equal(p.calls.length, 2);
+        assert.equal(p.modelCalls, 0);
+        assert.equal(r.toolActivity.length, 2);
+        assert.ok(p.calls.every(call => call.signal === p.value.signal));
+    });
+}
