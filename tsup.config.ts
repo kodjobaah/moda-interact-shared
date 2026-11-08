@@ -5,6 +5,7 @@ export default defineConfig({
     index: "src/index.ts",
     "incidents/index": "src/incidents/index.ts",
     "commerce/index": "src/commerce/index.ts",
+    "commerce/presentation/index": "src/commerce/presentation/index.ts",
     "commerce/runner/index": "src/commerce/runner/index.ts",
     "commerce/model/index": "src/commerce/model/index.ts",
     "commerce/model/node": "src/commerce/model/node.ts",

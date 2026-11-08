@@ -1,0 +1,2285 @@
+{
+  "sourceCommit": "d7e78bdb5e75248b9a15e2c84d07dcdc89027c19",
+  "fixtures": [
+    {
+      "input": {
+        "locale": "zh-Hans",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "此商品需要配送。\n配送政策：https://shop.example/policies/shipping\n如果您将此商品的 2 件加入购物篮：\nNative * shirt\n当前标价：US$12.50\n常规标价：US$15.00\n优惠条款：10% 折扣，具体取决于已核实的条件。\n优惠码：SAVE\n自动优惠；最终应用以结账确认为准。\n资格和最终价格将在结账时确认。\n优惠条款：减免 US$2.00，具体取决于已核实的条件。\n资格和最终价格将在结账时确认。\n优惠条款：免费配送，以结账验证为准。\n查看商品：https://shop.example/products/shirt\n我无法核实此推荐适用的优惠。"
+    },
+    {
+      "input": {
+        "locale": "zh-Hans",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "我可以帮助您了解本店商品，但无法回答这个问题。\n此商品需要配送。\n配送政策：https://shop.example/policies/shipping\n如果您将此商品的 2 件加入购物篮：\nNative * shirt\n当前标价：US$12.50\n常规标价：US$15.00\n优惠条款：10% 折扣，具体取决于已核实的条件。\n优惠码：SAVE\n自动优惠；最终应用以结账确认为准。\n资格和最终价格将在结账时确认。\n优惠条款：减免 US$2.00，具体取决于已核实的条件。\n资格和最终价格将在结账时确认。\n优惠条款：免费配送，以结账验证为准。\n查看商品：https://shop.example/products/shirt\n我无法核实此推荐适用的优惠。"
+    },
+    {
+      "input": {
+        "locale": "zh-Hans",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "我无法确认您询问的配送详情。请向商店查询。\n此商品需要配送。\n配送政策：https://shop.example/policies/shipping\n如果您将此商品的 2 件加入购物篮：\nNative * shirt\n当前标价：US$12.50\n常规标价：US$15.00\n优惠条款：10% 折扣，具体取决于已核实的条件。\n优惠码：SAVE\n自动优惠；最终应用以结账确认为准。\n资格和最终价格将在结账时确认。\n优惠条款：减免 US$2.00，具体取决于已核实的条件。\n资格和最终价格将在结账时确认。\n优惠条款：免费配送，以结账验证为准。\n查看商品：https://shop.example/products/shirt\n我无法核实此推荐适用的优惠。"
+    },
+    {
+      "input": {
+        "locale": "zh-Hant",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "此商品需要配送。\n配送政策：https://shop.example/policies/shipping\n如果您將此商品的 2 件加入購物籃：\nNative * shirt\n目前標價：US$12.50\n一般標價：US$15.00\n優惠條款：10% 折扣，須符合已核實的條件。\n優惠碼：SAVE\n自動優惠；最終套用情況以結帳確認為準。\n資格和最終價格將於結帳時確認。\n優惠條款：折抵 US$2.00，須符合已核實的條件。\n資格和最終價格將於結帳時確認。\n優惠條款：免費配送，以結帳驗證為準。\n查看商品：https://shop.example/products/shirt\n我無法核實此推薦適用的優惠。"
+    },
+    {
+      "input": {
+        "locale": "zh-Hant",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "我可以協助您了解本店商品，但無法回答這個問題。\n此商品需要配送。\n配送政策：https://shop.example/policies/shipping\n如果您將此商品的 2 件加入購物籃：\nNative * shirt\n目前標價：US$12.50\n一般標價：US$15.00\n優惠條款：10% 折扣，須符合已核實的條件。\n優惠碼：SAVE\n自動優惠；最終套用情況以結帳確認為準。\n資格和最終價格將於結帳時確認。\n優惠條款：折抵 US$2.00，須符合已核實的條件。\n資格和最終價格將於結帳時確認。\n優惠條款：免費配送，以結帳驗證為準。\n查看商品：https://shop.example/products/shirt\n我無法核實此推薦適用的優惠。"
+    },
+    {
+      "input": {
+        "locale": "zh-Hant",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "我無法確認您詢問的配送詳情。請向商店查詢。\n此商品需要配送。\n配送政策：https://shop.example/policies/shipping\n如果您將此商品的 2 件加入購物籃：\nNative * shirt\n目前標價：US$12.50\n一般標價：US$15.00\n優惠條款：10% 折扣，須符合已核實的條件。\n優惠碼：SAVE\n自動優惠；最終套用情況以結帳確認為準。\n資格和最終價格將於結帳時確認。\n優惠條款：折抵 US$2.00，須符合已核實的條件。\n資格和最終價格將於結帳時確認。\n優惠條款：免費配送，以結帳驗證為準。\n查看商品：https://shop.example/products/shirt\n我無法核實此推薦適用的優惠。"
+    },
+    {
+      "input": {
+        "locale": "cs",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Tuto položku je nutné odeslat.\nPodmínky dopravy: https://shop.example/policies/shipping\nPokud do košíku přidáte 2 kusů této položky:\nNative * shirt\nAktuální uvedená cena: 12,50 US$\nBěžná uvedená cena: 15,00 US$\nPodmínky nabídky: sleva 10 %, podle ověřených podmínek.\nKód: SAVE\nAutomatická nabídka; konečné uplatnění potvrdí pokladna.\nNárok a konečnou cenu potvrdí pokladna.\nPodmínky nabídky: sleva 2,00 US$, podle ověřených podmínek.\nNárok a konečnou cenu potvrdí pokladna.\nPodmínky nabídky: doprava zdarma, podléhá ověření při placení.\nZobrazit produkt: https://shop.example/products/shirt\nU tohoto návrhu se nepodařilo ověřit použitelnou nabídku."
+    },
+    {
+      "input": {
+        "locale": "cs",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "S produkty tohoto obchodu vám pomohu, na tuto otázku ale odpovědět nemohu.\nTuto položku je nutné odeslat.\nPodmínky dopravy: https://shop.example/policies/shipping\nPokud do košíku přidáte 2 kusů této položky:\nNative * shirt\nAktuální uvedená cena: 12,50 US$\nBěžná uvedená cena: 15,00 US$\nPodmínky nabídky: sleva 10 %, podle ověřených podmínek.\nKód: SAVE\nAutomatická nabídka; konečné uplatnění potvrdí pokladna.\nNárok a konečnou cenu potvrdí pokladna.\nPodmínky nabídky: sleva 2,00 US$, podle ověřených podmínek.\nNárok a konečnou cenu potvrdí pokladna.\nPodmínky nabídky: doprava zdarma, podléhá ověření při placení.\nZobrazit produkt: https://shop.example/products/shirt\nU tohoto návrhu se nepodařilo ověřit použitelnou nabídku."
+    },
+    {
+      "input": {
+        "locale": "cs",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Požadované údaje o dopravě nemohu potvrdit. Ověřte je prosím u obchodu.\nTuto položku je nutné odeslat.\nPodmínky dopravy: https://shop.example/policies/shipping\nPokud do košíku přidáte 2 kusů této položky:\nNative * shirt\nAktuální uvedená cena: 12,50 US$\nBěžná uvedená cena: 15,00 US$\nPodmínky nabídky: sleva 10 %, podle ověřených podmínek.\nKód: SAVE\nAutomatická nabídka; konečné uplatnění potvrdí pokladna.\nNárok a konečnou cenu potvrdí pokladna.\nPodmínky nabídky: sleva 2,00 US$, podle ověřených podmínek.\nNárok a konečnou cenu potvrdí pokladna.\nPodmínky nabídky: doprava zdarma, podléhá ověření při placení.\nZobrazit produkt: https://shop.example/products/shirt\nU tohoto návrhu se nepodařilo ověřit použitelnou nabídku."
+    },
+    {
+      "input": {
+        "locale": "da",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Denne vare kræver levering.\nLeveringspolitik: https://shop.example/policies/shipping\nHvis du lægger 2 af denne vare i kurven:\nNative * shirt\nAktuel angivet pris: 12,50 US$\nNormal angivet pris: 15,00 US$\nTilbudsvilkår: 10 % rabat, afhængigt af de bekræftede vilkår.\nKode: SAVE\nAutomatisk tilbud; betaling bekræfter den endelige anvendelse.\nBerettigelse og endelig pris bekræftes ved betaling.\nTilbudsvilkår: 2,00 US$ i rabat, afhængigt af de bekræftede vilkår.\nBerettigelse og endelig pris bekræftes ved betaling.\nTilbudsvilkår: gratis levering, bekræftes ved betaling.\nSe produkt: https://shop.example/products/shirt\nJeg kunne ikke bekræfte et gældende tilbud for dette forslag."
+    },
+    {
+      "input": {
+        "locale": "da",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Jeg kan hjælpe med butikkens produkter, men jeg kan ikke besvare det spørgsmål.\nDenne vare kræver levering.\nLeveringspolitik: https://shop.example/policies/shipping\nHvis du lægger 2 af denne vare i kurven:\nNative * shirt\nAktuel angivet pris: 12,50 US$\nNormal angivet pris: 15,00 US$\nTilbudsvilkår: 10 % rabat, afhængigt af de bekræftede vilkår.\nKode: SAVE\nAutomatisk tilbud; betaling bekræfter den endelige anvendelse.\nBerettigelse og endelig pris bekræftes ved betaling.\nTilbudsvilkår: 2,00 US$ i rabat, afhængigt af de bekræftede vilkår.\nBerettigelse og endelig pris bekræftes ved betaling.\nTilbudsvilkår: gratis levering, bekræftes ved betaling.\nSe produkt: https://shop.example/products/shirt\nJeg kunne ikke bekræfte et gældende tilbud for dette forslag."
+    },
+    {
+      "input": {
+        "locale": "da",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Jeg kan ikke bekræfte de ønskede leveringsoplysninger. Spørg venligst butikken.\nDenne vare kræver levering.\nLeveringspolitik: https://shop.example/policies/shipping\nHvis du lægger 2 af denne vare i kurven:\nNative * shirt\nAktuel angivet pris: 12,50 US$\nNormal angivet pris: 15,00 US$\nTilbudsvilkår: 10 % rabat, afhængigt af de bekræftede vilkår.\nKode: SAVE\nAutomatisk tilbud; betaling bekræfter den endelige anvendelse.\nBerettigelse og endelig pris bekræftes ved betaling.\nTilbudsvilkår: 2,00 US$ i rabat, afhængigt af de bekræftede vilkår.\nBerettigelse og endelig pris bekræftes ved betaling.\nTilbudsvilkår: gratis levering, bekræftes ved betaling.\nSe produkt: https://shop.example/products/shirt\nJeg kunne ikke bekræfte et gældende tilbud for dette forslag."
+    },
+    {
+      "input": {
+        "locale": "nl",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Dit artikel moet worden verzonden.\nVerzendbeleid: https://shop.example/policies/shipping\nAls u 2 van dit artikel aan uw mandje toevoegt:\nNative * shirt\nHuidige vermelde prijs: US$ 12,50\nNormale vermelde prijs: US$ 15,00\nAanbiedingsvoorwaarden: 10% korting, afhankelijk van de geverifieerde voorwaarden.\nCode: SAVE\nAutomatische aanbieding; de kassa bevestigt de uiteindelijke toepassing.\nVoorwaarden en eindprijs worden bij het afrekenen bevestigd.\nAanbiedingsvoorwaarden: US$ 2,00 korting, afhankelijk van de geverifieerde voorwaarden.\nVoorwaarden en eindprijs worden bij het afrekenen bevestigd.\nAanbiedingsvoorwaarden: gratis verzending, bevestiging bij het afrekenen.\nProduct bekijken: https://shop.example/products/shirt\nIk kon geen toepasbare aanbieding voor dit voorstel verifiëren."
+    },
+    {
+      "input": {
+        "locale": "nl",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Ik kan u helpen met producten van deze winkel, maar ik kan die vraag niet beantwoorden.\nDit artikel moet worden verzonden.\nVerzendbeleid: https://shop.example/policies/shipping\nAls u 2 van dit artikel aan uw mandje toevoegt:\nNative * shirt\nHuidige vermelde prijs: US$ 12,50\nNormale vermelde prijs: US$ 15,00\nAanbiedingsvoorwaarden: 10% korting, afhankelijk van de geverifieerde voorwaarden.\nCode: SAVE\nAutomatische aanbieding; de kassa bevestigt de uiteindelijke toepassing.\nVoorwaarden en eindprijs worden bij het afrekenen bevestigd.\nAanbiedingsvoorwaarden: US$ 2,00 korting, afhankelijk van de geverifieerde voorwaarden.\nVoorwaarden en eindprijs worden bij het afrekenen bevestigd.\nAanbiedingsvoorwaarden: gratis verzending, bevestiging bij het afrekenen.\nProduct bekijken: https://shop.example/products/shirt\nIk kon geen toepasbare aanbieding voor dit voorstel verifiëren."
+    },
+    {
+      "input": {
+        "locale": "nl",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Ik kan de gevraagde verzendgegevens niet bevestigen. Vraag het aan de winkel.\nDit artikel moet worden verzonden.\nVerzendbeleid: https://shop.example/policies/shipping\nAls u 2 van dit artikel aan uw mandje toevoegt:\nNative * shirt\nHuidige vermelde prijs: US$ 12,50\nNormale vermelde prijs: US$ 15,00\nAanbiedingsvoorwaarden: 10% korting, afhankelijk van de geverifieerde voorwaarden.\nCode: SAVE\nAutomatische aanbieding; de kassa bevestigt de uiteindelijke toepassing.\nVoorwaarden en eindprijs worden bij het afrekenen bevestigd.\nAanbiedingsvoorwaarden: US$ 2,00 korting, afhankelijk van de geverifieerde voorwaarden.\nVoorwaarden en eindprijs worden bij het afrekenen bevestigd.\nAanbiedingsvoorwaarden: gratis verzending, bevestiging bij het afrekenen.\nProduct bekijken: https://shop.example/products/shirt\nIk kon geen toepasbare aanbieding voor dit voorstel verifiëren."
+    },
+    {
+      "input": {
+        "locale": "en",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "This item requires shipping.\nShipping policy: https://shop.example/policies/shipping\nIf you add 2 of this item to your basket:\nNative * shirt\nCurrent listed price: $12.50\nRegular listed price: $15.00\nOffer terms: a 10% discount, subject to its verified conditions.\nCode: SAVE\nAutomatic offer; checkout confirms the final application.\nEligibility and the final price are confirmed at checkout.\nOffer terms: a $2.00 discount, subject to its verified conditions.\nEligibility and the final price are confirmed at checkout.\nOffer terms: free shipping, subject to checkout validation.\nView product: https://shop.example/products/shirt\nI couldn't verify an applicable offer for this suggestion."
+    },
+    {
+      "input": {
+        "locale": "en",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "I can help with this store's products, but I can't answer that question.\nThis item requires shipping.\nShipping policy: https://shop.example/policies/shipping\nIf you add 2 of this item to your basket:\nNative * shirt\nCurrent listed price: $12.50\nRegular listed price: $15.00\nOffer terms: a 10% discount, subject to its verified conditions.\nCode: SAVE\nAutomatic offer; checkout confirms the final application.\nEligibility and the final price are confirmed at checkout.\nOffer terms: a $2.00 discount, subject to its verified conditions.\nEligibility and the final price are confirmed at checkout.\nOffer terms: free shipping, subject to checkout validation.\nView product: https://shop.example/products/shirt\nI couldn't verify an applicable offer for this suggestion."
+    },
+    {
+      "input": {
+        "locale": "en",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "I can't confirm the shipping details for your request. Please check with the store.\nThis item requires shipping.\nShipping policy: https://shop.example/policies/shipping\nIf you add 2 of this item to your basket:\nNative * shirt\nCurrent listed price: $12.50\nRegular listed price: $15.00\nOffer terms: a 10% discount, subject to its verified conditions.\nCode: SAVE\nAutomatic offer; checkout confirms the final application.\nEligibility and the final price are confirmed at checkout.\nOffer terms: a $2.00 discount, subject to its verified conditions.\nEligibility and the final price are confirmed at checkout.\nOffer terms: free shipping, subject to checkout validation.\nView product: https://shop.example/products/shirt\nI couldn't verify an applicable offer for this suggestion."
+    },
+    {
+      "input": {
+        "locale": "fi",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Tämä tuote on toimitettava.\nToimitusehdot: https://shop.example/policies/shipping\nJos lisäät 2 tätä tuotetta koriisi:\nNative * shirt\nNykyinen ilmoitettu hinta: 12,50 $\nNormaali ilmoitettu hinta: 15,00 $\nTarjouksen ehdot: 10 % alennus vahvistettujen ehtojen mukaisesti.\nKoodi: SAVE\nAutomaattinen tarjous; kassa vahvistaa lopullisen käytön.\nKelpoisuus ja lopullinen hinta vahvistetaan kassalla.\nTarjouksen ehdot: 2,00 $ alennus vahvistettujen ehtojen mukaisesti.\nKelpoisuus ja lopullinen hinta vahvistetaan kassalla.\nTarjouksen ehdot: ilmainen toimitus, vahvistetaan kassalla.\nNäytä tuote: https://shop.example/products/shirt\nTälle ehdotukselle ei voitu vahvistaa soveltuvaa tarjousta."
+    },
+    {
+      "input": {
+        "locale": "fi",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Voin auttaa tämän kaupan tuotteissa, mutta en voi vastata tähän kysymykseen.\nTämä tuote on toimitettava.\nToimitusehdot: https://shop.example/policies/shipping\nJos lisäät 2 tätä tuotetta koriisi:\nNative * shirt\nNykyinen ilmoitettu hinta: 12,50 $\nNormaali ilmoitettu hinta: 15,00 $\nTarjouksen ehdot: 10 % alennus vahvistettujen ehtojen mukaisesti.\nKoodi: SAVE\nAutomaattinen tarjous; kassa vahvistaa lopullisen käytön.\nKelpoisuus ja lopullinen hinta vahvistetaan kassalla.\nTarjouksen ehdot: 2,00 $ alennus vahvistettujen ehtojen mukaisesti.\nKelpoisuus ja lopullinen hinta vahvistetaan kassalla.\nTarjouksen ehdot: ilmainen toimitus, vahvistetaan kassalla.\nNäytä tuote: https://shop.example/products/shirt\nTälle ehdotukselle ei voitu vahvistaa soveltuvaa tarjousta."
+    },
+    {
+      "input": {
+        "locale": "fi",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "En voi vahvistaa pyytämiäsi toimitustietoja. Tarkista asia kaupasta.\nTämä tuote on toimitettava.\nToimitusehdot: https://shop.example/policies/shipping\nJos lisäät 2 tätä tuotetta koriisi:\nNative * shirt\nNykyinen ilmoitettu hinta: 12,50 $\nNormaali ilmoitettu hinta: 15,00 $\nTarjouksen ehdot: 10 % alennus vahvistettujen ehtojen mukaisesti.\nKoodi: SAVE\nAutomaattinen tarjous; kassa vahvistaa lopullisen käytön.\nKelpoisuus ja lopullinen hinta vahvistetaan kassalla.\nTarjouksen ehdot: 2,00 $ alennus vahvistettujen ehtojen mukaisesti.\nKelpoisuus ja lopullinen hinta vahvistetaan kassalla.\nTarjouksen ehdot: ilmainen toimitus, vahvistetaan kassalla.\nNäytä tuote: https://shop.example/products/shirt\nTälle ehdotukselle ei voitu vahvistaa soveltuvaa tarjousta."
+    },
+    {
+      "input": {
+        "locale": "fr",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Cet article nécessite une livraison.\nPolitique de livraison : https://shop.example/policies/shipping\nSi vous ajoutez 2 de cet article à votre panier :\nNative * shirt\nPrix affiché actuel : 12,50 $US\nPrix affiché habituel : 15,00 $US\nConditions de l'offre : remise de 10 %, selon les conditions vérifiées.\nCode : SAVE\nOffre automatique ; le paiement confirme son application finale.\nL'éligibilité et le prix final sont confirmés au paiement.\nConditions de l'offre : remise de 2,00 $US, selon les conditions vérifiées.\nL'éligibilité et le prix final sont confirmés au paiement.\nConditions de l'offre : livraison gratuite, à confirmer lors du paiement.\nVoir le produit : https://shop.example/products/shirt\nJe n'ai pas pu vérifier une offre applicable à cette suggestion."
+    },
+    {
+      "input": {
+        "locale": "fr",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Je peux vous aider avec les produits de cette boutique, mais pas répondre à cette question.\nCet article nécessite une livraison.\nPolitique de livraison : https://shop.example/policies/shipping\nSi vous ajoutez 2 de cet article à votre panier :\nNative * shirt\nPrix affiché actuel : 12,50 $US\nPrix affiché habituel : 15,00 $US\nConditions de l'offre : remise de 10 %, selon les conditions vérifiées.\nCode : SAVE\nOffre automatique ; le paiement confirme son application finale.\nL'éligibilité et le prix final sont confirmés au paiement.\nConditions de l'offre : remise de 2,00 $US, selon les conditions vérifiées.\nL'éligibilité et le prix final sont confirmés au paiement.\nConditions de l'offre : livraison gratuite, à confirmer lors du paiement.\nVoir le produit : https://shop.example/products/shirt\nJe n'ai pas pu vérifier une offre applicable à cette suggestion."
+    },
+    {
+      "input": {
+        "locale": "fr",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Je ne peux pas confirmer les détails de livraison demandés. Veuillez consulter la boutique.\nCet article nécessite une livraison.\nPolitique de livraison : https://shop.example/policies/shipping\nSi vous ajoutez 2 de cet article à votre panier :\nNative * shirt\nPrix affiché actuel : 12,50 $US\nPrix affiché habituel : 15,00 $US\nConditions de l'offre : remise de 10 %, selon les conditions vérifiées.\nCode : SAVE\nOffre automatique ; le paiement confirme son application finale.\nL'éligibilité et le prix final sont confirmés au paiement.\nConditions de l'offre : remise de 2,00 $US, selon les conditions vérifiées.\nL'éligibilité et le prix final sont confirmés au paiement.\nConditions de l'offre : livraison gratuite, à confirmer lors du paiement.\nVoir le produit : https://shop.example/products/shirt\nJe n'ai pas pu vérifier une offre applicable à cette suggestion."
+    },
+    {
+      "input": {
+        "locale": "de",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Dieser Artikel muss versendet werden.\nVersandbedingungen: https://shop.example/policies/shipping\nWenn Sie 2 dieses Artikels in den Warenkorb legen:\nNative * shirt\nAktueller Listenpreis: 12,50 $\nRegulärer Listenpreis: 15,00 $\nAngebotsbedingungen: 10 % Rabatt, vorbehaltlich der geprüften Bedingungen.\nCode: SAVE\nAutomatisches Angebot; die Kasse bestätigt die endgültige Anwendung.\nBerechtigung und Endpreis werden beim Bezahlen bestätigt.\nAngebotsbedingungen: 2,00 $ Rabatt, vorbehaltlich der geprüften Bedingungen.\nBerechtigung und Endpreis werden beim Bezahlen bestätigt.\nAngebotsbedingungen: kostenloser Versand, vorbehaltlich der Bestätigung beim Bezahlen.\nProdukt ansehen: https://shop.example/products/shirt\nIch konnte kein passendes Angebot für diesen Vorschlag bestätigen."
+    },
+    {
+      "input": {
+        "locale": "de",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Ich helfe Ihnen gern mit den Produkten dieses Shops, kann diese Frage aber nicht beantworten.\nDieser Artikel muss versendet werden.\nVersandbedingungen: https://shop.example/policies/shipping\nWenn Sie 2 dieses Artikels in den Warenkorb legen:\nNative * shirt\nAktueller Listenpreis: 12,50 $\nRegulärer Listenpreis: 15,00 $\nAngebotsbedingungen: 10 % Rabatt, vorbehaltlich der geprüften Bedingungen.\nCode: SAVE\nAutomatisches Angebot; die Kasse bestätigt die endgültige Anwendung.\nBerechtigung und Endpreis werden beim Bezahlen bestätigt.\nAngebotsbedingungen: 2,00 $ Rabatt, vorbehaltlich der geprüften Bedingungen.\nBerechtigung und Endpreis werden beim Bezahlen bestätigt.\nAngebotsbedingungen: kostenloser Versand, vorbehaltlich der Bestätigung beim Bezahlen.\nProdukt ansehen: https://shop.example/products/shirt\nIch konnte kein passendes Angebot für diesen Vorschlag bestätigen."
+    },
+    {
+      "input": {
+        "locale": "de",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Ich kann die gewünschten Versanddetails nicht bestätigen. Bitte fragen Sie beim Shop nach.\nDieser Artikel muss versendet werden.\nVersandbedingungen: https://shop.example/policies/shipping\nWenn Sie 2 dieses Artikels in den Warenkorb legen:\nNative * shirt\nAktueller Listenpreis: 12,50 $\nRegulärer Listenpreis: 15,00 $\nAngebotsbedingungen: 10 % Rabatt, vorbehaltlich der geprüften Bedingungen.\nCode: SAVE\nAutomatisches Angebot; die Kasse bestätigt die endgültige Anwendung.\nBerechtigung und Endpreis werden beim Bezahlen bestätigt.\nAngebotsbedingungen: 2,00 $ Rabatt, vorbehaltlich der geprüften Bedingungen.\nBerechtigung und Endpreis werden beim Bezahlen bestätigt.\nAngebotsbedingungen: kostenloser Versand, vorbehaltlich der Bestätigung beim Bezahlen.\nProdukt ansehen: https://shop.example/products/shirt\nIch konnte kein passendes Angebot für diesen Vorschlag bestätigen."
+    },
+    {
+      "input": {
+        "locale": "it",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Questo articolo richiede la spedizione.\nPolitica di spedizione: https://shop.example/policies/shipping\nSe aggiungi 2 di questo articolo al carrello:\nNative * shirt\nPrezzo di listino attuale: 12,50 USD\nPrezzo di listino normale: 15,00 USD\nTermini dell'offerta: sconto del 10%, secondo le condizioni verificate.\nCodice: SAVE\nOfferta automatica; il pagamento conferma l'applicazione finale.\nIdoneità e prezzo finale sono confermati al pagamento.\nTermini dell'offerta: sconto di 2,00 USD, secondo le condizioni verificate.\nIdoneità e prezzo finale sono confermati al pagamento.\nTermini dell'offerta: spedizione gratuita, da verificare al pagamento.\nVisualizza prodotto: https://shop.example/products/shirt\nNon ho potuto verificare un'offerta applicabile a questo suggerimento."
+    },
+    {
+      "input": {
+        "locale": "it",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Posso aiutarti con i prodotti di questo negozio, ma non posso rispondere a questa domanda.\nQuesto articolo richiede la spedizione.\nPolitica di spedizione: https://shop.example/policies/shipping\nSe aggiungi 2 di questo articolo al carrello:\nNative * shirt\nPrezzo di listino attuale: 12,50 USD\nPrezzo di listino normale: 15,00 USD\nTermini dell'offerta: sconto del 10%, secondo le condizioni verificate.\nCodice: SAVE\nOfferta automatica; il pagamento conferma l'applicazione finale.\nIdoneità e prezzo finale sono confermati al pagamento.\nTermini dell'offerta: sconto di 2,00 USD, secondo le condizioni verificate.\nIdoneità e prezzo finale sono confermati al pagamento.\nTermini dell'offerta: spedizione gratuita, da verificare al pagamento.\nVisualizza prodotto: https://shop.example/products/shirt\nNon ho potuto verificare un'offerta applicabile a questo suggerimento."
+    },
+    {
+      "input": {
+        "locale": "it",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Non posso confermare i dettagli di spedizione richiesti. Contatta il negozio.\nQuesto articolo richiede la spedizione.\nPolitica di spedizione: https://shop.example/policies/shipping\nSe aggiungi 2 di questo articolo al carrello:\nNative * shirt\nPrezzo di listino attuale: 12,50 USD\nPrezzo di listino normale: 15,00 USD\nTermini dell'offerta: sconto del 10%, secondo le condizioni verificate.\nCodice: SAVE\nOfferta automatica; il pagamento conferma l'applicazione finale.\nIdoneità e prezzo finale sono confermati al pagamento.\nTermini dell'offerta: sconto di 2,00 USD, secondo le condizioni verificate.\nIdoneità e prezzo finale sono confermati al pagamento.\nTermini dell'offerta: spedizione gratuita, da verificare al pagamento.\nVisualizza prodotto: https://shop.example/products/shirt\nNon ho potuto verificare un'offerta applicabile a questo suggerimento."
+    },
+    {
+      "input": {
+        "locale": "ja",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "この商品は配送が必要です。\n配送ポリシー：https://shop.example/policies/shipping\nこの商品を 2 個カートに追加する場合：\nNative * shirt\n現在の表示価格：$12.50\n通常の表示価格：$15.00\nオファー条件：確認済みの条件に従い 10% 割引。\nコード：SAVE\n自動オファーです。最終的な適用はチェックアウトで確認されます。\n適用条件と最終価格はチェックアウトで確認されます。\nオファー条件：確認済みの条件に従い $2.00 割引。\n適用条件と最終価格はチェックアウトで確認されます。\nオファー条件：送料無料。適用はチェックアウトで確認してください。\n商品を見る：https://shop.example/products/shirt\nこの提案に適用できるオファーを確認できませんでした。"
+    },
+    {
+      "input": {
+        "locale": "ja",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "このストアの商品についてはお手伝いできますが、その質問には回答できません。\nこの商品は配送が必要です。\n配送ポリシー：https://shop.example/policies/shipping\nこの商品を 2 個カートに追加する場合：\nNative * shirt\n現在の表示価格：$12.50\n通常の表示価格：$15.00\nオファー条件：確認済みの条件に従い 10% 割引。\nコード：SAVE\n自動オファーです。最終的な適用はチェックアウトで確認されます。\n適用条件と最終価格はチェックアウトで確認されます。\nオファー条件：確認済みの条件に従い $2.00 割引。\n適用条件と最終価格はチェックアウトで確認されます。\nオファー条件：送料無料。適用はチェックアウトで確認してください。\n商品を見る：https://shop.example/products/shirt\nこの提案に適用できるオファーを確認できませんでした。"
+    },
+    {
+      "input": {
+        "locale": "ja",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "ご希望の配送情報を確認できません。ストアにご確認ください。\nこの商品は配送が必要です。\n配送ポリシー：https://shop.example/policies/shipping\nこの商品を 2 個カートに追加する場合：\nNative * shirt\n現在の表示価格：$12.50\n通常の表示価格：$15.00\nオファー条件：確認済みの条件に従い 10% 割引。\nコード：SAVE\n自動オファーです。最終的な適用はチェックアウトで確認されます。\n適用条件と最終価格はチェックアウトで確認されます。\nオファー条件：確認済みの条件に従い $2.00 割引。\n適用条件と最終価格はチェックアウトで確認されます。\nオファー条件：送料無料。適用はチェックアウトで確認してください。\n商品を見る：https://shop.example/products/shirt\nこの提案に適用できるオファーを確認できませんでした。"
+    },
+    {
+      "input": {
+        "locale": "ko",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "이 상품은 배송이 필요합니다.\n배송 정책: https://shop.example/policies/shipping\n이 상품 2개를 장바구니에 추가하면:\nNative * shirt\n현재 표시 가격: US$12.50\n정상 표시 가격: US$15.00\n혜택 조건: 확인된 조건에 따라 10% 할인.\n코드: SAVE\n자동 혜택이며 최종 적용은 결제 단계에서 확인됩니다.\n자격과 최종 가격은 결제 단계에서 확인됩니다.\n혜택 조건: 확인된 조건에 따라 US$2.00 할인.\n자격과 최종 가격은 결제 단계에서 확인됩니다.\n혜택 조건: 무료 배송. 결제 단계에서 확인됩니다.\n상품 보기: https://shop.example/products/shirt\n이 제안에 적용 가능한 혜택을 확인하지 못했습니다."
+    },
+    {
+      "input": {
+        "locale": "ko",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "이 스토어의 상품은 도와드릴 수 있지만 해당 질문에는 답변할 수 없습니다.\n이 상품은 배송이 필요합니다.\n배송 정책: https://shop.example/policies/shipping\n이 상품 2개를 장바구니에 추가하면:\nNative * shirt\n현재 표시 가격: US$12.50\n정상 표시 가격: US$15.00\n혜택 조건: 확인된 조건에 따라 10% 할인.\n코드: SAVE\n자동 혜택이며 최종 적용은 결제 단계에서 확인됩니다.\n자격과 최종 가격은 결제 단계에서 확인됩니다.\n혜택 조건: 확인된 조건에 따라 US$2.00 할인.\n자격과 최종 가격은 결제 단계에서 확인됩니다.\n혜택 조건: 무료 배송. 결제 단계에서 확인됩니다.\n상품 보기: https://shop.example/products/shirt\n이 제안에 적용 가능한 혜택을 확인하지 못했습니다."
+    },
+    {
+      "input": {
+        "locale": "ko",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "요청하신 배송 정보를 확인할 수 없습니다. 스토어에 문의해 주세요.\n이 상품은 배송이 필요합니다.\n배송 정책: https://shop.example/policies/shipping\n이 상품 2개를 장바구니에 추가하면:\nNative * shirt\n현재 표시 가격: US$12.50\n정상 표시 가격: US$15.00\n혜택 조건: 확인된 조건에 따라 10% 할인.\n코드: SAVE\n자동 혜택이며 최종 적용은 결제 단계에서 확인됩니다.\n자격과 최종 가격은 결제 단계에서 확인됩니다.\n혜택 조건: 확인된 조건에 따라 US$2.00 할인.\n자격과 최종 가격은 결제 단계에서 확인됩니다.\n혜택 조건: 무료 배송. 결제 단계에서 확인됩니다.\n상품 보기: https://shop.example/products/shirt\n이 제안에 적용 가능한 혜택을 확인하지 못했습니다."
+    },
+    {
+      "input": {
+        "locale": "nb",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Denne varen må sendes.\nFraktvilkår: https://shop.example/policies/shipping\nHvis du legger 2 av denne varen i handlekurven:\nNative * shirt\nGjeldende oppført pris: 12,50 USD\nOrdinær oppført pris: 15,00 USD\nTilbudsvilkår: 10 % rabatt, med forbehold om bekreftede vilkår.\nKode: SAVE\nAutomatisk tilbud; kassen bekrefter endelig bruk.\nKvalifikasjon og sluttpris bekreftes i kassen.\nTilbudsvilkår: 2,00 USD rabatt, med forbehold om bekreftede vilkår.\nKvalifikasjon og sluttpris bekreftes i kassen.\nTilbudsvilkår: gratis frakt, bekreftes i kassen.\nVis produkt: https://shop.example/products/shirt\nJeg kunne ikke bekrefte et gjeldende tilbud for dette forslaget."
+    },
+    {
+      "input": {
+        "locale": "nb",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Jeg kan hjelpe med produktene i denne butikken, men ikke svare på det spørsmålet.\nDenne varen må sendes.\nFraktvilkår: https://shop.example/policies/shipping\nHvis du legger 2 av denne varen i handlekurven:\nNative * shirt\nGjeldende oppført pris: 12,50 USD\nOrdinær oppført pris: 15,00 USD\nTilbudsvilkår: 10 % rabatt, med forbehold om bekreftede vilkår.\nKode: SAVE\nAutomatisk tilbud; kassen bekrefter endelig bruk.\nKvalifikasjon og sluttpris bekreftes i kassen.\nTilbudsvilkår: 2,00 USD rabatt, med forbehold om bekreftede vilkår.\nKvalifikasjon og sluttpris bekreftes i kassen.\nTilbudsvilkår: gratis frakt, bekreftes i kassen.\nVis produkt: https://shop.example/products/shirt\nJeg kunne ikke bekrefte et gjeldende tilbud for dette forslaget."
+    },
+    {
+      "input": {
+        "locale": "nb",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Jeg kan ikke bekrefte de ønskede fraktopplysningene. Kontakt butikken.\nDenne varen må sendes.\nFraktvilkår: https://shop.example/policies/shipping\nHvis du legger 2 av denne varen i handlekurven:\nNative * shirt\nGjeldende oppført pris: 12,50 USD\nOrdinær oppført pris: 15,00 USD\nTilbudsvilkår: 10 % rabatt, med forbehold om bekreftede vilkår.\nKode: SAVE\nAutomatisk tilbud; kassen bekrefter endelig bruk.\nKvalifikasjon og sluttpris bekreftes i kassen.\nTilbudsvilkår: 2,00 USD rabatt, med forbehold om bekreftede vilkår.\nKvalifikasjon og sluttpris bekreftes i kassen.\nTilbudsvilkår: gratis frakt, bekreftes i kassen.\nVis produkt: https://shop.example/products/shirt\nJeg kunne ikke bekrefte et gjeldende tilbud for dette forslaget."
+    },
+    {
+      "input": {
+        "locale": "pl",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Ten produkt wymaga wysyłki.\nZasady wysyłki: https://shop.example/policies/shipping\nJeśli dodasz 2 szt. tego produktu do koszyka:\nNative * shirt\nAktualna cena katalogowa: 12,50 USD\nRegularna cena katalogowa: 15,00 USD\nWarunki oferty: rabat 10%, zgodnie ze zweryfikowanymi warunkami.\nKod: SAVE\nOferta automatyczna; kasa potwierdzi ostateczne zastosowanie.\nUprawnienie i cena końcowa zostaną potwierdzone przy kasie.\nWarunki oferty: rabat 2,00 USD, zgodnie ze zweryfikowanymi warunkami.\nUprawnienie i cena końcowa zostaną potwierdzone przy kasie.\nWarunki oferty: bezpłatna wysyłka, do potwierdzenia przy kasie.\nZobacz produkt: https://shop.example/products/shirt\nNie udało się potwierdzić oferty dla tej propozycji."
+    },
+    {
+      "input": {
+        "locale": "pl",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Mogę pomóc w sprawie produktów tego sklepu, ale nie mogę odpowiedzieć na to pytanie.\nTen produkt wymaga wysyłki.\nZasady wysyłki: https://shop.example/policies/shipping\nJeśli dodasz 2 szt. tego produktu do koszyka:\nNative * shirt\nAktualna cena katalogowa: 12,50 USD\nRegularna cena katalogowa: 15,00 USD\nWarunki oferty: rabat 10%, zgodnie ze zweryfikowanymi warunkami.\nKod: SAVE\nOferta automatyczna; kasa potwierdzi ostateczne zastosowanie.\nUprawnienie i cena końcowa zostaną potwierdzone przy kasie.\nWarunki oferty: rabat 2,00 USD, zgodnie ze zweryfikowanymi warunkami.\nUprawnienie i cena końcowa zostaną potwierdzone przy kasie.\nWarunki oferty: bezpłatna wysyłka, do potwierdzenia przy kasie.\nZobacz produkt: https://shop.example/products/shirt\nNie udało się potwierdzić oferty dla tej propozycji."
+    },
+    {
+      "input": {
+        "locale": "pl",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Nie mogę potwierdzić żądanych informacji o wysyłce. Sprawdź je w sklepie.\nTen produkt wymaga wysyłki.\nZasady wysyłki: https://shop.example/policies/shipping\nJeśli dodasz 2 szt. tego produktu do koszyka:\nNative * shirt\nAktualna cena katalogowa: 12,50 USD\nRegularna cena katalogowa: 15,00 USD\nWarunki oferty: rabat 10%, zgodnie ze zweryfikowanymi warunkami.\nKod: SAVE\nOferta automatyczna; kasa potwierdzi ostateczne zastosowanie.\nUprawnienie i cena końcowa zostaną potwierdzone przy kasie.\nWarunki oferty: rabat 2,00 USD, zgodnie ze zweryfikowanymi warunkami.\nUprawnienie i cena końcowa zostaną potwierdzone przy kasie.\nWarunki oferty: bezpłatna wysyłka, do potwierdzenia przy kasie.\nZobacz produkt: https://shop.example/products/shirt\nNie udało się potwierdzić oferty dla tej propozycji."
+    },
+    {
+      "input": {
+        "locale": "pt-BR",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Este item precisa ser enviado.\nPolítica de envio: https://shop.example/policies/shipping\nSe você adicionar 2 deste item à sua cesta:\nNative * shirt\nPreço listado atual: US$ 12,50\nPreço listado normal: US$ 15,00\nTermos da oferta: desconto de 10%, sujeito às condições verificadas.\nCódigo: SAVE\nOferta automática; o checkout confirma a aplicação final.\nA elegibilidade e o preço final são confirmados no checkout.\nTermos da oferta: desconto de US$ 2,00, sujeito às condições verificadas.\nA elegibilidade e o preço final são confirmados no checkout.\nTermos da oferta: frete grátis, sujeito à validação no checkout.\nVer produto: https://shop.example/products/shirt\nNão foi possível verificar uma oferta aplicável para esta sugestão."
+    },
+    {
+      "input": {
+        "locale": "pt-BR",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Posso ajudar com os produtos desta loja, mas não posso responder a essa pergunta.\nEste item precisa ser enviado.\nPolítica de envio: https://shop.example/policies/shipping\nSe você adicionar 2 deste item à sua cesta:\nNative * shirt\nPreço listado atual: US$ 12,50\nPreço listado normal: US$ 15,00\nTermos da oferta: desconto de 10%, sujeito às condições verificadas.\nCódigo: SAVE\nOferta automática; o checkout confirma a aplicação final.\nA elegibilidade e o preço final são confirmados no checkout.\nTermos da oferta: desconto de US$ 2,00, sujeito às condições verificadas.\nA elegibilidade e o preço final são confirmados no checkout.\nTermos da oferta: frete grátis, sujeito à validação no checkout.\nVer produto: https://shop.example/products/shirt\nNão foi possível verificar uma oferta aplicável para esta sugestão."
+    },
+    {
+      "input": {
+        "locale": "pt-BR",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Não consigo confirmar os detalhes de envio solicitados. Consulte a loja.\nEste item precisa ser enviado.\nPolítica de envio: https://shop.example/policies/shipping\nSe você adicionar 2 deste item à sua cesta:\nNative * shirt\nPreço listado atual: US$ 12,50\nPreço listado normal: US$ 15,00\nTermos da oferta: desconto de 10%, sujeito às condições verificadas.\nCódigo: SAVE\nOferta automática; o checkout confirma a aplicação final.\nA elegibilidade e o preço final são confirmados no checkout.\nTermos da oferta: desconto de US$ 2,00, sujeito às condições verificadas.\nA elegibilidade e o preço final são confirmados no checkout.\nTermos da oferta: frete grátis, sujeito à validação no checkout.\nVer produto: https://shop.example/products/shirt\nNão foi possível verificar uma oferta aplicável para esta sugestão."
+    },
+    {
+      "input": {
+        "locale": "pt-PT",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Este artigo requer entrega.\nPolítica de entrega: https://shop.example/policies/shipping\nSe adicionar 2 deste artigo ao cesto:\nNative * shirt\nPreço atual anunciado: 12,50 US$\nPreço normal anunciado: 15,00 US$\nCondições da oferta: desconto de 10%, sujeito às condições verificadas.\nCódigo: SAVE\nOferta automática; o pagamento confirma a aplicação final.\nA elegibilidade e o preço final são confirmados no pagamento.\nCondições da oferta: desconto de 2,00 US$, sujeito às condições verificadas.\nA elegibilidade e o preço final são confirmados no pagamento.\nCondições da oferta: entrega gratuita, sujeita a validação no pagamento.\nVer produto: https://shop.example/products/shirt\nNão foi possível confirmar uma oferta aplicável a esta sugestão."
+    },
+    {
+      "input": {
+        "locale": "pt-PT",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Posso ajudar com os produtos desta loja, mas não posso responder a essa pergunta.\nEste artigo requer entrega.\nPolítica de entrega: https://shop.example/policies/shipping\nSe adicionar 2 deste artigo ao cesto:\nNative * shirt\nPreço atual anunciado: 12,50 US$\nPreço normal anunciado: 15,00 US$\nCondições da oferta: desconto de 10%, sujeito às condições verificadas.\nCódigo: SAVE\nOferta automática; o pagamento confirma a aplicação final.\nA elegibilidade e o preço final são confirmados no pagamento.\nCondições da oferta: desconto de 2,00 US$, sujeito às condições verificadas.\nA elegibilidade e o preço final são confirmados no pagamento.\nCondições da oferta: entrega gratuita, sujeita a validação no pagamento.\nVer produto: https://shop.example/products/shirt\nNão foi possível confirmar uma oferta aplicável a esta sugestão."
+    },
+    {
+      "input": {
+        "locale": "pt-PT",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Não consigo confirmar os detalhes de entrega pedidos. Consulte a loja.\nEste artigo requer entrega.\nPolítica de entrega: https://shop.example/policies/shipping\nSe adicionar 2 deste artigo ao cesto:\nNative * shirt\nPreço atual anunciado: 12,50 US$\nPreço normal anunciado: 15,00 US$\nCondições da oferta: desconto de 10%, sujeito às condições verificadas.\nCódigo: SAVE\nOferta automática; o pagamento confirma a aplicação final.\nA elegibilidade e o preço final são confirmados no pagamento.\nCondições da oferta: desconto de 2,00 US$, sujeito às condições verificadas.\nA elegibilidade e o preço final são confirmados no pagamento.\nCondições da oferta: entrega gratuita, sujeita a validação no pagamento.\nVer produto: https://shop.example/products/shirt\nNão foi possível confirmar uma oferta aplicável a esta sugestão."
+    },
+    {
+      "input": {
+        "locale": "es",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Este artículo requiere envío.\nPolítica de envío: https://shop.example/policies/shipping\nSi añade 2 de este artículo a la cesta:\nNative * shirt\nPrecio actual indicado: 12,50 US$\nPrecio habitual indicado: 15,00 US$\nCondiciones de la oferta: descuento del 10 %, sujeto a las condiciones verificadas.\nCódigo: SAVE\nOferta automática; el pago confirma la aplicación final.\nLa elegibilidad y el precio final se confirman al pagar.\nCondiciones de la oferta: descuento de 2,00 US$, sujeto a las condiciones verificadas.\nLa elegibilidad y el precio final se confirman al pagar.\nCondiciones de la oferta: envío gratis, sujeto a validación al pagar.\nVer producto: https://shop.example/products/shirt\nNo pude verificar una oferta aplicable a esta sugerencia."
+    },
+    {
+      "input": {
+        "locale": "es",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Puedo ayudarle con los productos de esta tienda, pero no puedo responder a esa pregunta.\nEste artículo requiere envío.\nPolítica de envío: https://shop.example/policies/shipping\nSi añade 2 de este artículo a la cesta:\nNative * shirt\nPrecio actual indicado: 12,50 US$\nPrecio habitual indicado: 15,00 US$\nCondiciones de la oferta: descuento del 10 %, sujeto a las condiciones verificadas.\nCódigo: SAVE\nOferta automática; el pago confirma la aplicación final.\nLa elegibilidad y el precio final se confirman al pagar.\nCondiciones de la oferta: descuento de 2,00 US$, sujeto a las condiciones verificadas.\nLa elegibilidad y el precio final se confirman al pagar.\nCondiciones de la oferta: envío gratis, sujeto a validación al pagar.\nVer producto: https://shop.example/products/shirt\nNo pude verificar una oferta aplicable a esta sugerencia."
+    },
+    {
+      "input": {
+        "locale": "es",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "No puedo confirmar los detalles de envío solicitados. Consulte con la tienda.\nEste artículo requiere envío.\nPolítica de envío: https://shop.example/policies/shipping\nSi añade 2 de este artículo a la cesta:\nNative * shirt\nPrecio actual indicado: 12,50 US$\nPrecio habitual indicado: 15,00 US$\nCondiciones de la oferta: descuento del 10 %, sujeto a las condiciones verificadas.\nCódigo: SAVE\nOferta automática; el pago confirma la aplicación final.\nLa elegibilidad y el precio final se confirman al pagar.\nCondiciones de la oferta: descuento de 2,00 US$, sujeto a las condiciones verificadas.\nLa elegibilidad y el precio final se confirman al pagar.\nCondiciones de la oferta: envío gratis, sujeto a validación al pagar.\nVer producto: https://shop.example/products/shirt\nNo pude verificar una oferta aplicable a esta sugerencia."
+    },
+    {
+      "input": {
+        "locale": "sv",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Den här varan måste skickas.\nLeveranspolicy: https://shop.example/policies/shipping\nOm du lägger 2 av den här varan i varukorgen:\nNative * shirt\nAktuellt listpris: 12,50 US$\nOrdinarie listpris: 15,00 US$\nErbjudandevillkor: 10 % rabatt, enligt verifierade villkor.\nKod: SAVE\nAutomatiskt erbjudande; kassan bekräftar den slutliga tillämpningen.\nBehörighet och slutpris bekräftas i kassan.\nErbjudandevillkor: 2,00 US$ rabatt, enligt verifierade villkor.\nBehörighet och slutpris bekräftas i kassan.\nErbjudandevillkor: fri frakt, bekräftas i kassan.\nVisa produkt: https://shop.example/products/shirt\nJag kunde inte verifiera ett tillämpligt erbjudande för det här förslaget."
+    },
+    {
+      "input": {
+        "locale": "sv",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Jag kan hjälpa till med butikens produkter, men jag kan inte svara på den frågan.\nDen här varan måste skickas.\nLeveranspolicy: https://shop.example/policies/shipping\nOm du lägger 2 av den här varan i varukorgen:\nNative * shirt\nAktuellt listpris: 12,50 US$\nOrdinarie listpris: 15,00 US$\nErbjudandevillkor: 10 % rabatt, enligt verifierade villkor.\nKod: SAVE\nAutomatiskt erbjudande; kassan bekräftar den slutliga tillämpningen.\nBehörighet och slutpris bekräftas i kassan.\nErbjudandevillkor: 2,00 US$ rabatt, enligt verifierade villkor.\nBehörighet och slutpris bekräftas i kassan.\nErbjudandevillkor: fri frakt, bekräftas i kassan.\nVisa produkt: https://shop.example/products/shirt\nJag kunde inte verifiera ett tillämpligt erbjudande för det här förslaget."
+    },
+    {
+      "input": {
+        "locale": "sv",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Jag kan inte bekräfta de efterfrågade leveransuppgifterna. Fråga butiken.\nDen här varan måste skickas.\nLeveranspolicy: https://shop.example/policies/shipping\nOm du lägger 2 av den här varan i varukorgen:\nNative * shirt\nAktuellt listpris: 12,50 US$\nOrdinarie listpris: 15,00 US$\nErbjudandevillkor: 10 % rabatt, enligt verifierade villkor.\nKod: SAVE\nAutomatiskt erbjudande; kassan bekräftar den slutliga tillämpningen.\nBehörighet och slutpris bekräftas i kassan.\nErbjudandevillkor: 2,00 US$ rabatt, enligt verifierade villkor.\nBehörighet och slutpris bekräftas i kassan.\nErbjudandevillkor: fri frakt, bekräftas i kassan.\nVisa produkt: https://shop.example/products/shirt\nJag kunde inte verifiera ett tillämpligt erbjudande för det här förslaget."
+    },
+    {
+      "input": {
+        "locale": "th",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "สินค้านี้ต้องจัดส่ง\nนโยบายการจัดส่ง: https://shop.example/policies/shipping\nหากเพิ่มสินค้านี้ 2 ชิ้นลงในตะกร้า:\nNative * shirt\nราคาปัจจุบันที่แสดง: US$12.50\nราคาปกติที่แสดง: US$15.00\nเงื่อนไขข้อเสนอ: ส่วนลด 10% ตามเงื่อนไขที่ตรวจสอบแล้ว\nรหัส: SAVE\nข้อเสนออัตโนมัติ ระบบชำระเงินจะยืนยันการใช้ขั้นสุดท้าย\nตรวจสอบสิทธิ์และราคาสุดท้ายที่หน้าชำระเงิน\nเงื่อนไขข้อเสนอ: ส่วนลด US$2.00 ตามเงื่อนไขที่ตรวจสอบแล้ว\nตรวจสอบสิทธิ์และราคาสุดท้ายที่หน้าชำระเงิน\nเงื่อนไขข้อเสนอ: จัดส่งฟรี โดยต้องยืนยันที่หน้าชำระเงิน\nดูสินค้า: https://shop.example/products/shirt\nฉันตรวจสอบข้อเสนอที่ใช้ได้สำหรับคำแนะนำนี้ไม่ได้"
+    },
+    {
+      "input": {
+        "locale": "th",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "ฉันช่วยแนะนำสินค้าในร้านนี้ได้ แต่ไม่สามารถตอบคำถามนั้นได้\nสินค้านี้ต้องจัดส่ง\nนโยบายการจัดส่ง: https://shop.example/policies/shipping\nหากเพิ่มสินค้านี้ 2 ชิ้นลงในตะกร้า:\nNative * shirt\nราคาปัจจุบันที่แสดง: US$12.50\nราคาปกติที่แสดง: US$15.00\nเงื่อนไขข้อเสนอ: ส่วนลด 10% ตามเงื่อนไขที่ตรวจสอบแล้ว\nรหัส: SAVE\nข้อเสนออัตโนมัติ ระบบชำระเงินจะยืนยันการใช้ขั้นสุดท้าย\nตรวจสอบสิทธิ์และราคาสุดท้ายที่หน้าชำระเงิน\nเงื่อนไขข้อเสนอ: ส่วนลด US$2.00 ตามเงื่อนไขที่ตรวจสอบแล้ว\nตรวจสอบสิทธิ์และราคาสุดท้ายที่หน้าชำระเงิน\nเงื่อนไขข้อเสนอ: จัดส่งฟรี โดยต้องยืนยันที่หน้าชำระเงิน\nดูสินค้า: https://shop.example/products/shirt\nฉันตรวจสอบข้อเสนอที่ใช้ได้สำหรับคำแนะนำนี้ไม่ได้"
+    },
+    {
+      "input": {
+        "locale": "th",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "ฉันยืนยันรายละเอียดการจัดส่งตามที่ขอไม่ได้ โปรดตรวจสอบกับร้านค้า\nสินค้านี้ต้องจัดส่ง\nนโยบายการจัดส่ง: https://shop.example/policies/shipping\nหากเพิ่มสินค้านี้ 2 ชิ้นลงในตะกร้า:\nNative * shirt\nราคาปัจจุบันที่แสดง: US$12.50\nราคาปกติที่แสดง: US$15.00\nเงื่อนไขข้อเสนอ: ส่วนลด 10% ตามเงื่อนไขที่ตรวจสอบแล้ว\nรหัส: SAVE\nข้อเสนออัตโนมัติ ระบบชำระเงินจะยืนยันการใช้ขั้นสุดท้าย\nตรวจสอบสิทธิ์และราคาสุดท้ายที่หน้าชำระเงิน\nเงื่อนไขข้อเสนอ: ส่วนลด US$2.00 ตามเงื่อนไขที่ตรวจสอบแล้ว\nตรวจสอบสิทธิ์และราคาสุดท้ายที่หน้าชำระเงิน\nเงื่อนไขข้อเสนอ: จัดส่งฟรี โดยต้องยืนยันที่หน้าชำระเงิน\nดูสินค้า: https://shop.example/products/shirt\nฉันตรวจสอบข้อเสนอที่ใช้ได้สำหรับคำแนะนำนี้ไม่ได้"
+    },
+    {
+      "input": {
+        "locale": "tr",
+        "disposition": "STANDARD",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Bu ürünün gönderilmesi gerekir.\nGönderim politikası: https://shop.example/policies/shipping\nBu üründen 2 adet sepetinize eklerseniz:\nNative * shirt\nGüncel liste fiyatı: $12,50\nNormal liste fiyatı: $15,00\nTeklif koşulları: doğrulanmış koşullara tabi %10 indirim.\nKod: SAVE\nOtomatik teklif; son uygulamayı ödeme ekranı doğrular.\nUygunluk ve son fiyat ödeme sırasında doğrulanır.\nTeklif koşulları: doğrulanmış koşullara tabi $2,00 indirim.\nUygunluk ve son fiyat ödeme sırasında doğrulanır.\nTeklif koşulları: ücretsiz gönderim; ödeme sırasında doğrulanır.\nÜrünü görüntüle: https://shop.example/products/shirt\nBu öneri için geçerli bir teklifi doğrulayamadım."
+    },
+    {
+      "input": {
+        "locale": "tr",
+        "disposition": "OUT_OF_SCOPE_REDIRECT",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "Bu mağazanın ürünleri konusunda yardımcı olabilirim ancak bu soruyu yanıtlayamam.\nBu ürünün gönderilmesi gerekir.\nGönderim politikası: https://shop.example/policies/shipping\nBu üründen 2 adet sepetinize eklerseniz:\nNative * shirt\nGüncel liste fiyatı: $12,50\nNormal liste fiyatı: $15,00\nTeklif koşulları: doğrulanmış koşullara tabi %10 indirim.\nKod: SAVE\nOtomatik teklif; son uygulamayı ödeme ekranı doğrular.\nUygunluk ve son fiyat ödeme sırasında doğrulanır.\nTeklif koşulları: doğrulanmış koşullara tabi $2,00 indirim.\nUygunluk ve son fiyat ödeme sırasında doğrulanır.\nTeklif koşulları: ücretsiz gönderim; ödeme sırasında doğrulanır.\nÜrünü görüntüle: https://shop.example/products/shirt\nBu öneri için geçerli bir teklifi doğrulayamadım."
+    },
+    {
+      "input": {
+        "locale": "tr",
+        "disposition": "SHIPPING_INFORMATION_UNVERIFIED",
+        "storeUrl": "https://shop.example",
+        "policyUrl": "https://shop.example/policies/shipping",
+        "requiresShipping": true,
+        "products": [
+          {
+            "title": "Native * shirt",
+            "url": "https://shop.example/products/shirt",
+            "quantity": 2,
+            "scope": "ADD_TO_BASKET",
+            "currentPrice": "12.50",
+            "currency": "USD",
+            "regularPrice": "15.00",
+            "offerTerms": [
+              {
+                "kind": "percent",
+                "value": "10",
+                "code": "SAVE",
+                "automatic": true
+              },
+              {
+                "kind": "amount",
+                "value": "2.00",
+                "currency": "USD"
+              },
+              {
+                "kind": "free-shipping"
+              }
+            ]
+          }
+        ],
+        "includeNoVerifiedOffer": true
+      },
+      "body": "İstediğiniz gönderim ayrıntılarını doğrulayamıyorum. Lütfen mağazaya danışın.\nBu ürünün gönderilmesi gerekir.\nGönderim politikası: https://shop.example/policies/shipping\nBu üründen 2 adet sepetinize eklerseniz:\nNative * shirt\nGüncel liste fiyatı: $12,50\nNormal liste fiyatı: $15,00\nTeklif koşulları: doğrulanmış koşullara tabi %10 indirim.\nKod: SAVE\nOtomatik teklif; son uygulamayı ödeme ekranı doğrular.\nUygunluk ve son fiyat ödeme sırasında doğrulanır.\nTeklif koşulları: doğrulanmış koşullara tabi $2,00 indirim.\nUygunluk ve son fiyat ödeme sırasında doğrulanır.\nTeklif koşulları: ücretsiz gönderim; ödeme sırasında doğrulanır.\nÜrünü görüntüle: https://shop.example/products/shirt\nBu öneri için geçerli bir teklifi doğrulayamadım."
+    }
+  ]
+}
