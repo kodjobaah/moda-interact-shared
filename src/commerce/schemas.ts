@@ -242,7 +242,40 @@ export const CommerceProductSaleEvidenceSchema = z.strictObject({
 export type CommerceProductSaleEvidence =
   z.infer<typeof CommerceProductSaleEvidenceSchema>;
 
+const optionLabel = z.string().transform(value => value.replace(/[\r\n\t]+/g, " ").trim()).pipe(z.string().min(1).max(128).refine(value => !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(value)));
+/** Provider facts are bounded by omission, never by truncating factual labels. */
+export function normalizeCommerceProductOptions(raw: unknown): {status:"AVAILABLE"|"NOT_PROVIDED"|"PARTIAL";items:Array<{name:string;values:string[];usedForVariants:boolean|null}>} {
+  if(raw === undefined || raw === null) return {status:"NOT_PROVIDED",items:[]};
+  const source=raw as {status?:unknown;items?:unknown};
+  if(!Array.isArray(source.items)) return {status:"PARTIAL",items:[]};
+  let partial=!["AVAILABLE","NOT_PROVIDED"].includes(String(source.status)) || source.items.length>16 || (source.status === "NOT_PROVIDED" && source.items.length>0);
+  const items:Array<{name:string;values:string[];usedForVariants:boolean|null}>=[];
+  const names=new Set<string>();
+  for(const value of source.items.slice(0,16)) {
+    if(!value||typeof value!=="object") {partial=true;continue;}
+    const item=value as {name?:unknown;values?:unknown;usedForVariants?:unknown};const name=optionLabel.safeParse(item.name);
+    if(!name.success||!Array.isArray(item.values)) {partial=true;continue;}
+    if(names.has(name.data))continue; names.add(name.data);
+    const values:string[]=[]; if(item.values.length>64)partial=true;
+    for(const rawValue of item.values.slice(0,64)) {const parsed=optionLabel.safeParse(rawValue);if(!parsed.success){if(!(typeof rawValue==="string"&&rawValue.trim()===""))partial=true;continue;}if(!values.includes(parsed.data))values.push(parsed.data);}
+    if(item.usedForVariants!==null&&typeof item.usedForVariants!=="boolean")partial=true;
+    items.push({name:name.data,values,usedForVariants:typeof item.usedForVariants==="boolean"?item.usedForVariants:null});
+  }
+  return {status:partial?"PARTIAL":items.length?"AVAILABLE":"NOT_PROVIDED",items};
+}
+export const CommerceProductOptionsSchema = z.preprocess(normalizeCommerceProductOptions,z.strictObject({
+  status: z.enum(["AVAILABLE", "NOT_PROVIDED", "PARTIAL"]),
+  items: z.array(z.strictObject({ name: optionLabel, values: z.array(optionLabel).max(64), usedForVariants: z.boolean().nullable() })).max(16),
+}));
+export function normalizeCommerceProductSelectedOptions(raw:unknown):Array<{name:string;value:string}> {
+  if(!Array.isArray(raw))return [];
+  const result:Array<{name:string;value:string}>=[];
+  for(const entry of raw.slice(0,16)){if(!entry||typeof entry!=="object")continue;const item=entry as {name?:unknown;value?:unknown};const name=optionLabel.safeParse(item.name),value=optionLabel.safeParse(item.value);if(name.success&&value.success&&!result.some(e=>e.name===name.data&&e.value===value.data))result.push({name:name.data,value:value.data});}return result;
+}
+export const CommerceProductSelectedOptionsSchema = z.preprocess(normalizeCommerceProductSelectedOptions,z.array(z.strictObject({name: optionLabel, value: optionLabel})).max(16));
 export const CommerceProductSchema = z.strictObject({
+  options: CommerceProductOptionsSchema.optional(),
+  selectedOptions: CommerceProductSelectedOptionsSchema.optional(),
   productId: ID,
   variantId: ID.nullable(),
   title: z.string().min(1).max(512),
@@ -265,6 +298,7 @@ export const CommerceProductSchema = z.strictObject({
   saleEvidence: CommerceProductSaleEvidenceSchema.nullable().optional(),
   observedAt: DateSchema,
 });
+export type CommerceProduct = z.infer<typeof CommerceProductSchema>;
 // Discount outputs own their UTC wire syntax; general DateSchema remains unchanged.
 // The final lookahead requires absolute end-of-input (unlike JavaScript's $).
 const discountUtcPattern = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.[0-9]+)?Z(?![\s\S])/;

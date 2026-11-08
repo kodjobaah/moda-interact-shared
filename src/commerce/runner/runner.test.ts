@@ -1038,7 +1038,7 @@ test("invalid empty route includes safe provider diagnostics without raw reasoni
   f.input.budgets = { outputTokens: 800 };
   f.input.dependencies.logger = createLogger({ serviceName: "test-host", environment: "test", sink: (record) => records.push(record) });
   const result = await runCommerceTurn(f.input);
-  expectFailure(result, "INVALID_FINAL", "MODEL_CALL_ROUTE_INVALID");
+  expectFailure(result, "BUDGET_EXHAUSTED", "MODEL_OUTPUT_TOKENS_EXHAUSTED");
   const invalid = records.find((record) => record.event === "commerce.turn.model.invalid");
   assert.equal(invalid?.data?.providerFinishReason, "length");
   assert.equal(invalid?.data?.providerReasoningTokens, 798);
@@ -1300,7 +1300,7 @@ test("presentation: both soft dispositions survive ordinary host-authorized fina
     const instructions = f.requests[0].instructions.join("\n");
     assert.ok(instructions.includes(RUNTIME_DATA_AUTHORITY_INSTRUCTION));
     assert.match(instructions, /trusted host instructions may authorize a normal ANSWER/);
-    assert.match(instructions, /failed authorized provider request remains a terminal error/);
+    assert.match(instructions, /DENIED, UNAVAILABLE, THROTTLED and DEADLINE retain mandatory referral/);
     assert.match(instructions, /product-bearing shipping observation/);
     assert.match(instructions, /null\/null policy-only shipping observation alone may retain/);
     assert.match(instructions, /generic runner does not implement that host composer/);
@@ -1332,4 +1332,28 @@ test("presentation: hard referral rejects disposition details and evidence; plai
     assert.deepEqual(result.result.evidenceIds, []);
     assert.notEqual(result.result.replyText, "Here is a soft answer.");
   }
+});
+
+for (const code of ["NOT_FOUND", "INVALID_INPUT", "DENIED", "UNAVAILABLE"] as const) test(`ARCH066 recovery policy ${code}`, async () => {
+ const f=fixture([call(),call(),final({...exampleFinal,answerKind:"ANSWER",referralReason:null})],true);let n=0;
+ f.input.dependencies.tools[0]!.execute=async()=>++n===1?{contractVersion:"commerce.v1",status:"ERROR",code,retryable:false}:{contractVersion:"commerce.v1",status:"OK",data:{source:"SHOPIFY_STOREFRONT",values:{title:"Coat"}},renderedText:"Coat"};
+ const result=await runCommerceTurn(f.input);
+ if(code === "NOT_FOUND"||code === "INVALID_INPUT")assert.equal(result.ok,true);else expectFailure(result,"INVALID_FINAL","FINAL_REFERRAL_REQUIRED");
+});
+test("ARCH066 product context identity rejects before model IO",async()=>{
+ const f=fixture([final()]);f.input.platform="WOOCOMMERCE";f.input.productContext={schemaVersion:1,shopId:"foreign",conversationId:f.input.turn.conversationId,platform:"WOOCOMMERCE",references:[],updatedAt:new Date(now).toISOString()};
+ expectFailure(await runCommerceTurn(f.input),"INVALID_INPUT","CONTEXT_INVALID");assert.equal(f.counts().model,0);
+});
+test("ARCH066 invalid arguments are correctable and consume call budget",async()=>{
+ const invalid={...call(),calls:[{name:exampleTool.name,arguments:{wrong:true}}]};const f=fixture([invalid,call(),final()],true);const result=await runCommerceTurn(f.input);assert.equal(result.ok,true);if(result.ok)assert.equal(result.usage.remoteCalls,2);assert.equal(f.counts().tools,1);
+});
+
+test("ARCH066 successful fresh product search replaces deleted reference and publishes no prices",async()=>{
+ const f=fixture([call("commerce_search_products"),final({...exampleFinal,answerKind:"ANSWER",referralReason:null})],true);
+ f.input.platform="WOOCOMMERCE";
+ f.input.manifest.capabilities[0]!.toolDescriptor.name="commerce_search_products";f.input.manifest.grantedTools[0]!.toolName="commerce_search_products";f.input.grant=exampleGrant(f.input.manifest);f.input.dependencies.tools[0]!.descriptor.name="commerce_search_products";
+ f.input.productContext={schemaVersion:1,shopId:f.input.turn.shopId,conversationId:f.input.turn.conversationId,platform:"WOOCOMMERCE",references:[{productId:"1",variantId:null,title:"Deleted",observedAt:new Date(now).toISOString()}],updatedAt:new Date(now).toISOString()};
+ f.input.dependencies.tools[0]!.execute=async()=>({contractVersion:"commerce.v1",status:"OK",renderedText:"Current product",data:{products:[{productId:"2",variantId:null,title:"Current",url:null,available:true,unitPrice:null,currency:null,productType:null,vendor:null,observedAt:new Date(now).toISOString()}]}});
+ const result=await runCommerceTurn(f.input);assert.equal(result.ok,true);if(result.ok){assert.equal(result.productContextUpdate?.references.length,2);assert.ok(result.productContextUpdate?.references.some(r=>r.productId==="2"));assert.ok(!JSON.stringify(result.productContextUpdate).includes("unitPrice"));}
+ assert.ok(JSON.stringify(f.requests[0]?.context).includes("UNTRUSTED_REFERENCE_DATA"));
 });

@@ -41,6 +41,8 @@ export type RunnerTool = {
 export type RunCommerceTurnInput = {
   /** Trusted service context only; never copied from model or tool arguments. */
   executionPurpose?: import("../definitions.js").CommerceExecutionPurpose;
+  platform?: "SHOPIFY" | "WOOCOMMERCE";
+  productContext?: import("../product-context.js").CommerceConversationProductContext | null;
   turn: CommerceTurnIdentity;
   grant: CommerceConversationGrant;
   manifest: CommerceManifest;
@@ -67,5 +69,5 @@ export type RunnerErrorCode =
   | "INVALID_INPUT" | "INVALID_FINAL" | "BUDGET_EXHAUSTED" | "CANCELLED"
   | "DEADLINE" | "UNAVAILABLE" | "DENIED" | "STALE_TURN" | "INCOMPATIBLE_VERSION";
 export type RunCommerceTurnResult =
-  | { ok: true; result: CommerceFinalResponse; usage: { modelSteps: number; remoteCalls: number } }
+  | { ok: true; productContextUpdate?: import("../product-context.js").CommerceConversationProductContext; result: CommerceFinalResponse; usage: { modelSteps: number; remoteCalls: number } }
   | { ok: false; error: { code: RunnerErrorCode; retryable: boolean; diagnostic?: RunnerDiagnostic } };
