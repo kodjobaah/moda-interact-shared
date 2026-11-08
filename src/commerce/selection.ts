@@ -1,5 +1,7 @@
 import { IdSchema } from "./primitives";
 import {
+  CommerceAnswerPresentationSelectionSchema,
+  type CommerceAnswerPresentationSelection,
   type CommerceManifest,
   CommerceManifestSchema,
   type CommerceConversationGrant,
@@ -131,4 +133,14 @@ export function currentlyGrantedTools(
             descriptor.definitionVersion === t.definitionVersion)
         : enabledToolIds.has(t.toolId) && t.capabilityKeys.some((k) => eligibleCapabilityKeys.has(k)),
   );
+}
+
+/** Validate model-selected identities; hosts must still authorize and freshly verify facts. */
+export function verifyCommerceAnswerPresentationSelection(raw: unknown):
+  | { kind: "verified"; selection: CommerceAnswerPresentationSelection }
+  | { kind: "limitation"; reason: "INVALID_SELECTION" } {
+  const parsed = CommerceAnswerPresentationSelectionSchema.safeParse(raw);
+  if (!parsed.success || (parsed.data.productOptionSelections?.length && parsed.data.productDetailSelections?.length))
+    return { kind: "limitation", reason: "INVALID_SELECTION" };
+  return { kind: "verified", selection: parsed.data };
 }
