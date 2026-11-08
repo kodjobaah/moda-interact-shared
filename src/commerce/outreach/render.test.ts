@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { evaluateInitialOutreach } from './evaluate.js';
 import { renderInitialOutreachPreview } from './render.js';
 import { InitialOutreachRenderInputSchema, InitialOutreachRenderResultSchema } from './template-contracts.js';
-import { fixture, ports, renderFixture, stable } from './test-fixtures.js';
+import { fixture, ports, renderFixture, stable, preparedBrandFixture, preparedBrandMediaFixture } from './test-fixtures.js';
 async function input() {
     const r = await evaluateInitialOutreach(fixture(), ports().value);
     assert.equal(r.kind, 'ready');
@@ -156,3 +156,83 @@ for (const golden of [
         assert.deepEqual(i.evaluation,original);
     });
 }
+
+async function brandInput(keys: import('./variables.js').SemanticKey[]) {
+    const i = await input(), registration = i.preparedProjection!.variant.metaRegistration!;
+    i.variables.shopName = 'Generic merchant';
+    const allKeys: import('./variables.js').SemanticKey[] = ['shop.name','checkout.itemsSummary',...keys];
+    registration.parameterBindingsSnapshot.body = allKeys.map((variable, n) => ({position:n+1, variable}));
+    registration.componentsSnapshot[0] = {type:'BODY',text:allKeys.map((_,n)=>`{{${n+1}}}`).join(' | ')};
+    rehash(i);
+    return i;
+}
+const brandKeys = ['shopBrand.brandName','shopBrand.logoAltText','shopBrand.logoWidth','shopBrand.logoHeight','shopBrand.squareLogoAltText'] as const;
+const mediaKeys = ['shopBrand.logoUrl','shopBrand.squareLogoUrl','shopBrand.coverImageUrl'] as const;
+test('saved brand five-field exact frozen golden preserves parameters/buttons/provenance', async()=>{
+    const i=await brandInput([...brandKeys]);i.preparedBrand=preparedBrandFixture();
+    const registration=i.preparedProjection!.variant.metaRegistration!;
+    const r=renderInitialOutreachPreview(i);assert.equal(r.kind,'ready');if(r.kind!=='ready')return;
+    assert.equal(r.renderedText,'Generic merchant | 2 × Custom label | Saved brand | Saved logo alt | 100 | 200 | Saved square alt');
+    assert.deepEqual(r.parameters,[{type:'body',parameters:['Generic merchant','2 × Custom label','Saved brand','Saved logo alt','100','200','Saved square alt'].map(text=>({type:'text',text}))},{type:'button',sub_type:'url',index:'0',parameters:[{type:'text',text:'https%3A%2F%2Fshop.example%2Fcheckout%2F1'}]}]);
+    assert.deepEqual(r.templateProvenance,{variantId:'variant-1',registrationId:'registration-1',definitionId:'definition-1',providerTemplateId:'provider-template-1',providerTemplateName:'moda_initial_no_offer',providerLanguageCode:'en_US',submittedContentHash:registration.submittedContentHash,bindingFingerprint:registration.submittedContentHash});
+    assert.equal(r.headerPreview,null);
+});
+test('three brand BODY derivatives coexist without header and with different CHECKOUT_PRODUCT header',async()=>{
+    const i=await brandInput([...mediaKeys]);i.preparedBrandMedia=preparedBrandMediaFixture();
+    const urls=['https://assets.example/logo.webp','https://assets.example/square.webp','https://assets.example/cover.webp'];
+    const values=['Generic merchant','2 × Custom label',...urls];
+    let r=renderInitialOutreachPreview(i);assert.equal(r.kind,'ready');if(r.kind!=='ready')return;
+    assert.equal(r.renderedText,values.join(' | '));assert.equal(r.headerPreview,null);
+    assert.deepEqual(r.parameters[0],{type:'body',parameters:values.map(text=>({type:'text',text}))});
+    const reg=i.preparedProjection!.variant.metaRegistration!;reg.componentsSnapshot.unshift({type:'HEADER',format:'IMAGE'});
+    reg.parameterBindingsSnapshot.schemaVersion=1;reg.parameterBindingsSnapshot.headerMediaRole='CHECKOUT_PRODUCT';
+    i.headerMedia={shopId:'shop-1',role:'CHECKOUT_PRODUCT',status:'READY',kind:'R2_DERIVATIVE',httpsUrl:'https://assets.example/checkout.webp'};rehash(i);
+    r=renderInitialOutreachPreview(i);assert.equal(r.kind,'ready');if(r.kind!=='ready')return;
+    assert.equal(r.renderedText,values.join(' | '));assert.deepEqual(r.headerPreview,i.headerMedia);
+    assert.deepEqual(r.parameters.slice(0,2),[{type:'header',parameters:[{type:'image',image:{link:'https://assets.example/checkout.webp'}}]},{type:'body',parameters:values.map(text=>({type:'text',text}))}]);
+});
+test('missing saved brand values never borrow generic name or header; unused missing projections remain compatible',async()=>{
+    for(const key of brandKeys){const i=await brandInput([key]);assert.deepEqual(renderInitialOutreachPreview(i),{kind:'refused',reasonCode:'BINDING_VALUE_UNAVAILABLE'});i.preparedBrand=preparedBrandFixture();(i.preparedBrand as any)[key.split('.')[1]!]=null;assert.deepEqual(renderInitialOutreachPreview(i),{kind:'refused',reasonCode:'BINDING_VALUE_UNAVAILABLE'});}
+    for(const [key,slot] of mediaKeys.map((key,n)=>[key,['logo','squareLogo','coverImage'][n]!] as const)){
+        const i=await brandInput([key]);i.headerMedia={...preparedBrandMediaFixture()[slot as 'logo']!};
+        assert.deepEqual(renderInitialOutreachPreview(i),{kind:'refused',reasonCode:'MEDIA_NOT_READY'});
+        i.preparedBrandMedia={logo:null,squareLogo:null,coverImage:null};assert.deepEqual(renderInitialOutreachPreview(i),{kind:'refused',reasonCode:'MEDIA_NOT_READY'});
+    }
+    const i=await input();i.preparedBrand=null;i.preparedBrandMedia=null;assert.equal(renderInitialOutreachPreview(i).kind,'ready');
+});
+test('saved text/dimension caps and mandatory text refusal use unchanged boundedText rules',async()=>{
+    for(const key of ['brandName','logoAltText','squareLogoAltText'] as const){
+        const i=await brandInput([`shopBrand.${key}`]);i.preparedBrand=preparedBrandFixture();
+        i.preparedBrand[key]='x'.repeat(200);assert.equal(renderInitialOutreachPreview(i).kind,'ready');
+        i.preparedBrand[key]='🪴'.repeat(100);assert.equal(renderInitialOutreachPreview(i).kind,'ready');
+        i.preparedBrand[key]='x'.repeat(201);assert.deepEqual(renderInitialOutreachPreview(i),{kind:'refused',reasonCode:'INVALID_REQUEST'});
+        for(const text of ['','   ','bad\u0000','bad\n','{{value}}','bad}}','\ud800']){i.preparedBrand[key]=text;assert.deepEqual(renderInitialOutreachPreview(i),{kind:'refused',reasonCode:'BINDING_VALUE_UNAVAILABLE'});}
+        i.preparedBrand[key]='  Saved text  ';const r=renderInitialOutreachPreview(i);assert.equal(r.kind,'ready');if(r.kind==='ready')assert.equal(r.renderedText,'Generic merchant | 2 × Custom label | Saved text');
+    }
+    for(const key of ['logoWidth','logoHeight'] as const){
+        const i=await brandInput([`shopBrand.${key}`]);i.preparedBrand=preparedBrandFixture();
+        for(const value of [1,10000]){i.preparedBrand[key]=value;const r=renderInitialOutreachPreview(i);assert.equal(r.kind,'ready');if(r.kind==='ready')assert.equal(r.renderedText,'Generic merchant | 2 × Custom label | '+String(value));}
+        for(const value of [0,-1,10001,1.5,NaN,Infinity,'100']){(i.preparedBrand as any)[key]=value;assert.deepEqual(renderInitialOutreachPreview(i),{kind:'refused',reasonCode:'INVALID_REQUEST'});}
+    }
+});
+test('prepared tenant/role/URL validation precedes assignment and applies to unused fields',async()=>{
+    const i=await input();i.preparedBrand=preparedBrandFixture();i.preparedBrand.shopId='foreign';i.preparedProjection=null;
+    assert.deepEqual(renderInitialOutreachPreview(i),{kind:'refused',reasonCode:'IDENTITY_MISMATCH'});
+    for(const patch of [{shopId:'foreign'},{role:'COVER_IMAGE'},{httpsUrl:'https://assets.example/logo.webp#fragment'},{httpsUrl:'https://assets.example/logo.webp#'},{httpsUrl:'https://localhost/logo.webp'}]){
+        const j=await input();j.preparedBrandMedia=preparedBrandMediaFixture();Object.assign(j.preparedBrandMedia.logo!,patch);j.preparedProjection=null;
+        assert.deepEqual(renderInitialOutreachPreview(j),{kind:'refused',reasonCode:'MEDIA_NOT_READY'});
+    }
+    const j=await input();j.preparedBrandMedia=preparedBrandMediaFixture();
+    for(const patch of [{httpsUrl:'not a URL'},{httpsUrl:'http://assets.example/logo.webp'},{httpsUrl:'https://user:secret@assets.example/logo.webp'},{httpsUrl:'https://assets.example/'+ 'x'.repeat(2048)},{status:'PENDING'},{kind:'ORIGINAL'},{extra:true}]){
+        const bad=structuredClone(j);Object.assign(bad.preparedBrandMedia!.logo!,patch);
+        assert.doesNotThrow(()=>renderInitialOutreachPreview(bad));assert.deepEqual(renderInitialOutreachPreview(bad),{kind:'refused',reasonCode:'INVALID_REQUEST'});
+    }
+    const malformed=await input();malformed.variables.checkoutUrl='not a URL';assert.doesNotThrow(()=>renderInitialOutreachPreview(malformed));assert.deepEqual(renderInitialOutreachPreview(malformed),{kind:'refused',reasonCode:'INVALID_REQUEST'});
+});
+test('brand BODY media retains exact validated URL bytes rather than boundedText trimming',async()=>{
+    const i=await brandInput(['shopBrand.logoUrl']);i.preparedBrandMedia=preparedBrandMediaFixture();
+    const url=' https://assets.example/logo.webp ';i.preparedBrandMedia.logo!.httpsUrl=url;
+    const parsed=InitialOutreachRenderInputSchema.safeParse(i);
+    if(parsed.success){const validatedUrl=parsed.data.preparedBrandMedia!.logo!.httpsUrl;const r=renderInitialOutreachPreview(i);assert.equal(r.kind,'ready');if(r.kind==='ready'){assert.equal(r.renderedText,'Generic merchant | 2 × Custom label | '+validatedUrl);assert.deepEqual(r.parameters[0],{type:'body',parameters:['Generic merchant','2 × Custom label',validatedUrl].map(text=>({type:'text',text}))});}}
+    else assert.deepEqual(renderInitialOutreachPreview(i),{kind:'refused',reasonCode:'INVALID_REQUEST'});
+});

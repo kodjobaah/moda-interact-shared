@@ -6,7 +6,7 @@ import { InitialOutreachCheckoutOfferSetSchema } from "../outreach-checkout-offe
 import type { CommerceModelInvoker } from "../runner/types.js";
 export const hostId = z.string().trim().min(1).max(191);
 const positive = z.number().int().positive().safe();
-export const https = z.string().max(2048).url().refine(v => { const u = new URL(v); return u.protocol === 'https:' && !u.username && !u.password; });
+export const https = z.string().max(2048).url().refine(v => { if (!URL.canParse(v)) return false; const u = new URL(v); return u.protocol === 'https:' && !u.username && !u.password; });
 export const StageSchema = z.enum(['INPUT', 'PRODUCT_READ', 'RECONCILE', 'OFFER_SELECT', 'REVALIDATE', 'COMPLETE']);
 export const RefusalReasonSchema = z.enum(['INPUT_INVALID', 'OUTSIDE_CHECKOUT', 'PRODUCT_NOT_FOUND', 'PRODUCT_UNAVAILABLE', 'IDENTITY_MISMATCH', 'CURRENCY_MISMATCH', 'PRICE_UNAVAILABLE', 'ARITHMETIC_UNSAFE', 'PROVIDER_UNAVAILABLE', 'DENIED', 'CANCELLED', 'DEADLINE', 'BUDGET_EXHAUSTED', 'INVALID_RESULT', 'CURRENT_FACTS_CHANGED', 'RESULT_TOO_LARGE']);
 export type RefusalReason = z.infer<typeof RefusalReasonSchema>;
