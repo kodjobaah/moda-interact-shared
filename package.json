@@ -163,6 +163,9 @@
     "validate:commerce-presentation": "node scripts/validate-commerce-presentation.mjs"
   },
   "dependencies": {
+    "@langchain/core": "1.2.13",
+    "@langchain/langgraph": "1.4.15",
+    "@langchain/openrouter": "0.4.15",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/api-logs": "0.221.0",
     "@opentelemetry/context-async-hooks": "^2.10.0",
@@ -180,13 +183,11 @@
     "bullmq-otel": "^2.0.1",
     "intl-messageformat": "^10.7.18",
     "libphonenumber-js": "1.12.30",
+    "parse5": "8.0.1",
     "semver": "7.8.5",
     "winston": "3.19.0",
     "winston-loki": "6.1.7",
-    "zod": "^4.0.0",
-    "@langchain/openrouter": "0.4.15",
-    "@langchain/core": "1.2.13",
-    "@langchain/langgraph": "1.4.15"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

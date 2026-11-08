@@ -1,3 +1,4 @@
+import { renderCommerceProductFacts } from "./facts.js";
 import { CommerceFinalResponseSchema, type CommerceFinalResponse } from "../response.js";
 import { CommerceVerifiedPresentationSchema, type CommerceVerifiedPresentation } from "./schemas.js";
 import { normalizeCommerceReplyText } from "./format.js";
@@ -11,15 +12,16 @@ import { resolveModaConfigurationLocale } from "../../internationalization.js";
 import type { VerifiedWrapperContext, WrapperSlot } from "./wrapper-contracts.js";
 export type CommerceWhatsAppPreviewInput = {
  envelope: CommerceFinalResponse;
- presentation: CommerceVerifiedPresentation;
+ presentation: import("zod").input<typeof CommerceVerifiedPresentationSchema>;
  /** Must agree with the host-verified projection. */
  locale?: string;
  brandName?: string | null;
  wrapper?: {slots:readonly WrapperSlot[];context:VerifiedWrapperContext;digest:PresentationDigest;platformFallbackLanguageTag?:string|null;languageTag?:string|null} | null;
 };
 export type CommerceWhatsAppPreviewResult={kind:"ready";body:string;candidates:readonly string[];wrapper:{definitionId:string;localeId:string;contentHash:string;slotEditVersion:number}|null}|{kind:"refused";reason:string};
-function candidatesFor(envelope:CommerceFinalResponse,p:CommerceVerifiedPresentation):readonly string[] {
+function candidatesFor(envelope:CommerceFinalResponse,p:import("zod").output<typeof CommerceVerifiedPresentationSchema>):readonly string[] {
  if(envelope.answerKind==="REFER_TO_STORE")return buildReplyCandidates({fullBody:normalizeCommerceReplyText(envelope.replyText),minimalBody:normalizeCommerceReplyText(envelope.replyText)});
+ if(p.disposition==="PRODUCT_DETAILS")return buildReplyCandidates({fullBody:renderCommerceProductFacts(p.productFacts,p.locale),firstProductBody:p.productFacts.length>1?renderCommerceProductFacts(p.productFacts.slice(0,1),p.locale):null,minimalBody:renderCommerceProductFacts([],p.locale)});
  if(p.disposition==="PRODUCT_OPTIONS")return buildReplyCandidates({fullBody:renderProductOptionFacts(p.optionFacts,p.locale),firstProductBody:p.optionFacts.length>1?renderProductOptionFacts(p.optionFacts.slice(0,1),p.locale):null,minimalBody:renderProductOptionFacts([],p.locale)});
  if(p.products.length||p.disposition!=="STANDARD"||p.requiresShipping!==null||p.policyUrl){
   const shared={locale:p.locale,disposition:p.disposition,storeUrl:p.storeUrl,policyUrl:p.policyUrl,requiresShipping:p.requiresShipping};
