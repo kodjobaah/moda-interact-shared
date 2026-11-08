@@ -32,6 +32,10 @@ assert.equal(c.CommerceBuiltInToolGrantSchema.safeParse({...builtInGrant,contrac
 assert.deepEqual(c.CommerceShippingInformationInputSchema.parse({}),{productId:null,variantId:null});
 assert.equal(c.CommerceToolInputs.commerce_search_products.parse({}).browse,false);
 assert(c.CommerceAnswerPresentationSelectionSchema.safeParse({responseDisposition:'STANDARD',shippingInformationSelection:{productId:null,variantId:null}}).success);
+const detailPair={productId:'p1',variantId:null};
+assert(c.CommerceAnswerPresentationSelectionSchema.safeParse({responseDisposition:'PRODUCT_DETAILS',productDetailSelections:[detailPair]}).success);
+assert.equal(c.verifyCommerceAnswerPresentationSelection({productDetailSelections:[detailPair],productOptionSelections:[detailPair]}).reason,'INVALID_SELECTION');
+assert.equal(c.CommerceAnswerPresentationSelectionSchema.safeParse({productDetailSelections:[detailPair,detailPair]}).success,false);
 const manifest=c.exampleManifest(digest);
 assert(c.CommerceManifestSchema.safeParse(manifest).success);
 const result=await runCommerceTurn({turn:c.exampleTurn,grant:c.exampleGrant(manifest),manifest,hostInstructions:[],context:{},history:[],language:{tag:null,source:null},signal:new AbortController().signal,dependencies:{digest,now:()=>Date.now(),tools:[],model:{invoke:async()=>({calls:[{name:'finalResponse',arguments:c.exampleFinal}],outputTokens:30})}}});
