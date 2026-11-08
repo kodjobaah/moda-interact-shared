@@ -1413,3 +1413,13 @@ for (const name of ["commerce_search_products", "commerce_get_product"] as const
     assert.equal(f.requests.length, 1);
   });
 }
+
+for(const name of ["commerce_search_products","commerce_get_product"] as const) test(`generic facts normalize before ${name} model and evidence boundary`,async()=>{
+ const source={...optionBoundaryProduct(),description:{status:"AVAILABLE",text:"Merchant\u0000 facts"},attributes:{status:"NOT_PROVIDED",items:[{name:" Native\t label",values:["2 m","2 m",42,"x".repeat(129)]}]}};
+ const f=productResultFixture(name,source);let evidence:unknown;
+ f.input.dependencies.tools[0]!.extractEvidence=result=>{evidence=result;return [];};
+ const result=await runCommerceTurn(f.input);assert.equal(result.ok,true,JSON.stringify(result));
+ const message=f.requests[1]!.messages[0] as {result:{data:{products?:Array<Record<string,unknown>>;product?:Record<string,unknown>}}};
+ const normalized=message.result.data.products?.[0]??message.result.data.product!;
+ assert.deepEqual(normalized.description,{status:"PARTIAL",text:"Merchant facts"});assert.deepEqual(normalized.attributes,{status:"PARTIAL",items:[{name:"Native label",values:["2 m"]}]});assert.deepEqual(evidence,message.result);assert.equal(source.description.status,"AVAILABLE");assert.ok(source.description.text.includes("\u0000"));
+});

@@ -18,3 +18,5 @@ export * from "./built-in-tools";
 export * from "./purpose-output";
 
 export * from "./product-context";
+
+export * from "./product-facts.js";

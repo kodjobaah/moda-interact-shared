@@ -1,3 +1,5 @@
+import { CommerceProductDescriptionSchema, CommerceProductAttributesSchema, normalizeCommerceProductDescriptionField, normalizeCommerceProductAttributes } from "./product-facts.js";
+export { CommerceProductDescriptionSchema, CommerceProductAttributesSchema } from "./product-facts.js";
 import { z } from "zod";
 import { validRange } from "semver";
 import {
@@ -274,6 +276,8 @@ export function normalizeCommerceProductSelectedOptions(raw:unknown):Array<{name
 }
 export const CommerceProductSelectedOptionsSchema = z.preprocess(normalizeCommerceProductSelectedOptions,z.array(z.strictObject({name: optionLabel, value: optionLabel})).max(16));
 export const CommerceProductSchema = z.strictObject({
+  description: z.preprocess(normalizeCommerceProductDescriptionField, CommerceProductDescriptionSchema).optional(),
+  attributes: z.preprocess(normalizeCommerceProductAttributes, CommerceProductAttributesSchema).optional(),
   options: CommerceProductOptionsSchema.optional(),
   selectedOptions: CommerceProductSelectedOptionsSchema.optional(),
   productId: ID,

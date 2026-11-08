@@ -98,3 +98,12 @@ test('wrapper variable2048 bound and compiled-control rejection',()=>{
  assert.deepEqual(renderPreparedWrapper({prepared,context:{...context,variables:{'shop.name':'x'.repeat(2049)}},responseBody:'reply'}),{kind:'rejected',reason:'VARIABLE_UNAVAILABLE'});
  assert.deepEqual(renderPreparedWrapper({prepared:{...read.prepared,header:[{kind:'text',value:'bad\u0000'}]},context,responseBody:'reply'}),{kind:'rejected',reason:'PREPARED_INVALID'});
 });
+
+test('PRODUCT_DETAILS uses existing wrapper selection and complete minimal candidate bounds',async()=>{
+ const {verifyCommerceProductFacts,productFactMessages}=await import('./index.js');
+ const p={productId:'facts',variantId:null,title:'Native facts',url:null,available:null,unitPrice:null,currency:null,productType:null,vendor:null,observedAt:new Date(0).toISOString(),description:{status:'AVAILABLE',text:'Detailed merchant facts'},attributes:{status:'AVAILABLE',items:[{name:'Custom units',values:['2 ml']}]},options:{status:'NOT_PROVIDED',items:[]},selectedOptions:[]};
+ const verified=verifyCommerceProductFacts([{productId:'facts',variantId:null}],[p]);assert.equal(verified.kind,'verified');if(verified.kind!=='verified')return;
+ const result=composeCommerceWhatsAppPreview({envelope,presentation:{...projection,disposition:'PRODUCT_DETAILS',productFacts:verified.productFacts},wrapper:wrapper()});assert.equal(result.kind,'ready');if(result.kind==='ready'){assert.ok(result.body.startsWith('Welcome\nNative facts'));assert.equal(result.wrapper?.definitionId,'definition');}
+ verified.productFacts[0]!.description={status:'PARTIAL',text:'😀'.repeat(4096)};
+ const minimal=composeCommerceWhatsAppPreview({envelope,presentation:{...projection,disposition:'PRODUCT_DETAILS',productFacts:verified.productFacts},wrapper:wrapper()});assert.equal(minimal.kind,'ready');if(minimal.kind==='ready'){assert.equal(minimal.body,'Welcome\n'+productFactMessages.en[0]);assert.ok(minimal.body.length<=4096);}
+});

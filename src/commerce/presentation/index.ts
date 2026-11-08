@@ -12,3 +12,6 @@ export * from "./wrapper-projection.js";
 export * from "./wrapper-render.js";
 export * from "./wrapper-selection.js";
 export * from "./compose.js";
+
+export * from "./facts.js";
+export * from "./fact-messages.js";
