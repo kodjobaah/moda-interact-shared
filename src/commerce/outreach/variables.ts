@@ -21,7 +21,7 @@ function boundedText(v: unknown, limit: number): string {
     return v.trim();
 }
 export class PreparedVariableResolver {
-    constructor(private input: InitialOutreachRenderInput, private languageTag: string, private sendable: SendableOutreachOffer) { }
+    constructor(private input: VariableInput, private languageTag: string, private sendable: SendableOutreachOffer) { }
     encodeCheckoutButtonSuffix(_prefix: string): string { return encodeURIComponent(this.input.variables.checkoutUrl); }
     encodePromotionButtonSuffix(_prefix: string): never { throw new BindingUnavailable('PROMOTION_PRODUCT_URL_UNAVAILABLE'); }
     checkStaticButtonUrl(value: string): void {
@@ -82,3 +82,5 @@ export class PreparedVariableResolver {
         throw new BindingUnavailable('BINDING_VALUE_UNAVAILABLE');
     }
 }
+
+type VariableInput = Pick<InitialOutreachRenderInput, 'evaluation'|'variables'|'headerMedia'|'preparedBrand'|'preparedBrandMedia'>;
