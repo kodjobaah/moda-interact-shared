@@ -138,6 +138,10 @@
     "./commerce/outreach": {
       "types": "./dist/commerce/outreach/index.d.ts",
       "import": "./dist/commerce/outreach/index.js"
+    },
+    "./commerce/presentation/node": {
+      "types": "./dist/commerce/presentation/node/index.d.ts",
+      "import": "./dist/commerce/presentation/node/index.js"
     }
   },
   "files": [
@@ -165,9 +169,11 @@
     "validate:arch047-whatsapp-template-events": "node scripts/validate-whatsapp-template-events-entrypoint.mjs",
     "test:product-discovery-contracts": "tsx --test src/commerce/product-discovery-contracts.test.ts src/commerce/product-discovery-projection.test.ts src/commerce/runner/built-in-tools.test.ts src/commerce/runner/runner.test.ts",
     "validate:commerce-presentation": "node scripts/validate-commerce-presentation.mjs",
-    "validate:commerce-outreach": "node scripts/validate-commerce-outreach.mjs"
+    "validate:commerce-outreach": "node scripts/validate-commerce-outreach.mjs",
+    "validate:conversation-product-image-node": "node scripts/validate-conversation-product-image-node.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1143.0",
     "@langchain/core": "1.2.13",
     "@langchain/langgraph": "1.4.15",
     "@langchain/openrouter": "0.4.15",
@@ -190,6 +196,7 @@
     "libphonenumber-js": "1.12.30",
     "parse5": "8.0.1",
     "semver": "7.8.5",
+    "sharp": "0.35.4",
     "winston": "3.19.0",
     "winston-loki": "6.1.7",
     "zod": "^4.0.0"
