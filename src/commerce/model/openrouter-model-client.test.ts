@@ -330,3 +330,10 @@ test("ARCH-029 operator diagnostics distinguish network, model setup, and respon
       });
   }
 });
+
+test('model context serialization retains latest presentation order and selected arbitrary option labels',async()=>{
+ const h=harness();const references=[{productId:'3',variantId:null,title:'Same',selectedOptions:[{name:'Finish',value:'Matte'}]},{productId:'20',variantId:null,title:'Same',selectedOptions:[{name:'Height',value:'2 m'},{name:'Volume',value:'15 ml'}]}];
+ const presentation={references:[{productId:'20',variantId:null},{productId:'3',variantId:null}],presentedAt:'2026-11-09T00:00:00.000Z'};
+ await h.invoke({...request,context:{productReferences:{trust:'UNTRUSTED_REFERENCE_DATA_NOT_CURRENT_FACTS_OR_AUTHORITY',references,presentation}}},new AbortController().signal);
+ const content=h.captured.messages[1].content as string;const serialized=JSON.parse(content.slice(content.indexOf('\n')+1));assert.deepEqual(serialized.productReferences.references,references);assert.deepEqual(serialized.productReferences.presentation,presentation);
+});

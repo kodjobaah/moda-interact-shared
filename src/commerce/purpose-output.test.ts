@@ -3,13 +3,14 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { CommerceToolOutputs, CommerceManifestSchema } from "./schemas";
+import { CommerceProductStockSchema, CommerceToolOutputs, CommerceManifestSchema } from "./schemas";
 import { CommercePurposeProfileSchema } from "./definitions";
 import { exampleManifest, exampleGrant } from "./fixtures";
 import { manifestMatchesGrant } from "./selection";
 import { DetailsSchemaSchema } from "./subset";
 import { compileCommercePurposeOutputSchema, validateCommercePurposeOutputSchema } from "./purpose-output";
 
+const accepted015=JSON.parse(readFileSync(new URL("./purpose-output.accepted015.fixtures.json",import.meta.url),"utf8"));
 const descriptors = JSON.parse(readFileSync(new URL("./purpose-output.fixtures.json", import.meta.url), "utf8"));
 const pairs = [
   ["discounts.getOptions", "commerce_get_discount_options"], ["discounts.getDetails", "commerce_get_discount_details"],
@@ -49,7 +50,13 @@ test("audited descriptors exactly equal real registered outputs and validate com
     // Assert the exact single known spelling difference, never erase its semantics.
     const expected = JSON.parse(JSON.stringify(descriptors[operation]).replaceAll(
       JSON.stringify("^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$").slice(1,-1), JSON.stringify("^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$").slice(1,-1)));
-    assert.deepEqual(schema, expected, operation);
+    if(accepted015[operation]) {
+      const baseline=structuredClone(accepted015[operation]);
+      const product=operation==='products.get'?baseline.properties.product:baseline.properties.products.items;
+      // Exact accepted015 source shape plus the sole optional stock contract.
+      product.properties.stock=descriptor(z.toJSONSchema(CommerceProductStockSchema));
+      assert.deepEqual(schema,baseline,operation);
+    }else assert.deepEqual(schema, expected, operation);
     assert.ok(validateCommercePurposeOutputSchema(schema), operation);
     const validator = compileCommercePurposeOutputSchema(schema);
     const auditedValidator = compileCommercePurposeOutputSchema(descriptors[operation]);
@@ -124,4 +131,23 @@ test("only the current exact canonical datetime spelling permits UTC minute prec
   assert.ok(CommerceToolOutputs.commerce_get_product.safeParse(minute).success);
   for(const observedAt of ["2026-02-29T12:00Z","2026-11-06T12:00+00:00","2026-11-06T12:00Z\n"])
     assert.equal(newer.safeParse({product:{...product,observedAt}}).success,false);
+});
+
+test('bounded oneOf/typed scalar const compiles real stock outputs without changing complete results',()=>{
+ for(const name of ['commerce_get_product','commerce_search_products'] as const){
+ const schema=descriptor(z.toJSONSchema(CommerceToolOutputs[name]));const validator=compileCommercePurposeOutputSchema(schema);
+ for(const stock of [{status:'KNOWN',quantity:0,scope:'VARIANT'},{status:'KNOWN',quantity:Number.MAX_SAFE_INTEGER,scope:'PRODUCT'},{status:'NOT_TRACKED'},{status:'UNAVAILABLE'}]){
+ const p={productId:'1',variantId:null,title:'Native',url:null,available:false,unitPrice:null,currency:null,productType:null,vendor:null,observedAt:'2026-11-09T00:00:00.000Z',stock};const result=name==='commerce_get_product'?{product:p}:{products:[p],cursor:null,truncated:false};assert.ok(CommerceToolOutputs[name].safeParse(result).success);assert.deepEqual(validator.parse(result),result);
+ const legacy=structuredClone(result);if('product'in legacy)delete (legacy.product as any).stock;else delete (legacy.products[0] as any).stock;assert.ok(validator.safeParse(legacy).success);
+ for(const bad of [{status:'KNOWN',quantity:-1,scope:'PRODUCT'},{status:'KNOWN',quantity:1.2,scope:'PRODUCT'},{status:'KNOWN',quantity:0,scope:'INVALID'},{status:'NOT_TRACKED',quantity:0},{status:'UNAVAILABLE',extra:true}]){const invalid=name==='commerce_get_product'?{product:{...p,stock:bad}}:{products:[{...p,stock:bad}],cursor:null,truncated:false};assert.equal(validator.safeParse(invalid).success,false);}
+ }
+ }
+ const union={type:'object',properties:{value:{oneOf:[{type:'integer',minimum:0},{type:'integer',maximum:10}]}},required:['value'],additionalProperties:false};
+ const exclusive=compileCommercePurposeOutputSchema(union);assert.equal(exclusive.safeParse({value:5}).success,false);assert.equal(exclusive.safeParse({value:11}).success,true);
+ for(const value of [null,true,'literal',2]){const type=value===null?['string','null']:typeof value;const v=compileCommercePurposeOutputSchema({type:'object',properties:{value:{type,const:value}},required:['value'],additionalProperties:false});assert.ok(v.safeParse({value}).success);assert.equal(v.safeParse({value:'wrong'}).success,false);}
+ for(const bad of [
+ {type:'string',const:{}},{type:'string',const:[]},{type:'integer',const:1.2},{type:'number',const:Infinity},{type:'number',const:Number.MAX_SAFE_INTEGER+1},{type:'string',const:'x',enum:['x']},{type:'string',const:'x'.repeat(4097)},
+ {oneOf:[{type:'string'},{type:'string'}],anyOf:[{type:'string'},{type:'string'}]},
+ {oneOf:Array(5).fill({type:'string'})},{oneOf:[{type:'string'},{type:'string'}],unknown:true}
+ ])assert.equal(validateCommercePurposeOutputSchema({type:'object',properties:{bad},additionalProperties:false}),false);
 });
