@@ -88,3 +88,15 @@ test("optional required keyword follows JSON Schema semantics; nullable enums st
     false,
   );
 });
+import { EMPTY_RESPONSE_CONTRACT, finalResponseToolSchema, finalResponseSchema } from './response';
+import { PLATFORM_INSTRUCTIONS } from './runner/instructions';
+import { exampleFinal } from './fixtures';
+test('provider-facing final tool exposes pinned selections without making them mandatory for referrals',()=>{
+ const detailsSchema={type:'object',properties:{productRecommendations:{type:'array',maxItems:3,items:{type:'string',maxLength:128}}},required:[],additionalProperties:false} as const;
+ const contract={...EMPTY_RESPONSE_CONTRACT,detailsSchema:structuredClone(detailsSchema)};
+ const schema=finalResponseToolSchema(contract as unknown as typeof EMPTY_RESPONSE_CONTRACT) as any;
+ assert.deepEqual(schema.properties.details.properties,detailsSchema.properties);
+ assert.deepEqual(schema.allOf[0].oneOf[0].properties.details,detailsSchema);
+ assert.equal(finalResponseSchema(contract as unknown as typeof EMPTY_RESPONSE_CONTRACT).safeParse({...exampleFinal,answerKind:'REFER_TO_STORE',referralReason:'UNVERIFIABLE_FACTS',evidenceIds:[],details:{}}).success,true);
+ assert.ok(PLATFORM_INSTRUCTIONS.some(text=>text.includes('Do not supply only replyText or empty details')));
+});

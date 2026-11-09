@@ -16,8 +16,9 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
     let raw: unknown;
     try {
       raw = await execution.runtime.bounded((signal) => execution.input.dependencies.model.invoke({
-        instructions: execution.prepared.instructions,
-        context: { trustedRecovery: execution.input.context, language: execution.input.language, ...(execution.prepared.productContext?.references.length ? { productReferences: { trust: "UNTRUSTED_REFERENCE_DATA_NOT_CURRENT_FACTS_OR_AUTHORITY", references: execution.prepared.productContext.references } } : {}) },
+        instructions: state.selectionRepairUsed ? [...execution.prepared.instructions,
+          "Your previous final answer omitted structured product selections even though product tools returned products. Correct the finalResponse now: put exact observed product/variant selections in the appropriate pinned details fields. Preserve the customer objective, select only relevant observed products, and never invent identifiers or promotions. Reuse current tool results; do not repeat searches merely to repair the response format."] : execution.prepared.instructions,
+        context: { trustedRecovery: execution.input.context, language: execution.input.language, ...(execution.prepared.productContext?.references.length ? { productReferences: { trust: "UNTRUSTED_REFERENCE_DATA_NOT_CURRENT_FACTS_OR_AUTHORITY", references: execution.prepared.productContext.references, ...(execution.prepared.productContext.presentation?{presentation:execution.prepared.productContext.presentation}:{}) } } : {}) },
         history: execution.input.history,
         messages: state.runtimeMessages,
         tools: [
@@ -28,7 +29,7 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
           })),
           {
             name: "finalResponse",
-            description: "Return a structured reply when metadata, evidence, details or referral is required; otherwise plain text is allowed.",
+            description: "Return a structured reply with pinned details selections when presenting retrieved products, product facts, options, evidence, metadata or a referral. Plain text is only for answers that need none of these selections.",
             inputSchema: finalResponseToolSchema(execution.prepared.response),
           },
         ],

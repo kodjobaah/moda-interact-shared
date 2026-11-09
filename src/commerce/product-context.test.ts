@@ -34,3 +34,31 @@ test("ignored observations preserve timestamp and identity rejects before evicti
  assert.throws(()=>merge(previous,[],{...identity,conversationId:"foreign"}));
  const selected=merge(null,[observation([{...product("1"),variantId:"2"}])],identity);assert.deepEqual(resolve(selected,{productId:"1",variantId:"2"}),{kind:"MATCH",productId:"1",variantId:"2"});
 });
+
+import {recordCommerceProductPresentation as record} from './product-context.js';
+test('presentation order survives reference recency, arbitrary selected options remain labels only',()=>{
+ const p={...product('20'),selectedOptions:[{name:'Height',value:'2 m'},{name:'Finish',value:'Matte'},{name:'Volume',value:'15 ml'}],stock:{status:'KNOWN' as const,quantity:7,scope:'PRODUCT' as const}};
+ let c=merge(null,[observation([p,product('3')])],identity);
+ c=record(c,[{productId:'20',variantId:null},{productId:'3',variantId:null}],identity);
+ assert.deepEqual(c.references.map(r=>r.productId),['20','3']);
+ const newer={...identity,now:now+1000};c=merge(c,[observation([product('3')],new Date(newer.now).toISOString())],newer);
+ assert.deepEqual(c.references.map(r=>r.productId),['3','20']);assert.deepEqual(c.presentation?.references.map(r=>r.productId),['20','3']);
+ assert.deepEqual(c.references.find(r=>r.productId==='20')?.selectedOptions,p.selectedOptions);assert.ok(!JSON.stringify(c).includes('quantity'));assert.ok(!JSON.stringify(c).includes('stock'));
+ assert.equal(merge(c,[],{...identity,now:now+86400001}).presentation,undefined);
+ assert.throws(()=>record(c,[{productId:'999',variantId:null}],identity),/PRODUCT_PRESENTATION_INVALID/);
+ assert.throws(()=>record(c,[{productId:'3',variantId:null},{productId:'3',variantId:null}],identity),/PRODUCT_PRESENTATION_INVALID/);
+ assert.throws(()=>record(c,[],{...identity,shopId:'foreign'}),/IDENTITY/);
+ assert.equal(CommerceConversationProductContextSchema.safeParse({...c,presentation:{references:[{productId:'999',variantId:null}],presentedAt:new Date(now).toISOString()}}).success,false);
+ const evicted=merge(c,[observation(Array.from({length:20},(_,i)=>product(String(i+100))),new Date(now+2000).toISOString())],{...identity,now:now+2000});assert.equal(evicted.presentation,undefined);
+});
+
+test('recording presentation near context cap preserves bounded deterministic eviction semantics',()=>{
+ const options=Array.from({length:16},(_,i)=>({name:String(i)+'n'.repeat(120),value:'v'.repeat(128)}));
+ const context={schemaVersion:1 as const,shopId:identity.shopId,conversationId:identity.conversationId,platform:identity.platform,references:Array.from({length:8},(_,i)=>({productId:String(i+1),variantId:null,title:'t',observedAt:new Date(now).toISOString(),selectedOptions:structuredClone(options)})),updatedAt:new Date(now).toISOString()};
+ const bytes=()=>new TextEncoder().encode(JSON.stringify(context)).length;
+ while(bytes()>32760)context.references.at(-1)!.selectedOptions.pop();
+ context.references.at(-1)!.title+='t'.repeat(32760-bytes());assert.equal(bytes(),32760);assert.ok(CommerceConversationProductContextSchema.safeParse(context).success);
+ const selected=context.references.slice(0,3).map(({productId,variantId})=>({productId,variantId}));
+ const recorded=record(context,selected,identity);assert.ok(new TextEncoder().encode(JSON.stringify(recorded)).length<=32768);assert.deepEqual(recorded.presentation?.references,selected);assert.ok(recorded.references.length<context.references.length);
+ const tail=context.references.slice(-3).map(({productId,variantId})=>({productId,variantId}));const tailRecorded=record(context,tail,identity);assert.ok(new TextEncoder().encode(JSON.stringify(tailRecorded)).length<=32768);assert.equal(tailRecorded.presentation,undefined);
+});

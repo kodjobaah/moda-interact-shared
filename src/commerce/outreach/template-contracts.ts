@@ -48,3 +48,13 @@ export const InitialOutreachRenderResultSchema = z.discriminatedUnion('kind', [
 ]);
 export type InitialOutreachRenderInput = z.infer<typeof InitialOutreachRenderInputSchema>;
 export type InitialOutreachRenderResult = z.infer<typeof InitialOutreachRenderResultSchema>;
+
+export const StudioOutreachTemplateSchema = z.strictObject({templateId:hostId, localeId:hostId, languageTag:z.string().min(1).max(512), components:z.array(ComponentSchema).min(1).max(4), bindings:FrozenBindingsSchema});
+export const StudioInitialOutreachRenderInputSchema = InitialOutreachRenderInputSchema.omit({preparedProjection:true}).extend({template:StudioOutreachTemplateSchema});
+export const StudioInitialOutreachRenderResultSchema = z.discriminatedUnion('kind',[
+ z.strictObject({kind:z.literal('ready'),renderedText:z.string().max(8192),parameters:z.array(PreparedComponentSchema).max(4),headerPreview:ReadyMediaSchema.nullable(),templateId:hostId,localeId:hostId,templateValidation:z.literal('NOT_EVALUATED')}),
+ z.strictObject({kind:z.literal('refused'),reasonCode:RenderReasonSchema})
+]);
+export type StudioOutreachTemplate = z.infer<typeof StudioOutreachTemplateSchema>;
+export type StudioInitialOutreachRenderInput = z.infer<typeof StudioInitialOutreachRenderInputSchema>;
+export type StudioInitialOutreachRenderResult = z.infer<typeof StudioInitialOutreachRenderResultSchema>;

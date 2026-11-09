@@ -39,6 +39,20 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
         languageSource: execution.input.language.source,
         checkCancellationAndDeadline: execution.runtime.checkCancellationAndDeadline,
       });
+      const fields = execution.prepared.response.detailsSchema.properties ?? {};
+      const supportsSelections = ['productRecommendations', 'productDetailSelections', 'productOptionSelections'].some(key => Object.hasOwn(fields, key));
+      const selected = ['productRecommendations', 'productDetailSelections', 'productOptionSelections'].some(key => Array.isArray(final.details[key]) && final.details[key].length > 0);
+      const observedProducts = state.runtimeMessages.some(message => {
+        if (message.tool !== 'commerce_search_products' && message.tool !== 'commerce_get_product') return false;
+        const result = message.result as { status?: string; data?: { products?: unknown[]; product?: unknown } };
+        return result?.status === 'OK' && (Boolean(result.data?.product) || Boolean(result.data?.products?.length));
+      });
+      // One correction uses the existing model-step/deadline budget. Never guess
+      // selections or replay provider calls on the model's behalf.
+      if (!state.selectionRepairUsed && !state.requiredReferral && final.answerKind === 'ANSWER' && supportsSelections && observedProducts && !selected && final.details.responseDisposition !== 'SHIPPING_INFORMATION_UNVERIFIED' && !final.details.shippingInformationSelection) {
+        logModelInvalid(execution.logger, state.modelSteps, 'MISSING_PRODUCT_SELECTION_REPAIR');
+        return { selectionRepairUsed: true, pendingStep: null, finalResult: null };
+      }
       return { finalResult: final };
     } catch (error) {
       logModelInvalid(execution.logger, state.modelSteps, error instanceof RunnerFailure ? error.diagnostic.reasonCode : "UNEXPECTED_EXCEPTION");

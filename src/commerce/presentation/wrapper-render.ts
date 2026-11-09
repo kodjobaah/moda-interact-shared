@@ -1,3 +1,4 @@
+import { ConversationProductImageBindingSchema } from "./product-image.js";
 import type { PreparedToken, PreparedWrapper, VerifiedWrapperContext, WrapperRefusal } from "./wrapper-contracts.js";
 
 /** WhatsApp plain-text message maximum; reject before moderation and provider calls. */
@@ -60,6 +61,7 @@ export function renderPreparedWrapper(input: {
   responseBody: string;
 }): { kind: "rendered"; body: string } | { kind: "rejected"; reason: WrapperRefusal } {
   const { prepared, context, responseBody } = input;
+  if (Object.hasOwn(prepared, "productImage") && !ConversationProductImageBindingSchema.safeParse(prepared.productImage).success) return { kind: "rejected", reason: "PREPARED_INVALID" };
   if (prepared.body.filter(token => token.kind === "responseSlot").length !== 1 ||
       [...prepared.header, ...prepared.footer, ...prepared.conditionals.flatMap(c => c.tokens)].some(token => token.kind === "responseSlot")) return { kind: "rejected", reason: "PREPARED_INVALID" };
   if (typeof responseBody !== "string" || !responseBody.trim() ||

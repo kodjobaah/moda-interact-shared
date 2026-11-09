@@ -1,3 +1,4 @@
+import { verifyCommerceAnswerPresentationSelection } from "../selection.js";
 import { renderCommerceProductFacts } from "./facts.js";
 import { CommerceFinalResponseSchema, type CommerceFinalResponse } from "../response.js";
 import { CommerceVerifiedPresentationSchema, type CommerceVerifiedPresentation } from "./schemas.js";
@@ -12,6 +13,8 @@ import { resolveModaConfigurationLocale } from "../../internationalization.js";
 import type { VerifiedWrapperContext, WrapperSlot } from "./wrapper-contracts.js";
 export type CommerceWhatsAppPreviewInput = {
  envelope: CommerceFinalResponse;
+ /** Follow-up replies preserve grounded agent wording; legacy formatting remains explicit. */
+ responseStyle?: "AGENT" | "LEGACY";
  presentation: import("zod").input<typeof CommerceVerifiedPresentationSchema>;
  /** Must agree with the host-verified projection. */
  locale?: string;
@@ -34,7 +37,16 @@ export function composeCommerceWhatsAppPreview(input:CommerceWhatsAppPreviewInpu
  try {
   const envelope=CommerceFinalResponseSchema.parse(input.envelope),p=CommerceVerifiedPresentationSchema.parse(input.presentation);
   if((input.locale!==undefined&&resolveModaConfigurationLocale(input.locale)!==p.locale)||(input.brandName!==undefined&&input.brandName!==p.brandName))return {kind:"refused",reason:"INVALID_INPUT"};
-  const candidates=candidatesFor(envelope,p);if(candidates[0]&&/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(candidates[0]))return {kind:"refused",reason:"INVALID_INPUT"};if(!candidates.length)return {kind:"refused",reason:"OUTPUT_TOO_LONG"};
+  if(input.responseStyle!==undefined&&input.responseStyle!=="AGENT"&&input.responseStyle!=="LEGACY")return {kind:"refused",reason:"INVALID_INPUT"};
+  if(input.responseStyle==="AGENT") {
+   const selection=verifyCommerceAnswerPresentationSelection(Object.fromEntries(["productOptionSelections","productDetailSelections","responseDisposition","shippingInformationSelection"].filter(name=>Object.hasOwn(envelope.details,name)).map(name=>[name,envelope.details[name]])));
+   if(selection.kind!=="verified")return {kind:"refused",reason:"INVALID_SELECTION"};
+   const details=selection.selection.productDetailSelections??[],options=selection.selection.productOptionSelections??[];
+   const pairs=details.length?details:options;
+   const facts=details.length?p.productFacts:p.optionFacts;
+   if(pairs.length&&(pairs.length!==facts.length||pairs.some((pair,index)=>pair.productId!==facts[index]?.productId||pair.variantId!==facts[index]?.variantId)))return {kind:"refused",reason:"UNOBSERVED_SELECTION"};
+  }
+  const candidates=input.responseStyle==="AGENT"?buildReplyCandidates({fullBody:normalizeCommerceReplyText(envelope.replyText),minimalBody:normalizeCommerceReplyText(envelope.replyText)}):candidatesFor(envelope,p);if(candidates[0]&&/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(candidates[0]))return {kind:"refused",reason:"INVALID_INPUT"};if(!candidates.length)return {kind:"refused",reason:"OUTPUT_TOO_LONG"};
   const w=input.wrapper;
   // With no configured wrapper, still enforce the plain-text controls and bounds.
   if(!w||!w.slots.length){const body=candidates[0]!;if(/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(body))return {kind:"refused",reason:"INVALID_INPUT"};return {kind:"ready",body,candidates,wrapper:null};}

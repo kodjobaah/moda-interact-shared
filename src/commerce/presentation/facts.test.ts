@@ -33,3 +33,21 @@ test("PRODUCT_DETAILS is additive, rejects invalid mixtures, retains referral an
  const referral=composeCommerceWhatsAppPreview({envelope:{...envelope,answerKind:"REFER_TO_STORE",referralReason:"TOOL_REVOKED",replyText:"Contact store"},presentation:{...presentation,productFacts:[f]}});assert.equal(referral.kind,"ready");if(referral.kind==="ready")assert.equal(referral.body,"Contact store");
  f.description={status:"PARTIAL",text:"😀".repeat(4096)};const bounded=composeCommerceWhatsAppPreview({envelope,presentation:{...presentation,productFacts:[f,f,f]}});assert.equal(bounded.kind,"ready");if(bounded.kind==="ready"){assert.ok(bounded.body.length<=4096);assert.equal(bounded.body,productFactMessages.en[0]);assert.ok(bounded.candidates.length<=3);}
 });
+
+import {CommerceProductStockSchema,normalizeCommerceStockQuantity,CommerceToolOutputs} from '../schemas.js';
+import {stockFactMessages} from './fact-messages.js';
+import {z} from 'zod';
+test('stock normalization is safe, zero distinct and generated product outputs include stock',()=>{
+ for(const v of [null,undefined,'3',{},NaN,Infinity,-Infinity,1.2,Number.MAX_SAFE_INTEGER+1])assert.equal(normalizeCommerceStockQuantity(v),null);
+ assert.equal(normalizeCommerceStockQuantity(-9),0);assert.equal(normalizeCommerceStockQuantity(0),0);assert.equal(normalizeCommerceStockQuantity(Number.MAX_SAFE_INTEGER),Number.MAX_SAFE_INTEGER);
+ assert.equal(CommerceProductStockSchema.safeParse({status:'KNOWN',scope:'VARIANT',quantity:-1}).success,false);
+ const output=z.toJSONSchema(CommerceToolOutputs.commerce_get_product);assert.ok(JSON.stringify(output).includes('stock'));assert.ok(JSON.stringify(output).includes('NOT_TRACKED'));
+});
+test('verified stocks preserve provider observation and deterministic localized exact quantity/scope',()=>{
+ for(const stock of [{status:'KNOWN',quantity:0,scope:'VARIANT'},{status:'KNOWN',quantity:123,scope:'PRODUCT'},{status:'NOT_TRACKED'},{status:'UNAVAILABLE'}] as const){
+ const r=verifyCommerceProductFacts([{productId:'1',variantId:null}],[{...product,stock}]);assert.equal(r.kind,'verified');if(r.kind!=='verified')throw Error();assert.deepEqual(r.productFacts[0]!.stock,stock);assert.equal(r.productFacts[0]!.observedAt,product.observedAt);
+ for(const locale of MODA_SUPPORTED_LANGUAGE_TAGS){const text=renderCommerceProductFacts(r.productFacts,locale);const labels=stockFactMessages[locale];assert.ok(text.includes(stock.status==='KNOWN'?labels[stock.scope==='VARIANT'?1:0]:labels[stock.status==='NOT_TRACKED'?2:3]));if(stock.status==='KNOWN')assert.ok(text.includes(new Intl.NumberFormat(locale).format(stock.quantity)));}
+ }
+ assert.deepEqual(fact().stock,{status:'UNAVAILABLE'});
+ const r=verifyCommerceProductFacts([{productId:'1',variantId:null}],[{...product,stock:{status:'KNOWN',quantity:0,scope:'VARIANT'}}]);if(r.kind!=='verified')throw Error();const composed=composeCommerceWhatsAppPreview({envelope,presentation:{...presentation,productFacts:r.productFacts}});assert.equal(composed.kind,'ready');if(composed.kind==='ready')assert.equal(composed.body,'Merchant product\nStock (selected variant): 0\nNative description\nCustom label: 2 units');
+});
