@@ -8,6 +8,8 @@ import { safeName } from "./subset";
 export type CommercePurposeOutputSchema = {
   type?: string | [string, "null"];
   anyOf?: CommercePurposeOutputSchema[];
+  oneOf?: CommercePurposeOutputSchema[];
+  const?: string | number | boolean | null;
   description?: string;
   properties?: Record<string, CommercePurposeOutputSchema>;
   required?: string[];
@@ -32,7 +34,7 @@ const STRICT_DATETIME = CANONICAL_PATTERNS.find(pattern => pattern.includes("246
 const DATETIME = CANONICAL_PATTERNS.find(pattern => pattern !== MONEY && pattern !== STRICT_DATETIME)!;
 const MINUTE_DATETIME = CANONICAL_PATTERNS[3];
 const scalarTypes = ["string", "number", "integer", "boolean", "object", "array"];
-const baseKeys = ["type", "description", "enum"];
+const baseKeys = ["type", "description", "enum", "const"];
 const typeKeys: Record<string, string[]> = {
   object: ["properties", "required", "additionalProperties"],
   array: ["items", "minItems", "maxItems"],
@@ -61,14 +63,26 @@ export function validateCommercePurposeOutputSchema(value: unknown): value is Co
     if (depth > 8 || ++nodes > 256 || !record(raw)) return false;
     const s = raw as CommercePurposeOutputSchema;
     if (s.description !== undefined && (typeof s.description !== "string" || s.description.length > 1000)) return false;
-    if (Object.hasOwn(s, "anyOf")) return Object.keys(s).every(key => ["anyOf", "description"].includes(key))
-      && Array.isArray(s.anyOf) && s.anyOf.length >= 2 && s.anyOf.length <= 4
-      && s.anyOf.every(branch => walk(branch, depth + 1, root));
+    if (Object.hasOwn(s, 'anyOf') || Object.hasOwn(s, 'oneOf')) {
+      const key = Object.hasOwn(s, 'oneOf') ? 'oneOf' : 'anyOf';
+      const branches=s[key];
+      return Object.keys(s).every(name=>[key,'description'].includes(name))
+        && Array.isArray(branches)&&branches.length>=2&&branches.length<=4
+        && branches.every(branch=>walk(branch,depth+1,root));
+    }
     const nullable = Array.isArray(s.type);
     if (nullable && (s.type!.length !== 2 || s.type![1] !== "null")) return false;
     const type = nullable ? s.type![0] : s.type;
     if (typeof type !== "string" || !scalarTypes.includes(type) || (root && (type !== "object" || nullable))) return false;
     if (Object.keys(s).some(key => ![...baseKeys, ...typeKeys[type]!].includes(key))) return false;
+    if(Object.hasOwn(s,'const')) {
+      const value=s.const;
+      if(Object.hasOwn(s,'enum') || (value===null ? !nullable :
+        typeof value!==(type==='integer'?'number':type)
+        || !['string','number','boolean'].includes(typeof value)
+        || (typeof value==='number'&&(!Number.isFinite(value)||Math.abs(value)>Number.MAX_SAFE_INTEGER||(type==='integer'&&!Number.isSafeInteger(value))))
+        || (typeof value==='string'&&value.length>4096)))return false;
+    }
     if (s.enum !== undefined && (!Array.isArray(s.enum) || s.enum.length < 1 || s.enum.length > 32
       || new Set(s.enum.map(v => canonicalJson(v))).size !== s.enum.length
       || s.enum.some(v => v === null ? !nullable : typeof v !== (type === "integer" ? "number" : type)
@@ -98,9 +112,11 @@ export function validateCommercePurposeOutputSchema(value: unknown): value is Co
 }
 export const CommercePurposeOutputSchemaSchema = z.custom<CommercePurposeOutputSchema>(validateCommercePurposeOutputSchema);
 function matches(schema: CommercePurposeOutputSchema, value: unknown): boolean {
+  if (schema.oneOf) return schema.oneOf.filter(branch=>matches(branch,value)).length===1;
   if (schema.anyOf) return schema.anyOf.some(branch => matches(branch, value));
   const nullable = Array.isArray(schema.type);
   const type = nullable ? schema.type![0] : schema.type;
+  if(Object.hasOwn(schema,'const')&&value!==schema.const)return false;
   if (value === null) return nullable && (!schema.enum || schema.enum.includes(null));
   if (schema.enum && !schema.enum.includes(value as never)) return false;
   if (type === "string") {

@@ -275,7 +275,14 @@ export function normalizeCommerceProductSelectedOptions(raw:unknown):Array<{name
   for(const entry of raw.slice(0,16)){if(!entry||typeof entry!=="object")continue;const item=entry as {name?:unknown;value?:unknown};const name=optionLabel.safeParse(item.name),value=optionLabel.safeParse(item.value);if(name.success&&value.success&&!result.some(e=>e.name===name.data&&e.value===value.data))result.push({name:name.data,value:value.data});}return result;
 }
 export const CommerceProductSelectedOptionsSchema = z.preprocess(normalizeCommerceProductSelectedOptions,z.array(z.strictObject({name: optionLabel, value: optionLabel})).max(16));
+export const CommerceProductStockSchema = z.discriminatedUnion('status', [
+ z.strictObject({status:z.literal('KNOWN'),quantity:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),scope:z.enum(['PRODUCT','VARIANT'])}),
+ z.strictObject({status:z.literal('NOT_TRACKED')}),z.strictObject({status:z.literal('UNAVAILABLE')})
+]);
+export type CommerceProductStock = z.infer<typeof CommerceProductStockSchema>;
+export function normalizeCommerceStockQuantity(value:unknown):number|null { return typeof value==='number'&&Number.isSafeInteger(value)?Math.max(0,value):null; }
 export const CommerceProductSchema = z.strictObject({
+  stock: CommerceProductStockSchema.optional(),
   description: z.preprocess(normalizeCommerceProductDescriptionField, CommerceProductDescriptionSchema).optional(),
   attributes: z.preprocess(normalizeCommerceProductAttributes, CommerceProductAttributesSchema).optional(),
   options: CommerceProductOptionsSchema.optional(),
