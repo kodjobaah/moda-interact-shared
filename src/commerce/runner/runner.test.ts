@@ -1431,3 +1431,20 @@ test('ARCH067 model sees selected labels and latest successful presentation orde
  f.input.productContext={schemaVersion:1,shopId:f.input.turn.shopId,conversationId:f.input.turn.conversationId,platform:'WOOCOMMERCE',references,presentation,updatedAt:at};
  const result=await runCommerceTurn(f.input);assert.equal(result.ok,true);const context=f.requests[0]!.context as {productReferences:{references:unknown[];presentation:unknown}};assert.deepEqual(context.productReferences.presentation,presentation);assert.ok(JSON.stringify(context.productReferences.references).includes('Height'));assert.ok(f.requests[0]!.instructions.some(s=>s.includes('latest successfully presented')));
 });
+
+import { validateFinalResponseNode } from './graph/nodes/validate-final-response';
+import { finalResponseSchema } from '../response';
+test('product selection correction is bounded and only triggered for supported product-bearing answers',async()=>{
+ const f=fixture([final()]);
+ const prepared=await prepareCommerceTurn(f.input);
+ prepared.response={...prepared.response,detailsSchema:{type:'object',properties:{productRecommendations:{type:'array',maxItems:3,items:{type:'string',maxLength:128}}},required:[],additionalProperties:false}};
+ prepared.finalSchema=finalResponseSchema(prepared.response);
+ const runtime={checkCancellationAndDeadline:()=>{}};
+ const execute={input:f.input,prepared,runtime,logger:{},stats:{modelSteps:1,remoteCalls:0}} as unknown as Parameters<typeof validateFinalResponseNode>[0];
+ const node=validateFinalResponseNode(execute);
+ const state={...initialCommerceTurnGraphState(),modelSteps:1,pendingStep:final({...exampleFinal,answerKind:'ANSWER',referralReason:null}),runtimeMessages:[{tool:'commerce_search_products',result:{status:'OK',data:{products:[{productId:'tree'}]}}}]};
+ const first=await node(state);assert.equal(first.selectionRepairUsed,true);assert.equal(first.finalResult,null);
+ const second=await node({...state,selectionRepairUsed:true});assert.ok(second.finalResult);assert.equal(second.selectionRepairUsed,undefined);
+ assert.ok((await node({...state,runtimeMessages:[]})).finalResult);
+ assert.ok((await node({...state,runtimeMessages:[{tool:'commerce_search_products',result:{status:'ERROR',data:{products:[{}]}}}]})).finalResult);
+});

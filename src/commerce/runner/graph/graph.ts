@@ -49,6 +49,6 @@ export function createCommerceTurnGraph(execution: CommerceTurnGraphExecution) {
       textResponse: "validateFinalResponse",
     })
     .addEdge("executeToolCalls", "resolveAvailableTools")
-    .addEdge("validateFinalResponse", END)
+    .addConditionalEdges("validateFinalResponse", (state: CommerceTurnGraphStateValue) => state.finalResult ? "complete" : "repair", { complete: END, repair: "resolveAvailableTools" })
     .compile();
 }

@@ -7,6 +7,7 @@ import type { ModelStep } from "../types.js";
 export type CommerceRuntimeMessage = Readonly<{ tool: string; result: unknown }>;
 
 export const CommerceTurnGraphState = Annotation.Root({
+  selectionRepairUsed: Annotation<boolean>(),
   modelSteps: Annotation<number>(),
   remoteCalls: Annotation<number>(),
   availableTools: Annotation<readonly ToolDescriptor[]>(),
@@ -21,6 +22,7 @@ export type CommerceTurnGraphStateValue = typeof CommerceTurnGraphState.State;
 
 export function initialCommerceTurnGraphState(): CommerceTurnGraphStateValue {
   return {
+    selectionRepairUsed: false,
     modelSteps: 0,
     remoteCalls: 0,
     availableTools: [],

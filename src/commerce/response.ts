@@ -163,7 +163,10 @@ export function finalResponseToolSchema(definition: CommerceResponseContract) {
       uniqueItems: true,
       items: { type: "string", maxLength: 128 },
     },
-    details: { type: "object" },
+    // Expose pinned fields at the root as well as in the ANSWER branch. Some
+    // tool providers do not surface properties nested only inside allOf/oneOf.
+    // Required fields remain branch-specific so referrals can still use {}.
+    details: { type: "object", properties: contract.detailsSchema.properties ?? {}, additionalProperties: false },
   };
   return {
     type: "object",
