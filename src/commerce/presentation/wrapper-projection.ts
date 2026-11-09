@@ -1,3 +1,4 @@
+import { ConversationProductImageBindingSchema } from "./product-image.js";
 import type { PreparedToken, PreparedWrapper, WrapperVariable } from "./wrapper-contracts.js";
 
 const VARIABLES = new Set<WrapperVariable>([
@@ -65,10 +66,12 @@ export function readPreparedWrapper(localeAst: unknown, contentHash: string | nu
     return { kind: "missing" };
   }
   const prepared = localeAst.prepared;
-  if (!onlyKeys(prepared, ["schemaVersion", "family", "responseSlot", "header", "body", "footer", "conditionals"]) ||
+  if (!onlyKeys(prepared, ["schemaVersion", "family", "responseSlot", "header", "body", "footer", "conditionals", "productImage"]) ||
       prepared.schemaVersion !== 1 || prepared.family !== "MODA_CONVERSATION_WRAPPER" ||
       prepared.responseSlot !== SLOT || !Array.isArray(prepared.conditionals) ||
       prepared.conditionals.length > 1) return { kind: "invalid" };
+  const binding = Object.hasOwn(prepared, "productImage") ? ConversationProductImageBindingSchema.safeParse(prepared.productImage) : undefined;
+  if (binding && !binding.success) return { kind: "invalid" };
   const header = readTokens(prepared.header, "header");
   const body = readTokens(prepared.body, "body");
   const footer = readTokens(prepared.footer, "footer");
@@ -89,5 +92,6 @@ export function readPreparedWrapper(localeAst: unknown, contentHash: string | nu
   return { kind: "ok", prepared: {
     schemaVersion: 1, family: "MODA_CONVERSATION_WRAPPER", responseSlot: SLOT,
     header, body, footer, conditionals,
+    ...(binding?.success ? { productImage: binding.data } : {}),
   } };
 }
