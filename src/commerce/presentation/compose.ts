@@ -12,6 +12,8 @@ import { resolveModaConfigurationLocale } from "../../internationalization.js";
 import type { VerifiedWrapperContext, WrapperSlot } from "./wrapper-contracts.js";
 export type CommerceWhatsAppPreviewInput = {
  envelope: CommerceFinalResponse;
+ /** Follow-up replies preserve the grounded agent wording; initial outreach uses its own renderer. */
+ responseStyle?: "AGENT";
  presentation: import("zod").input<typeof CommerceVerifiedPresentationSchema>;
  /** Must agree with the host-verified projection. */
  locale?: string;
@@ -34,7 +36,7 @@ export function composeCommerceWhatsAppPreview(input:CommerceWhatsAppPreviewInpu
  try {
   const envelope=CommerceFinalResponseSchema.parse(input.envelope),p=CommerceVerifiedPresentationSchema.parse(input.presentation);
   if((input.locale!==undefined&&resolveModaConfigurationLocale(input.locale)!==p.locale)||(input.brandName!==undefined&&input.brandName!==p.brandName))return {kind:"refused",reason:"INVALID_INPUT"};
-  const candidates=candidatesFor(envelope,p);if(candidates[0]&&/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(candidates[0]))return {kind:"refused",reason:"INVALID_INPUT"};if(!candidates.length)return {kind:"refused",reason:"OUTPUT_TOO_LONG"};
+  const candidates=input.responseStyle==="AGENT"?buildReplyCandidates({fullBody:normalizeCommerceReplyText(envelope.replyText),minimalBody:normalizeCommerceReplyText(envelope.replyText)}):candidatesFor(envelope,p);if(candidates[0]&&/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(candidates[0]))return {kind:"refused",reason:"INVALID_INPUT"};if(!candidates.length)return {kind:"refused",reason:"OUTPUT_TOO_LONG"};
   const w=input.wrapper;
   // With no configured wrapper, still enforce the plain-text controls and bounds.
   if(!w||!w.slots.length){const body=candidates[0]!;if(/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(body))return {kind:"refused",reason:"INVALID_INPUT"};return {kind:"ready",body,candidates,wrapper:null};}
