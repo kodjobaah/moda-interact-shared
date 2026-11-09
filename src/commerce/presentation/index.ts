@@ -15,3 +15,5 @@ export * from "./compose.js";
 
 export * from "./facts.js";
 export * from "./fact-messages.js";
+
+export * from "./product-image.js";
