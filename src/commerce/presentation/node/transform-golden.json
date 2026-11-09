@@ -1,0 +1,39 @@
+{
+  "sourceCommit": "db32bdf1e69944b0a15f7c76400f222f00244be4",
+  "sharpVersion": "0.35.4",
+  "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"300\"><rect width=\"100\" height=\"300\" fill=\"#dc0a14\" fill-opacity=\"0.5\"/></svg>",
+  "records": [
+    {
+      "role": "PRODUCT",
+      "contentType": "image/jpeg",
+      "width": 1125,
+      "height": 600,
+      "sizeBytes": 4755,
+      "contentSha256": "08fb5ae0b26d721b3278a600136c269dad686082cd1b8cd3434f5f431f1f9086"
+    },
+    {
+      "role": "LOGO",
+      "contentType": "image/png",
+      "width": 1125,
+      "height": 600,
+      "sizeBytes": 5461,
+      "contentSha256": "3fdd9ae66a33c599fabc6f5a5f4fea76ddb07845719f8d1bd264650bfcf1e2e8"
+    },
+    {
+      "role": "SQUARE_LOGO",
+      "contentType": "image/png",
+      "width": 1125,
+      "height": 600,
+      "sizeBytes": 5461,
+      "contentSha256": "3fdd9ae66a33c599fabc6f5a5f4fea76ddb07845719f8d1bd264650bfcf1e2e8"
+    },
+    {
+      "role": "COVER_IMAGE",
+      "contentType": "image/png",
+      "width": 1125,
+      "height": 600,
+      "sizeBytes": 3634,
+      "contentSha256": "ca5067c9bdbd1629377601992fbaa8a9acf3c757fff05285c46235b3518cceb7"
+    }
+  ]
+}

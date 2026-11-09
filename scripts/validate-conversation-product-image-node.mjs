@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import vm from 'node:vm';
+const media = await import('@modainteract/moda-interact-shared/commerce/presentation/node');
+for (const name of ['prepareConversationProductImage','conversationProductObjectKey','createSafeImageFetcher','verifyEncodedBrandImage','assertSelfContainedSvg','createShopBrandImageTransformer','createOutreachProductImageTransformer','createBrandR2S3Transport','putGuardedImmutableR2Object','createShopBrandPublicMediaProbe','resolveAndValidateDestination','createPinnedLookup']) assert.equal(typeof media[name], 'function', name);
+const result=await media.prepareConversationProductImage({source:{kind:'SOURCE',shopId:'shop',platform:'WOOCOMMERCE',productId:'30',variantId:null,sourceUrl:'https://merchant.example/product.jpg'},publicOrigin:'',bucketName:'',r2:{endpoint:'',accessKeyId:'',secretAccessKey:''}});
+assert.equal(result.kind,'OMITTED'); assert.equal(result.reason,'CONFIGURATION_UNAVAILABLE');
+const browser=await build({entryPoints:['dist/commerce/presentation/index.js'],bundle:true,platform:'browser',format:'iife',globalName:'Presentation',write:false,metafile:true});
+assert.ok(!Object.keys(browser.metafile.inputs).some(path=>/node:|sharp|@aws-sdk|prisma|\/logging\/|\/observability\/|langchain/.test(path)));
+const context=vm.createContext({Intl,URL,TextEncoder,TextDecoder,structuredClone,console});vm.runInContext(browser.outputFiles[0].text,context,{timeout:10000});
+assert.equal(vm.runInContext('typeof Presentation.prepareConversationProductImage',context),'undefined');
+assert.equal(vm.runInContext("Presentation.buildConversationDeliveryPlan({body:'Answer',shopId:'shop',displayedPairs:[]}).plan.body",context),'Answer');
+console.log('Node media public exports and browser isolation passed without provider I/O');

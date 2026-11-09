@@ -7,6 +7,7 @@ export default defineConfig({
     "commerce/outreach/index": "src/commerce/outreach/index.ts",
     "commerce/index": "src/commerce/index.ts",
     "commerce/presentation/index": "src/commerce/presentation/index.ts",
+    "commerce/presentation/node/index": "src/commerce/presentation/node/index.ts",
     "commerce/runner/index": "src/commerce/runner/index.ts",
     "commerce/model/index": "src/commerce/model/index.ts",
     "commerce/model/node": "src/commerce/model/node.ts",
