@@ -165,6 +165,12 @@ export function prepareFrozenComponents(input: {
     }
     if (registration.category !== "MARKETING")
         return invalid();
+    return { ...prepareStoredComponents({components: approved, bindings: frozen, variables}), bindingFingerprint: fingerprint };
+}
+export function prepareStoredComponents(input: {components: unknown; bindings: unknown; variables: PreparedVariableResolver}): {components: readonly PreparedMetaComponent[]} {
+    const approved = strictComponents(input.components);
+    const frozen = parseFrozenBindings(input.bindings);
+    const variables = input.variables;
     const result: PreparedMetaComponent[] = [];
     let matchedHeader = false;
     let matchedBody = false;
@@ -238,5 +244,5 @@ export function prepareFrozenComponents(input: {
     if (!matchedBody || (frozen.header.length > 0 && !matchedHeader) ||
         (frozen.buttons.length > 0 && !matchedButtons))
         return invalid();
-    return { components: result, bindingFingerprint: fingerprint };
+    return {components: result};
 }

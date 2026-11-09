@@ -62,3 +62,7 @@ generic shopName/headerMedia. Consumers adopt only accepted immutable SHARED-012
 publication/adoption/deployment remain separate. Background's remaining72 failing
 checks require same-task investigation/revalidation; Shared goldens do not waive
 them.
+
+Studio renders explicitly selected existing content with `renderStudioInitialOutreachPreview` and the strict Studio template/input/result schemas. `templateValidation: NOT_EVALUATED` identifies rendering only. No approval, WABA, sender, lifecycle, drift, category or hash checks run on this path; it never selects an assignment or fallback. The host owns selected-shop authorization and database template selection. Missing IMAGE data refuses MEDIA_NOT_READY.
+
+Production retains `selectRecoveryAssignment` eligibility/approval/sender/locale checks and `prepareFrozenComponents` stored digest/category checks. Both entrypoints delegate parameter construction to internal `prepareStoredComponents`, text substitution/4096 BODY and8192 total bounds to internal `renderStoredComponentText`, and values/assets to the existing resolver. Public `selectSendableOutreachOffer` and `purposeFor` are the existing shared classifier/mapping implementations; Commerce must import them instead of copying logic. SHARED016 owns a future release; this task does not publish or change consumer versions.
