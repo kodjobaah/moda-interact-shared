@@ -144,3 +144,21 @@ export function verifyCommerceAnswerPresentationSelection(raw: unknown):
     return { kind: "limitation", reason: "INVALID_SELECTION" };
   return { kind: "verified", selection: parsed.data };
 }
+
+/** Empty optional selection lists mean unused slots, never product choices. */
+export function normalizeCommerceProductSelections(details: Record<string, unknown>): Record<string, unknown> {
+ const normalized={...details};
+ for(const key of ['productRecommendations','productDetailSelections','productOptionSelections']) {
+  if(Array.isArray(normalized[key]) && normalized[key].length===0) {
+   delete normalized[key];
+   if(key==='productRecommendations') delete normalized.productRecommendationVersion;
+  }
+ }
+ return normalized;
+}
+/** One product presentation mode per reply; shipping may accompany any mode. */
+export function commerceProductSelectionConflict(details: Record<string, unknown>): string | null {
+ const active=['productRecommendations','productDetailSelections','productOptionSelections'].filter(key=>Array.isArray(details[key])&&details[key].length>0);
+ if(active.length<2)return null;
+ return active.includes('productRecommendations')?'RECOMMENDATION_FACT_SELECTION_CONFLICT':'DETAIL_OPTION_SELECTION_CONFLICT';
+}

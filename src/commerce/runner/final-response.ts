@@ -1,3 +1,4 @@
+import { normalizeCommerceProductSelections, commerceProductSelectionConflict } from "../selection.js";
 import type { CommerceFinalResponse } from "../response.js";
 import type { CommerceEvidence } from "../schemas.js";
 import { RunnerFailure } from "./failure.js";
@@ -14,11 +15,15 @@ export function validateFinalResponse(input: {
   now: () => number;
   checkCancellationAndDeadline(): void;
 }): CommerceFinalResponse {
-  const parsed = input.prepared.finalSchema.safeParse(input.raw);
+  const raw = input.raw && typeof input.raw === 'object' && !Array.isArray(input.raw) && 'details' in input.raw && input.raw.details && typeof input.raw.details === 'object' && !Array.isArray(input.raw.details)
+    ? {...input.raw,details:normalizeCommerceProductSelections(input.raw.details as Record<string,unknown>)} : input.raw;
+  const parsed = input.prepared.finalSchema.safeParse(raw);
   if (!parsed.success) throw new RunnerFailure("INVALID_FINAL", {
     stage: "final.validate", reasonCode: "FINAL_SCHEMA_INVALID", ...schemaIssueMetadata(parsed.error),
   }, parsed.error);
   const final = parsed.data;
+  const conflict=commerceProductSelectionConflict(final.details);
+  if(conflict) throw new RunnerFailure("INVALID_FINAL",{stage:"final.validate",reasonCode:"FINAL_SCHEMA_INVALID",issueCount:1,issueCodes:["custom"],issuePaths:["details.productRecommendations","details.productDetailSelections","details.productOptionSelections"]});
   if (input.languageSource === "customer-explicit" && final.detectedLanguageTag !== null)
     throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "FINAL_LANGUAGE_MISMATCH" });
   if (input.requiredReferral && final.answerKind !== "REFER_TO_STORE")

@@ -1,4 +1,4 @@
-import { verifyCommerceAnswerPresentationSelection } from "../selection.js";
+import { normalizeCommerceProductSelections, commerceProductSelectionConflict, verifyCommerceAnswerPresentationSelection } from "../selection.js";
 import { renderCommerceProductFacts } from "./facts.js";
 import { CommerceFinalResponseSchema, type CommerceFinalResponse } from "../response.js";
 import { CommerceVerifiedPresentationSchema, type CommerceVerifiedPresentation } from "./schemas.js";
@@ -36,6 +36,8 @@ function candidatesFor(envelope:CommerceFinalResponse,p:import("zod").output<typ
 export function composeCommerceWhatsAppPreview(input:CommerceWhatsAppPreviewInput):CommerceWhatsAppPreviewResult {
  try {
   const envelope=CommerceFinalResponseSchema.parse(input.envelope),p=CommerceVerifiedPresentationSchema.parse(input.presentation);
+  envelope.details=normalizeCommerceProductSelections(envelope.details);
+  const conflict=commerceProductSelectionConflict(envelope.details);if(conflict)return {kind:"refused",reason:conflict};
   if((input.locale!==undefined&&resolveModaConfigurationLocale(input.locale)!==p.locale)||(input.brandName!==undefined&&input.brandName!==p.brandName))return {kind:"refused",reason:"INVALID_INPUT"};
   if(input.responseStyle!==undefined&&input.responseStyle!=="AGENT"&&input.responseStyle!=="LEGACY")return {kind:"refused",reason:"INVALID_INPUT"};
   if(input.responseStyle==="AGENT") {

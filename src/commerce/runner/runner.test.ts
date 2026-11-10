@@ -1558,3 +1558,14 @@ test('repeated malformed finals stop after one correction and preserve the field
  const bad={...exampleFinal,replyText:null};const f=fixture([final(bad),final(bad),final()]);
  const result=await runCommerceTurn(f.input);expectFailure(result,'INVALID_FINAL','FINAL_SCHEMA_INVALID');assert.equal(f.requests.length,2);if(!result.ok)assert.deepEqual(result.error.diagnostic?.issuePaths,['replyText']);
 });
+test('conflicting selection modes trigger the same bounded schema correction',async()=>{
+ const f=fixture([final()]);const prepared=await prepareCommerceTurn(f.input);
+ const list={type:'array' as const,maxItems:3,items:{type:'string' as const,maxLength:128}};
+ prepared.response={...prepared.response,detailsSchema:{type:'object',properties:{productDetailSelections:list,productRecommendations:list},required:[],additionalProperties:false}};
+ prepared.finalSchema=finalResponseSchema(prepared.response);
+ const execution={input:f.input,prepared,runtime:{checkCancellationAndDeadline:()=>{}},logger:{},stats:{modelSteps:1,remoteCalls:0}} as unknown as Parameters<typeof validateFinalResponseNode>[0];
+ const state={...initialCommerceTurnGraphState(),modelSteps:1,pendingStep:final({...exampleFinal,answerKind:'ANSWER',referralReason:null,details:{productDetailSelections:['tree'],productRecommendations:['tree']}})};
+ assert.equal((await validateFinalResponseNode(execution)(state)).selectionRepairUsed,true);
+ const corrected=await validateFinalResponseNode(execution)({...state,selectionRepairUsed:true,pendingStep:final({...exampleFinal,answerKind:'ANSWER',referralReason:null,details:{productDetailSelections:['tree'],productRecommendations:[]}})});
+ assert.deepEqual(corrected.finalResult?.details,{productDetailSelections:['tree']});
+});
