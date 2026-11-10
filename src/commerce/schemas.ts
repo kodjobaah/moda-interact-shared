@@ -676,13 +676,28 @@ export const CommerceToolOutputs = {
   commerce_find_qualifying_products: alternatives,
   commerce_find_similar_products: alternatives,
 };
+/** Accept a verified bare hostname or HTTPS shop origin, never a path or credentials. */
+export function commerceStoreHostname(value: string): string | null {
+  try {
+    if (!value || /[\\\s]/u.test(value)) return null;
+    const url = new URL(value.includes('://') ? value : `https://${value}`);
+    return url.protocol === 'https:' && !url.username && !url.password && !url.port
+      && url.pathname === '/' && !url.search && !url.hash
+      ? url.hostname.toLowerCase() : null;
+  } catch { return null; }
+}
+
 export function productBelongsToDomain(
   product: z.infer<typeof CommerceProductSchema>,
   verifiedDomain: string,
 ) {
   try {
     return (
-      product.url === null || new URL(product.url).hostname === verifiedDomain
+      product.url === null || (commerceStoreHostname(verifiedDomain) !== null
+        && new URL(product.url).protocol === 'https:'
+        && !new URL(product.url).username && !new URL(product.url).password
+        && !new URL(product.url).port
+        && new URL(product.url).hostname === commerceStoreHostname(verifiedDomain))
     );
   } catch {
     return false;
