@@ -1459,6 +1459,7 @@ for (const platform of ['SHOPIFY','WOOCOMMERCE'] as const) test(`product selecti
  const state={...initialCommerceTurnGraphState(),selectionRepairUsed:true,modelSteps:1,availableTools:[exampleTool],runtimeMessages:[{tool:'commerce_search_products',result:{status:'OK',data:{products:[{productId:'18'}]}}}]} as unknown as Parameters<ReturnType<typeof invokeModelNode>>[0];
  await invokeModelNode(execution)(state);
  assert.deepEqual(f.requests[0]!.tools.map(t=>t.name),['finalResponse']);
+ assert.equal(f.requests[0]!.requiredToolName,'finalResponse');
  assert.deepEqual(f.requests[0]!.messages,state.runtimeMessages);
  await assert.rejects(invokeModelNode(execution)(state),error=>(error as {diagnostic:{reasonCode:string}}).diagnostic.reasonCode==='FINAL_PRODUCT_SELECTION_MISSING');
  assert.equal(f.counts().tools,0);
@@ -1492,4 +1493,15 @@ for (const platform of ['SHOPIFY', 'WOOCOMMERCE'] as const) test(`observed produ
  assert.equal((f.requests[1]!.tools.find(t=>t.name==='finalResponse')!.inputSchema as {allOf:unknown[]}).allOf.length,2);
  await invokeModelNode(execution)({...state,requiredReferral:'TOOL_UNAVAILABLE'});
  assert.equal((f.requests[2]!.tools.find(t=>t.name==='finalResponse')!.inputSchema as {allOf:unknown[]}).allOf.length,2);
+});
+
+for (const platform of ['SHOPIFY','WOOCOMMERCE'] as const) test(`untracked stock retains exact product selection through repair for ${platform}`, async () => {
+ const f=fixture([final()]);f.input.platform=platform;
+ const prepared=await prepareCommerceTurn(f.input);
+ prepared.response={...prepared.response,detailsSchema:{type:'object',properties:{productDetailSelections:{type:'array',maxItems:3,items:{type:'object',properties:{productId:{type:'string',maxLength:128},variantId:{type:['string','null'],maxLength:128}},required:['productId','variantId'],additionalProperties:false}}},required:[],additionalProperties:false}};
+ prepared.finalSchema=finalResponseSchema(prepared.response);
+ const execution={input:f.input,prepared,runtime:{checkCancellationAndDeadline:()=>{}},logger:{},stats:{modelSteps:2,remoteCalls:1}} as unknown as Parameters<typeof validateFinalResponseNode>[0];
+ const pair={productId:'28',variantId:platform==='SHOPIFY'?'variant-28':null};
+ const result=await validateFinalResponseNode(execution)({...initialCommerceTurnGraphState(),selectionRepairUsed:true,modelSteps:2,pendingStep:final({...exampleFinal,answerKind:'ANSWER',referralReason:null,replyText:'We cannot confirm an exact stock count.',details:{productDetailSelections:[pair]}}),runtimeMessages:[{tool:'commerce_get_product',result:{status:'OK',data:{product:{...pair,stock:{status:'NOT_TRACKED'}}}}}]} as never);
+ assert.deepEqual(result.finalResult?.details.productDetailSelections,[pair]);
 });

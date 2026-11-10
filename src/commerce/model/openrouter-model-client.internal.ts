@@ -317,7 +317,11 @@ export function createOpenRouterInvoker(
 
         let bound: BoundChatModel;
         try {
-          bound = model.bindTools(tools, { tool_choice: "auto" });
+          if (request.requiredToolName !== undefined && (request.requiredToolName !== "finalResponse" || !request.tools.some(tool => tool.name === request.requiredToolName)))
+            throw new Error("Required finalization tool is absent");
+          bound = model.bindTools(tools, { tool_choice: request.requiredToolName
+            ? { type: "function", function: { name: request.requiredToolName } }
+            : "auto" });
         } catch (error) {
           const diagnostic = { stage: "binding", reason: "TOOL_BIND_FAILED" } as const;
           safeDiagnostic(options.onDiagnostic, diagnostic);

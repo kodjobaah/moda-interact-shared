@@ -337,3 +337,15 @@ test('model context serialization retains latest presentation order and selected
  await h.invoke({...request,context:{productReferences:{trust:'UNTRUSTED_REFERENCE_DATA_NOT_CURRENT_FACTS_OR_AUTHORITY',references,presentation}}},new AbortController().signal);
  const content=h.captured.messages[1].content as string;const serialized=JSON.parse(content.slice(content.indexOf('\n')+1));assert.deepEqual(serialized.productReferences.references,references);assert.deepEqual(serialized.productReferences.presentation,presentation);
 });
+
+for (const platform of ['SHOPIFY', 'WOOCOMMERCE']) test(`repair forces finalResponse at the provider boundary for ${platform}`, async () => {
+  const { invoke, captured } = harness({tool_calls:[{name:'finalResponse',args:{details:{productDetailSelections:[{productId:'28',variantId:null}]}}}],usage_metadata:{output_tokens:30}});
+  const result = await invoke({...request, requiredToolName:'finalResponse', tools:[{name:'finalResponse',description:'Finalize',inputSchema:{type:'object'}}]},new AbortController().signal);
+  assert.deepEqual(captured.bindOptions,{tool_choice:{type:'function',function:{name:'finalResponse'}}});
+  assert.equal(result.calls[0]?.name,'finalResponse');
+});
+test('required finalization rejects an absent tool before provider invocation', async () => {
+  const { invoke, captured } = harness();
+  await assert.rejects(invoke({...request,requiredToolName:'finalResponse'},new AbortController().signal));
+  assert.equal(captured.invokeOptions,undefined);
+});

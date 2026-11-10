@@ -22,6 +22,8 @@ export type ModelResponseSummary = {
 };
 export type ModelStep = { calls: ModelCall[]; outputTokens: number; text?: string; providerSummary?: ModelResponseSummary };
 export type ModelRequest = {
+  /** Runner-controlled finalization; never supplied by merchant configuration. */
+  requiredToolName?: "finalResponse";
   instructions: readonly string[];
   context: unknown;
   history: readonly unknown[];
