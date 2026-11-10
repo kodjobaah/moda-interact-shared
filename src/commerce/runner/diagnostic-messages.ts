@@ -72,6 +72,7 @@ const explanations = {
   TOOL_RESULT_MISSING: ["The tool execution loop ended without receiving a result.", "Inspect tool execution lifecycle and retry completion."],
   TOOL_STALE_TURN: ["The tool reported that the conversation turn is no longer current.", "Inspect conversation versioning and abandon this obsolete turn."],
   EVIDENCE_INVALID: ["Tool evidence failed its integrity, grant or freshness checks.", "Inspect tool evidence generation and turn/grant correlation."],
+  FINAL_PRODUCT_SELECTION_MISSING: ["The model did not return the required observed product selections during its bounded final-response correction.", "Inspect the pinned response schema and model output; reuse verified product results rather than repeating provider searches."],
   FINAL_SCHEMA_INVALID: ["The model's finalResponse failed runtime schema validation.", "Inspect issueCodes and issuePaths; correct response formatting or tool instructions."],
   FINAL_LANGUAGE_MISMATCH: ["The final answer included language detection despite an explicit customer language.", "Check model instructions governing language metadata."],
   FINAL_REFERRAL_REQUIRED: ["The model did not produce the mandatory store referral after a denied or failed tool.", "Check final-response referral rules and the recorded tool outcome."],

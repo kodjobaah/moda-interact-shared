@@ -49,7 +49,8 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
       });
       // One correction uses the existing model-step/deadline budget. Never guess
       // selections or replay provider calls on the model's behalf.
-      if (!state.selectionRepairUsed && !state.requiredReferral && final.answerKind === 'ANSWER' && supportsSelections && observedProducts && !selected && final.details.responseDisposition !== 'SHIPPING_INFORMATION_UNVERIFIED' && !final.details.shippingInformationSelection) {
+      if (!state.requiredReferral && final.answerKind === 'ANSWER' && supportsSelections && observedProducts && !selected && final.details.responseDisposition !== 'SHIPPING_INFORMATION_UNVERIFIED' && !final.details.shippingInformationSelection) {
+        if (state.selectionRepairUsed) throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "FINAL_PRODUCT_SELECTION_MISSING", modelStep: state.modelSteps });
         logModelInvalid(execution.logger, state.modelSteps, 'MISSING_PRODUCT_SELECTION_REPAIR');
         return { selectionRepairUsed: true, pendingStep: null, finalResult: null };
       }

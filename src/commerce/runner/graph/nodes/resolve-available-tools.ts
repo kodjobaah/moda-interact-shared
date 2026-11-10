@@ -8,7 +8,8 @@ export function resolveAvailableToolsNode(execution: CommerceTurnGraphExecution)
     execution.runtime.checkCancellationAndDeadline();
     if (state.modelSteps >= execution.prepared.budgets.modelSteps)
       throw new RunnerFailure("BUDGET_EXHAUSTED", { stage: "tools.resolve", reasonCode: "MODEL_STEP_BUDGET_EXHAUSTED" });
-    const availableTools = await resolveAvailableTools(execution.prepared, execution.runtime);
+    // A format correction consumes a model step, never another provider request.
+    const availableTools = state.selectionRepairUsed ? [] : await resolveAvailableTools(execution.prepared, execution.runtime);
     return { availableTools };
   };
 }

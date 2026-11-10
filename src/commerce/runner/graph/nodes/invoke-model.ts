@@ -22,7 +22,7 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
         history: execution.input.history,
         messages: state.runtimeMessages,
         tools: [
-          ...state.availableTools.map((descriptor) => ({
+          ...(state.selectionRepairUsed ? [] : state.availableTools).map((descriptor) => ({
             name: descriptor.name,
             description: descriptor.description,
             inputSchema: descriptor.inputSchema,
@@ -47,6 +47,8 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
       step = validateModelStep(raw, execution.prepared.budgets.outputTokens);
       observedStep = step;
       routeModelStep(step);
+      if (state.selectionRepairUsed && (step.calls.length !== 1 || step.calls[0]?.name !== "finalResponse"))
+        throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "FINAL_PRODUCT_SELECTION_MISSING", modelStep });
     } catch (error) {
       logModelInvalid(
         execution.logger, modelStep,

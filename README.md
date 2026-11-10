@@ -298,6 +298,12 @@ details schema. `finalResponseToolSchema(definition)` produces the host-local
 finalization Tool's input schema. `verifyResponseContract` checks the definition
 against its hash using the caller's digest implementation.
 
+When a product-bearing answer omits its structured selections, the runner allows
+one bounded correction using the existing observations and model-step/deadline
+budget. Only `finalResponse` is available during correction: no provider reads
+are repeated. An unsuccessful correction returns `INVALID_FINAL` with
+`FINAL_PRODUCT_SELECTION_MISSING` to both Studio and Background.
+
 An ANSWER requires null referral reason; a REFER_TO_STORE response requires the
 appropriate reason, empty evidence IDs and empty details. Language detection
 fields are either both null or a valid pair. Only reply text is customer-facing;

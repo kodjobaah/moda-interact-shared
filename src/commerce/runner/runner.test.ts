@@ -1444,7 +1444,21 @@ test('product selection correction is bounded and only triggered for supported p
  const node=validateFinalResponseNode(execute);
  const state={...initialCommerceTurnGraphState(),modelSteps:1,pendingStep:final({...exampleFinal,answerKind:'ANSWER',referralReason:null}),runtimeMessages:[{tool:'commerce_search_products',result:{status:'OK',data:{products:[{productId:'tree'}]}}}]};
  const first=await node(state);assert.equal(first.selectionRepairUsed,true);assert.equal(first.finalResult,null);
- const second=await node({...state,selectionRepairUsed:true});assert.ok(second.finalResult);assert.equal(second.selectionRepairUsed,undefined);
+ await assert.rejects(node({...state,selectionRepairUsed:true}), error => (error as {diagnostic:{reasonCode:string}}).diagnostic.reasonCode==='FINAL_PRODUCT_SELECTION_MISSING');
+ const corrected=await node({...state,selectionRepairUsed:true,pendingStep:final({...exampleFinal,answerKind:"ANSWER",referralReason:null,details:{productRecommendations:["tree"]}})});assert.ok(corrected.finalResult);
  assert.ok((await node({...state,runtimeMessages:[]})).finalResult);
  assert.ok((await node({...state,runtimeMessages:[{tool:'commerce_search_products',result:{status:'ERROR',data:{products:[{}]}}}]})).finalResult);
+});
+
+import { invokeModelNode } from './graph/nodes/invoke-model';
+for (const platform of ['SHOPIFY','WOOCOMMERCE'] as const) test(`product selection repair exposes only finalResponse and rejects provider calls for ${platform}`,async()=>{
+ const f=fixture([final(),call('commerce_search_products')],true);f.input.platform=platform;
+ const prepared=await prepareCommerceTurn(f.input);
+ const execution={input:f.input,prepared,runtime:{checkCancellationAndDeadline:()=>{},bounded:async(fn:(s:AbortSignal)=>Promise<unknown>)=>fn(f.input.signal)},logger:{},stats:{modelSteps:1,remoteCalls:0}} as unknown as Parameters<typeof invokeModelNode>[0];
+ const state={...initialCommerceTurnGraphState(),selectionRepairUsed:true,modelSteps:1,availableTools:[exampleTool],runtimeMessages:[{tool:'commerce_search_products',result:{status:'OK',data:{products:[{productId:'18'}]}}}]} as unknown as Parameters<ReturnType<typeof invokeModelNode>>[0];
+ await invokeModelNode(execution)(state);
+ assert.deepEqual(f.requests[0]!.tools.map(t=>t.name),['finalResponse']);
+ assert.deepEqual(f.requests[0]!.messages,state.runtimeMessages);
+ await assert.rejects(invokeModelNode(execution)(state),error=>(error as {diagnostic:{reasonCode:string}}).diagnostic.reasonCode==='FINAL_PRODUCT_SELECTION_MISSING');
+ assert.equal(f.counts().tools,0);
 });
