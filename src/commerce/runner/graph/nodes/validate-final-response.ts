@@ -57,7 +57,12 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
       return { finalResult: final };
     } catch (error) {
       logModelInvalid(execution.logger, state.modelSteps, error instanceof RunnerFailure ? error.diagnostic.reasonCode : "UNEXPECTED_EXCEPTION");
-      if (error instanceof RunnerFailure) throw error;
+      if (error instanceof RunnerFailure) {
+        if (error.diagnostic.reasonCode === "FINAL_SCHEMA_INVALID" && !state.selectionRepairUsed) {
+          return { selectionRepairUsed: true, schemaRepairDiagnostic:error.diagnostic, schemaRepairIssues: error.diagnostic.issuePaths?.length ? error.diagnostic.issuePaths : ["finalResponse"], pendingStep: null, finalResult: null };
+        }
+        throw error;
+      }
       throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "UNEXPECTED_EXCEPTION", modelStep: state.modelSteps, validationPhase }, error);
     }
   };

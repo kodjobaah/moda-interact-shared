@@ -1132,7 +1132,8 @@ test("R2 malformed adapter calls are INVALID_FINAL with no remote side effects",
       true,
     );
     expectFailure(await runCommerceTurn(f.input), "INVALID_FINAL");
-    assert.deepEqual(f.counts(), { model: 1, tools: 0 });
+    assert.equal(f.counts().tools,0);
+    assert.ok(f.counts().model>=1 && f.counts().model<=2);
   }
   const host = fixture([final()]);
   host.input.turn.inboundVersion = 0;
@@ -1544,4 +1545,15 @@ test('a cached product cannot bypass authorization revocation',async()=>{
  const result=await runCommerceTurn(f.input);assert.equal(result.ok,true,JSON.stringify(result));assert.equal(executions,1);
  const messages=f.requests[2]!.messages as Array<{result:{status:string;code?:string}}>;
  assert.equal(messages[1]!.result.status,'ERROR');assert.equal(messages[1]!.result.code,'DENIED');
+});
+
+for(const platform of ['SHOPIFY','WOOCOMMERCE'] as const) test(`malformed replyText gets one structured correction for ${platform}`,async()=>{
+ const good={...exampleFinal,answerKind:'ANSWER' as const,referralReason:null};
+ const f=fixture([final({...good,replyText:null}),final(good)]);f.input.platform=platform;
+ const result=await runCommerceTurn(f.input);assert.equal(result.ok,true,JSON.stringify(result));
+ assert.equal(f.requests.length,2);assert.equal(f.requests[1]!.requiredToolName,'finalResponse');assert.deepEqual(f.requests[1]!.tools.map(t=>t.name),['finalResponse']);assert.ok(f.requests[1]!.instructions.some(t=>t.includes('replyText must be a nonempty string')));assert.deepEqual(f.requests[1]!.messages,f.requests[0]!.messages);assert.equal(f.counts().tools,0);
+});
+test('repeated malformed finals stop after one correction and preserve the field path',async()=>{
+ const bad={...exampleFinal,replyText:null};const f=fixture([final(bad),final(bad),final()]);
+ const result=await runCommerceTurn(f.input);expectFailure(result,'INVALID_FINAL','FINAL_SCHEMA_INVALID');assert.equal(f.requests.length,2);if(!result.ok)assert.deepEqual(result.error.diagnostic?.issuePaths,['replyText']);
 });
