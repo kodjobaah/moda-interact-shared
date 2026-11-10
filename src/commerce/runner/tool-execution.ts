@@ -1,3 +1,4 @@
+import {hasObservedProducts,productSelectionFields} from "./product-selection.js";
 import { CommerceProductSchema } from "../schemas.js";
 import { isBuiltInTool } from "../definitions.js";
 import { canonicalJson, jsonBytes } from "../canonical-json.js";
@@ -15,7 +16,7 @@ import { resolveToolCall } from "./tool-policy.js";
 import type { RunCommerceTurnInput, ModelStep } from "./types.js";
 
 export type ToolExecutionResult = {
-  productReadReused: boolean;
+  finalizationRequired: boolean;
   remoteCalls: number;
   runtimeMessages: ReadonlyArray<{ tool: string; result: unknown }>;
   evidenceById: Readonly<Record<string, CommerceEvidence>>;
@@ -37,7 +38,7 @@ export async function executeToolCalls(input: {
   onRemoteCall?: (remoteCalls: number) => void;
   productReadCache?: Map<string, ReturnType<typeof CommerceToolResultSchema.parse>>;
 }): Promise<ToolExecutionResult> {
-  let productReadReused = false;
+  let finalizationRequired = false;
   let remoteCalls = input.remoteCalls;
   const runtimeMessages = [...input.runtimeMessages];
   const evidenceById = { ...input.evidenceById };
@@ -45,6 +46,11 @@ export async function executeToolCalls(input: {
 
   toolCalls: for (const call of input.step.calls) {
     input.runtime.checkCancellationAndDeadline();
+    if(remoteCalls>=input.prepared.budgets.remoteCalls && hasObservedProducts(runtimeMessages) && productSelectionFields(input.prepared.response).length>0) {
+      finalizationRequired=true;
+      safeLog(input.logger,"debug","commerce.turn.discovery.completed",{modelStep:input.modelStep,reasonCode:"VERIFICATION_CAPACITY_RESERVED",remoteCalls});
+      break;
+    }
     const policy = resolveToolCall(call.name, input.prepared, input.availableTools);
     if ("denial" in policy) {
       requiredReferral = requiredReferral === "TOOL_REVOKED" ? requiredReferral : policy.denial;
@@ -78,8 +84,6 @@ export async function executeToolCalls(input: {
     resolveToolCall(call.name, input.prepared, input.availableTools);
     const args = compileSubset(tool.descriptor.inputSchema, "input").safeParse(call.arguments);
     if (!args.success) {
-      if(remoteCalls >= input.prepared.budgets.remoteCalls) throw new RunnerFailure("BUDGET_EXHAUSTED",{stage:"tool.validate",reasonCode:"TOOL_CALL_BUDGET_EXHAUSTED"});
-      remoteCalls++; input.onRemoteCall?.(remoteCalls);
       runtimeMessages.push({tool:call.name,result:{contractVersion:"commerce.v1",status:"ERROR",code:"INVALID_INPUT",retryable:false}});
       safeLog(input.logger,"warn","commerce.turn.tool.invalid_input",{toolName:call.name,reasonCode:"TOOL_INPUT_INVALID",...schemaIssueMetadata(args.error)});
       continue;
@@ -90,7 +94,7 @@ export async function executeToolCalls(input: {
     const cacheKey = call.name === "commerce_get_product" ? canonicalJson(args.data) : undefined;
     const cached = cacheKey === undefined ? undefined : input.productReadCache?.get(cacheKey);
     if (cached) {
-      productReadReused = true;
+      finalizationRequired = true;
       runtimeMessages.push({ tool: call.name, result: structuredClone(cached) });
       safeLog(input.logger, "debug", "commerce.turn.tool.reused", {
         modelStep: input.modelStep, toolName: call.name, reasonCode: "SAME_TURN_PRODUCT_READ",
@@ -225,5 +229,5 @@ export async function executeToolCalls(input: {
     runtimeMessages.push({ tool: call.name, result });
   }
 
-  return { productReadReused, remoteCalls, runtimeMessages, evidenceById, requiredReferral };
+  return { finalizationRequired, remoteCalls, runtimeMessages, evidenceById, requiredReferral };
 }

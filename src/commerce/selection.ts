@@ -162,3 +162,10 @@ export function commerceProductSelectionConflict(details: Record<string, unknown
  if(active.length<2)return null;
  return active.includes('productRecommendations')?'RECOMMENDATION_FACT_SELECTION_CONFLICT':'DETAIL_OPTION_SELECTION_CONFLICT';
 }
+
+/** Reserve up to three product refreshes plus one shipping/offer verification call. */
+export function planCommerceVerificationBudget(totalCalls: number, productVerification = true) {
+ if(!Number.isSafeInteger(totalCalls)||totalCalls<1) throw new RangeError('Invalid commerce call budget');
+ const verificationCalls=productVerification?Math.min(4,totalCalls-1):0;
+ return {totalCalls,discoveryCalls:totalCalls-verificationCalls,verificationCalls};
+}

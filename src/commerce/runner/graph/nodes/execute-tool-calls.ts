@@ -22,9 +22,9 @@ export function executeToolCallsNode(execution: CommerceTurnGraphExecution) {
       logger: execution.logger,
       onRemoteCall: (remoteCalls) => { execution.stats.remoteCalls = remoteCalls; },
     });
-    const { productReadReused, ...updates } = result;
+    const { finalizationRequired, ...updates } = result;
     // Repeating an exact successful read cannot reveal additional facts. Finish
     // with existing observations under the same single final-correction budget.
-    return { ...updates, ...(productReadReused ? {selectionRepairUsed:true} : {}), pendingStep: null };
+    return { ...updates, ...(finalizationRequired ? {selectionRepairUsed:true} : {}), pendingStep: null };
   };
 }

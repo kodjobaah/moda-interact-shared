@@ -1,3 +1,4 @@
+import { hasObservedProducts,productSelectionFields } from "../../product-selection.js";
 import { RunnerFailure } from "../../failure.js";
 import { resolveAvailableTools } from "../../tool-policy.js";
 import type { CommerceTurnGraphExecution } from "../graph.js";
@@ -9,7 +10,8 @@ export function resolveAvailableToolsNode(execution: CommerceTurnGraphExecution)
     if (state.modelSteps >= execution.prepared.budgets.modelSteps)
       throw new RunnerFailure("BUDGET_EXHAUSTED", { stage: "tools.resolve", reasonCode: "MODEL_STEP_BUDGET_EXHAUSTED" });
     // A format correction consumes a model step, never another provider request.
-    const availableTools = state.selectionRepairUsed ? [] : await resolveAvailableTools(execution.prepared, execution.runtime);
-    return { availableTools };
+    const finalize = state.remoteCalls >= execution.prepared.budgets.remoteCalls && hasObservedProducts(state.runtimeMessages) && productSelectionFields(execution.prepared.response).length > 0;
+    const availableTools = state.selectionRepairUsed || finalize ? [] : await resolveAvailableTools(execution.prepared, execution.runtime);
+    return { availableTools, ...(finalize ? {selectionRepairUsed:true} : {}) };
   };
 }

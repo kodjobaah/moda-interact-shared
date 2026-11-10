@@ -1346,8 +1346,8 @@ test("ARCH066 product context identity rejects before model IO",async()=>{
  const f=fixture([final()]);f.input.platform="WOOCOMMERCE";f.input.productContext={schemaVersion:1,shopId:"foreign",conversationId:f.input.turn.conversationId,platform:"WOOCOMMERCE",references:[],updatedAt:new Date(now).toISOString()};
  expectFailure(await runCommerceTurn(f.input),"INVALID_INPUT","CONTEXT_INVALID");assert.equal(f.counts().model,0);
 });
-test("ARCH066 invalid arguments are correctable and consume call budget",async()=>{
- const invalid={...call(),calls:[{name:exampleTool.name,arguments:{wrong:true}}]};const f=fixture([invalid,call(),final()],true);const result=await runCommerceTurn(f.input);assert.equal(result.ok,true);if(result.ok)assert.equal(result.usage.remoteCalls,2);assert.equal(f.counts().tools,1);
+test("ARCH066 invalid arguments are correctable without consuming remote call budget",async()=>{
+ const invalid={...call(),calls:[{name:exampleTool.name,arguments:{wrong:true}}]};const f=fixture([invalid,call(),final()],true);const result=await runCommerceTurn(f.input);assert.equal(result.ok,true);if(result.ok)assert.equal(result.usage.remoteCalls,1);assert.equal(f.counts().tools,1);
 });
 
 test("ARCH066 successful fresh product search replaces deleted reference and publishes no prices",async()=>{
@@ -1568,4 +1568,13 @@ test('conflicting selection modes trigger the same bounded schema correction',as
  assert.equal((await validateFinalResponseNode(execution)(state)).selectionRepairUsed,true);
  const corrected=await validateFinalResponseNode(execution)({...state,selectionRepairUsed:true,pendingStep:final({...exampleFinal,answerKind:'ANSWER',referralReason:null,details:{productDetailSelections:['tree'],productRecommendations:[]}})});
  assert.deepEqual(corrected.finalResult?.details,{productDetailSelections:['tree']});
+});
+
+import {resolveAvailableToolsNode} from './graph/nodes/resolve-available-tools';
+test('discovery exhaustion reserves the next model step for finalization with observed products',async()=>{
+ const f=fixture([final()]);const prepared=await prepareCommerceTurn(f.input);prepared.budgets.remoteCalls=4;
+ prepared.response={...prepared.response,detailsSchema:{type:'object',properties:{productRecommendations:{type:'array',maxItems:3,items:{type:'string',maxLength:128}}},required:[],additionalProperties:false}};
+ const execution={input:f.input,prepared,runtime:{checkCancellationAndDeadline:()=>{}},logger:{},stats:{modelSteps:2,remoteCalls:4}} as unknown as Parameters<typeof resolveAvailableToolsNode>[0];
+ const result=await resolveAvailableToolsNode(execution)({...initialCommerceTurnGraphState(),modelSteps:2,remoteCalls:4,runtimeMessages:[{tool:'commerce_search_products',result:{status:'OK',data:{products:[{productId:'tree'}]}}}]} as never);
+ assert.equal(result.selectionRepairUsed,true);assert.deepEqual(result.availableTools,[]);
 });
