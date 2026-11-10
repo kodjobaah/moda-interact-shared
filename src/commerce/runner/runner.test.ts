@@ -1513,12 +1513,13 @@ for (const platform of ['SHOPIFY','WOOCOMMERCE'] as const) test(`same-turn exact
  const execute=f.input.dependencies.tools[0]!.execute;
  f.input.dependencies.tools[0]!.execute=async(...args)=>{executions++;return execute(...args);};
  f.input.dependencies.tools[0]!.isAuthorized=async()=>{authorizations++;return true;};
- const steps=[call('commerce_get_product'),call('commerce_get_product'),call('commerce_get_product'),final({...exampleFinal,answerKind:'ANSWER',referralReason:null})];
+ const steps=[call('commerce_get_product'),call('commerce_get_product'),final({...exampleFinal,answerKind:'ANSWER',referralReason:null})];
  f.input.dependencies.model.invoke=async request=>{f.requests.push(request);return steps[step++]!;};
  const result=await runCommerceTurn(f.input);
  assert.equal(result.ok,true,JSON.stringify(result));assert.equal(executions,1);assert.ok(authorizations>=4);
- const messages=f.requests[3]!.messages as Array<{result:{data:{product:{stock:unknown}}}}>;
- assert.equal(messages.length,3);assert.deepEqual(messages[2]!.result.data.product.stock,{status:'NOT_TRACKED'});
+ assert.equal(f.requests[2]!.requiredToolName,'finalResponse');assert.deepEqual(f.requests[2]!.tools.map(t=>t.name),['finalResponse']);
+ const messages=f.requests[2]!.messages as Array<{result:{data:{product:{stock:unknown}}}}>;
+ assert.equal(messages.length,2);assert.deepEqual(messages[1]!.result.data.product.stock,{status:'NOT_TRACKED'});
  // A new turn invocation must read again, even if the product identity is unchanged.
  step=0;f.requests.length=0;assert.equal((await runCommerceTurn(f.input)).ok,true);assert.equal(executions,2);
 });

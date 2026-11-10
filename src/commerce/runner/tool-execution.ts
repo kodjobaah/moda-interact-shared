@@ -15,6 +15,7 @@ import { resolveToolCall } from "./tool-policy.js";
 import type { RunCommerceTurnInput, ModelStep } from "./types.js";
 
 export type ToolExecutionResult = {
+  productReadReused: boolean;
   remoteCalls: number;
   runtimeMessages: ReadonlyArray<{ tool: string; result: unknown }>;
   evidenceById: Readonly<Record<string, CommerceEvidence>>;
@@ -36,6 +37,7 @@ export async function executeToolCalls(input: {
   onRemoteCall?: (remoteCalls: number) => void;
   productReadCache?: Map<string, ReturnType<typeof CommerceToolResultSchema.parse>>;
 }): Promise<ToolExecutionResult> {
+  let productReadReused = false;
   let remoteCalls = input.remoteCalls;
   const runtimeMessages = [...input.runtimeMessages];
   const evidenceById = { ...input.evidenceById };
@@ -88,6 +90,7 @@ export async function executeToolCalls(input: {
     const cacheKey = call.name === "commerce_get_product" ? canonicalJson(args.data) : undefined;
     const cached = cacheKey === undefined ? undefined : input.productReadCache?.get(cacheKey);
     if (cached) {
+      productReadReused = true;
       runtimeMessages.push({ tool: call.name, result: structuredClone(cached) });
       safeLog(input.logger, "debug", "commerce.turn.tool.reused", {
         modelStep: input.modelStep, toolName: call.name, reasonCode: "SAME_TURN_PRODUCT_READ",
@@ -222,5 +225,5 @@ export async function executeToolCalls(input: {
     runtimeMessages.push({ tool: call.name, result });
   }
 
-  return { remoteCalls, runtimeMessages, evidenceById, requiredReferral };
+  return { productReadReused, remoteCalls, runtimeMessages, evidenceById, requiredReferral };
 }
