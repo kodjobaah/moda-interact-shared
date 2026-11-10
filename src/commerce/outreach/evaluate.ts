@@ -220,7 +220,7 @@ export async function evaluateInitialOutreach(raw: InitialOutreachEvaluationInpu
                         optionsRead = true;
                         nextCursor = output.cursor ?? null;
                         incomplete = output.truncated || nextCursor !== null;
-                        history.push({ tool: call.name, result: output });
+                        history.push({ tool: call.name, result: { contractVersion: 'commerce.v1', status: 'OK', data: output, renderedText: 'Verified checkout discount options' } });
                     }
                     else {
                         const args = CommerceToolInputs.commerce_get_discount_details.parse(call.arguments);
@@ -228,7 +228,7 @@ export async function evaluateInitialOutreach(raw: InitialOutreachEvaluationInpu
                         if (!optionsRead || !option)
                             throw new OutreachRefusal('INVALID_RESULT');
                         const details = await readDetails(args.offerId, option);
-                        history.push({ tool: call.name, result: { details } });
+                        history.push({ tool: call.name, result: { contractVersion: 'commerce.v1', status: 'OK', data: { details }, renderedText: 'Verified checkout discount details' } });
                     }
                 }
             }
@@ -245,8 +245,23 @@ export async function evaluateInitialOutreach(raw: InitialOutreachEvaluationInpu
             const members = group.offerIds.map(id => observed.get(id)!).map(o => ({ offerId: o.offer.offerId, providerDiscountId: o.details.providerDiscountId!, method: o.offer.method, code: o.offer.method === 'CODE' ? o.offer.code : null, description: o.offer.title, eligibility: { ...o.eligibility, eligibleLineKeys: [...o.eligibility.eligibleLineKeys], reasonCodes: [...o.eligibility.reasonCodes] } }));
             return { kind: 'CHECKOUT_DISCOUNT', offerSet: { schemaVersion: 'moda.outreach.checkout-offers.v1', offers: members.map(({ offerId, providerDiscountId, method, code }) => ({ offerId, providerDiscountId, method, code })) }, members, group: { ...group, offerIds: [...group.offerIds], reasonCodes: [...group.reasonCodes] }, discoveryIncomplete };
         }
-        if (input.policy.mode === 'FIXED')
-            decision = choose([...observed.values()].filter(o => o.eligibility.verdict === 'SUPPORTED').map(o => o.offer.offerId).sort(), false);
+        if (input.policy.mode === 'FIXED') {
+            const subtotal = decimalToMinorUnits(reconciled.currentMerchandiseSubtotal.amountDecimal, input.checkout.currency);
+            const ranked = [...observed.values()].filter(candidate => candidate.eligibility.verdict === 'SUPPORTED').map(candidate => {
+                const facts = candidate.details.facts;
+                // Only compare amounts proven for the entire order in this checkout currency.
+                const isOrderAmount = facts.discountKind === 'FIXED_AMOUNT' && facts.discountCurrency === input.checkout.currency &&
+                    facts.targeting.kind === 'ALL' && facts.combination.discountClasses?.includes('ORDER');
+                const amount = isOrderAmount && facts.discountValue !== null ? decimalToMinorUnits(facts.discountValue, input.checkout.currency) : null;
+                const saving = amount !== null && subtotal !== null ? (amount < subtotal ? amount : subtotal) : null;
+                return { id: candidate.offer.offerId, saving };
+            });
+            ranked.sort((a, b) => {
+                if (a.saving !== b.saving) return a.saving === null || (b.saving !== null && a.saving < b.saving) ? 1 : -1;
+                return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+            });
+            decision = choose(ranked.map(candidate => candidate.id), false);
+        }
         stage = 'REVALIDATE';
         log();
         const rechecked = await readProducts(true);
