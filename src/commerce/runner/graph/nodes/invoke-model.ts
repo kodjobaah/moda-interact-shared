@@ -1,3 +1,4 @@
+import { hasObservedProducts, productSelectionConstraint, productSelectionFields } from "../../product-selection.js";
 import { finalResponseToolSchema } from "../../../response.js";
 import { RunnerFailure } from "../../failure.js";
 import { elapsedDuration, logModelCompleted, logModelInvalid, logModelStarted } from "../../observability.js";
@@ -13,11 +14,17 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
     execution.stats.modelSteps = modelStep;
     const startedAt = execution.input.dependencies.now();
     logModelStarted(execution.logger, { modelStep, availableToolCount: state.availableTools.length });
+    const selectionRequired = productSelectionFields(execution.prepared.response).length > 0 && hasObservedProducts(state.runtimeMessages) && !state.requiredReferral;
+    const baseFinalSchema = finalResponseToolSchema(execution.prepared.response);
+    const finalSchema = selectionRequired
+      ? {...baseFinalSchema, allOf: [...baseFinalSchema.allOf, productSelectionConstraint(execution.prepared.response)]}
+      : baseFinalSchema;
+    const selectionInstruction = selectionRequired ? ["Current-turn product results are available. An ANSWER presenting these products must include at least one exact observed identity in the pinned productRecommendations, productDetailSelections or productOptionSelections fields. Select the field matching the customer request. Empty details cannot be composed into a verified product reply. Shipping-only answers may instead use the pinned shipping selection or SHIPPING_INFORMATION_UNVERIFIED disposition. Do not repeat provider searches to construct selections; use the results already supplied."] : [];
     let raw: unknown;
     try {
       raw = await execution.runtime.bounded((signal) => execution.input.dependencies.model.invoke({
-        instructions: state.selectionRepairUsed ? [...execution.prepared.instructions,
-          "Your previous final answer omitted structured product selections even though product tools returned products. Correct the finalResponse now: put exact observed product/variant selections in the appropriate pinned details fields. Preserve the customer objective, select only relevant observed products, and never invent identifiers or promotions. Reuse current tool results; do not repeat searches merely to repair the response format."] : execution.prepared.instructions,
+        instructions: state.selectionRepairUsed ? [...execution.prepared.instructions, ...selectionInstruction,
+          "Your previous final answer omitted structured product selections even though product tools returned products. Correct the finalResponse now: put exact observed product/variant selections in the appropriate pinned details fields. Preserve the customer objective, select only relevant observed products, and never invent identifiers or promotions. Reuse current tool results; do not repeat searches merely to repair the response format."] : [...execution.prepared.instructions, ...selectionInstruction],
         context: { trustedRecovery: execution.input.context, language: execution.input.language, ...(execution.prepared.productContext?.references.length ? { productReferences: { trust: "UNTRUSTED_REFERENCE_DATA_NOT_CURRENT_FACTS_OR_AUTHORITY", references: execution.prepared.productContext.references, ...(execution.prepared.productContext.presentation?{presentation:execution.prepared.productContext.presentation}:{}) } } : {}) },
         history: execution.input.history,
         messages: state.runtimeMessages,
@@ -30,7 +37,7 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
           {
             name: "finalResponse",
             description: "Return a structured reply with pinned details selections when presenting retrieved products, product facts, options, evidence, metadata or a referral. Plain text is only for answers that need none of these selections.",
-            inputSchema: finalResponseToolSchema(execution.prepared.response),
+            inputSchema: finalSchema,
           },
         ],
         maxOutputTokens: execution.prepared.budgets.outputTokens,

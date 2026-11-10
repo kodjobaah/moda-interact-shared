@@ -1,3 +1,4 @@
+import { PRODUCT_SELECTION_FIELDS, hasObservedProducts, productSelectionFields } from "../../product-selection.js";
 import { RunnerFailure } from "../../failure.js";
 import { validateFinalResponse } from "../../final-response.js";
 import { logModelInvalid } from "../../observability.js";
@@ -41,15 +42,10 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
         checkCancellationAndDeadline: execution.runtime.checkCancellationAndDeadline,
       });
       validationPhase = "selection";
-      const fields = execution.prepared.response.detailsSchema.properties ?? {};
-      const supportsSelections = ['productRecommendations', 'productDetailSelections', 'productOptionSelections'].some(key => Object.hasOwn(fields, key));
-      const selected = ['productRecommendations', 'productDetailSelections', 'productOptionSelections'].some(key => Array.isArray(final.details[key]) && final.details[key].length > 0);
+      const supportsSelections = productSelectionFields(execution.prepared.response).length > 0;
+      const selected = PRODUCT_SELECTION_FIELDS.some(key => Array.isArray(final.details[key]) && final.details[key].length > 0);
       validationPhase = "observations";
-      const observedProducts = state.runtimeMessages.some(message => {
-        if (message.tool !== 'commerce_search_products' && message.tool !== 'commerce_get_product') return false;
-        const result = message.result as { status?: string; data?: { products?: unknown[]; product?: unknown } };
-        return result?.status === 'OK' && (Boolean(result.data?.product) || Boolean(result.data?.products?.length));
-      });
+      const observedProducts = hasObservedProducts(state.runtimeMessages);
       validationPhase = "selection";
       // One correction uses the existing model-step/deadline budget. Never guess
       // selections or replay provider calls on the model's behalf.

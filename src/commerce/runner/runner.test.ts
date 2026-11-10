@@ -1473,3 +1473,23 @@ test('final validation exceptions retain their phase, step and code location for
   assert.equal(diagnostic.stage,'final.validate');assert.equal(diagnostic.validationPhase,'schema');assert.equal(diagnostic.modelStep,4);assert.equal(diagnostic.exceptionName,'TypeError');assert.ok(diagnostic.exceptionFrames?.length);assert.doesNotMatch(JSON.stringify(diagnostic),/provider-secret/);return true;
  });
 });
+
+for (const platform of ['SHOPIFY', 'WOOCOMMERCE'] as const) test(`observed products constrain the first final response for ${platform} in every host`, async () => {
+ const f=fixture([final(), final(), final()]); f.input.platform=platform;
+ const prepared=await prepareCommerceTurn(f.input);
+ prepared.response={...prepared.response,detailsSchema:{type:'object',properties:{productRecommendations:{type:'array',maxItems:3,items:{type:'string',maxLength:128}}},required:[],additionalProperties:false}};
+ const original=JSON.stringify(prepared.response);
+ const execution={input:f.input,prepared,runtime:{checkCancellationAndDeadline:()=>{},bounded:async(fn:(s:AbortSignal)=>Promise<unknown>)=>fn(f.input.signal)},logger:{},stats:{modelSteps:1,remoteCalls:0}} as unknown as Parameters<typeof invokeModelNode>[0];
+ const state={...initialCommerceTurnGraphState(),runtimeMessages:[{tool:'commerce_search_products',result:{status:'OK',data:{products:[{productId:'18'}]}}}]} as unknown as Parameters<ReturnType<typeof invokeModelNode>>[0];
+ await invokeModelNode(execution)(state);
+ const schema=f.requests[0]!.tools.find(t=>t.name==='finalResponse')!.inputSchema as {allOf:unknown[]};
+ assert.equal(schema.allOf.length,3);
+ assert.match(JSON.stringify(schema.allOf[2]),/productRecommendations/);
+ assert.match(JSON.stringify(schema.allOf[2]),/minItems/);
+ assert.ok(f.requests[0]!.instructions.some(s=>s.includes('Empty details cannot be composed')));
+ assert.equal(JSON.stringify(prepared.response),original);
+ await invokeModelNode(execution)({...state,runtimeMessages:[]});
+ assert.equal((f.requests[1]!.tools.find(t=>t.name==='finalResponse')!.inputSchema as {allOf:unknown[]}).allOf.length,2);
+ await invokeModelNode(execution)({...state,requiredReferral:'TOOL_UNAVAILABLE'});
+ assert.equal((f.requests[2]!.tools.find(t=>t.name==='finalResponse')!.inputSchema as {allOf:unknown[]}).allOf.length,2);
+});
