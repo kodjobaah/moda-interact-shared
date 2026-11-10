@@ -1505,3 +1505,43 @@ for (const platform of ['SHOPIFY','WOOCOMMERCE'] as const) test(`untracked stock
  const result=await validateFinalResponseNode(execution)({...initialCommerceTurnGraphState(),selectionRepairUsed:true,modelSteps:2,pendingStep:final({...exampleFinal,answerKind:'ANSWER',referralReason:null,replyText:'We cannot confirm an exact stock count.',details:{productDetailSelections:[pair]}}),runtimeMessages:[{tool:'commerce_get_product',result:{status:'OK',data:{product:{...pair,stock:{status:'NOT_TRACKED'}}}}}]} as never);
  assert.deepEqual(result.finalResult?.details.productDetailSelections,[pair]);
 });
+
+for (const platform of ['SHOPIFY','WOOCOMMERCE'] as const) test(`same-turn exact product reads reuse verified facts but reauthorize for ${platform}`, async () => {
+ const f=productResultFixture('commerce_get_product',{...optionBoundaryProduct(),...(platform==='SHOPIFY'?{productId:'gid://shopify/Product/7',variantId:'gid://shopify/ProductVariant/8'}:{}),stock:{status:'NOT_TRACKED'}});f.input.platform=platform;
+ let executions=0,authorizations=0,step=0;
+ const execute=f.input.dependencies.tools[0]!.execute;
+ f.input.dependencies.tools[0]!.execute=async(...args)=>{executions++;return execute(...args);};
+ f.input.dependencies.tools[0]!.isAuthorized=async()=>{authorizations++;return true;};
+ const steps=[call('commerce_get_product'),call('commerce_get_product'),call('commerce_get_product'),final({...exampleFinal,answerKind:'ANSWER',referralReason:null})];
+ f.input.dependencies.model.invoke=async request=>{f.requests.push(request);return steps[step++]!;};
+ const result=await runCommerceTurn(f.input);
+ assert.equal(result.ok,true,JSON.stringify(result));assert.equal(executions,1);assert.ok(authorizations>=4);
+ const messages=f.requests[3]!.messages as Array<{result:{data:{product:{stock:unknown}}}}>;
+ assert.equal(messages.length,3);assert.deepEqual(messages[2]!.result.data.product.stock,{status:'NOT_TRACKED'});
+ // A new turn invocation must read again, even if the product identity is unchanged.
+ step=0;f.requests.length=0;assert.equal((await runCommerceTurn(f.input)).ok,true);assert.equal(executions,2);
+});
+test('failed product reads are never memoized', async()=>{
+ const f=productResultFixture('commerce_get_product',optionBoundaryProduct());let executions=0,step=0;
+ f.input.dependencies.tools[0]!.execute=async()=>{executions++;return {contractVersion:'commerce.v1',status:'ERROR',code:'NOT_FOUND',retryable:false};};
+ const steps=[call('commerce_get_product'),call('commerce_get_product'),final({...exampleFinal,answerKind:'ANSWER',referralReason:null})];
+ f.input.dependencies.model.invoke=async()=>steps[step++]!;
+ assert.equal((await runCommerceTurn(f.input)).ok,true);assert.equal(executions,2);
+});
+test('different validated product read arguments remain independent', async()=>{
+ const f=productResultFixture('commerce_get_product',optionBoundaryProduct());let executions=0,step=0;
+ const execute=f.input.dependencies.tools[0]!.execute;f.input.dependencies.tools[0]!.execute=async(...args)=>{executions++;return execute(...args);};
+ const steps=[call('commerce_get_product'),{...call('commerce_get_product'),calls:[{name:'commerce_get_product',arguments:{handle:'tree'}}]},final({...exampleFinal,answerKind:'ANSWER',referralReason:null})];
+ f.input.dependencies.model.invoke=async()=>steps[step++]!;
+ assert.equal((await runCommerceTurn(f.input)).ok,true);assert.equal(executions,2);
+});
+test('a cached product cannot bypass authorization revocation',async()=>{
+ const f=productResultFixture('commerce_get_product',optionBoundaryProduct());let executions=0,checks=0,step=0;
+ const execute=f.input.dependencies.tools[0]!.execute;f.input.dependencies.tools[0]!.execute=async(...args)=>{executions++;return execute(...args);};
+ f.input.dependencies.tools[0]!.isAuthorized=async()=>++checks<=2;
+ const steps=[call('commerce_get_product'),call('commerce_get_product'),final({...exampleFinal,answerKind:'REFER_TO_STORE',referralReason:'TOOL_REVOKED',details:{},evidenceIds:[]})];
+ f.input.dependencies.model.invoke=async request=>{f.requests.push(request);return steps[step++]!;};
+ const result=await runCommerceTurn(f.input);assert.equal(result.ok,true,JSON.stringify(result));assert.equal(executions,1);
+ const messages=f.requests[2]!.messages as Array<{result:{status:string;code?:string}}>;
+ assert.equal(messages[1]!.result.status,'ERROR');assert.equal(messages[1]!.result.code,'DENIED');
+});

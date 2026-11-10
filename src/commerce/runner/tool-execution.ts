@@ -1,6 +1,6 @@
 import { CommerceProductSchema } from "../schemas.js";
 import { isBuiltInTool } from "../definitions.js";
-import { jsonBytes } from "../canonical-json.js";
+import { canonicalJson, jsonBytes } from "../canonical-json.js";
 import { CommerceToolResultSchema, CommerceToolOutputs, type CommerceEvidence } from "../schemas.js";
 import type { CommerceFinalResponse } from "../response.js";
 import { compileCommercePurposeOutputSchema } from "../purpose-output.js";
@@ -34,6 +34,7 @@ export async function executeToolCalls(input: {
   requiredReferral: CommerceFinalResponse["referralReason"];
   logger: CommerceTurnLogger;
   onRemoteCall?: (remoteCalls: number) => void;
+  productReadCache?: Map<string, ReturnType<typeof CommerceToolResultSchema.parse>>;
 }): Promise<ToolExecutionResult> {
   let remoteCalls = input.remoteCalls;
   const runtimeMessages = [...input.runtimeMessages];
@@ -79,6 +80,18 @@ export async function executeToolCalls(input: {
       remoteCalls++; input.onRemoteCall?.(remoteCalls);
       runtimeMessages.push({tool:call.name,result:{contractVersion:"commerce.v1",status:"ERROR",code:"INVALID_INPUT",retryable:false}});
       safeLog(input.logger,"warn","commerce.turn.tool.invalid_input",{toolName:call.name,reasonCode:"TOOL_INPUT_INVALID",...schemaIssueMetadata(args.error)});
+      continue;
+    }
+
+    // Exact validated arguments only; never reuse searches, errors, or prior-turn facts.
+    // Authorization above is deliberately checked even when no provider call is needed.
+    const cacheKey = call.name === "commerce_get_product" ? canonicalJson(args.data) : undefined;
+    const cached = cacheKey === undefined ? undefined : input.productReadCache?.get(cacheKey);
+    if (cached) {
+      runtimeMessages.push({ tool: call.name, result: structuredClone(cached) });
+      safeLog(input.logger, "debug", "commerce.turn.tool.reused", {
+        modelStep: input.modelStep, toolName: call.name, reasonCode: "SAME_TURN_PRODUCT_READ",
+      });
       continue;
     }
 
@@ -203,6 +216,9 @@ export async function executeToolCalls(input: {
       modelStep: input.modelStep,
       logger: input.logger,
     })) evidenceById[evidence.evidenceId] = evidence;
+    if (cacheKey !== undefined && result.status === "OK" &&
+      (result.data as { product?: unknown } | null)?.product)
+      input.productReadCache?.set(cacheKey, structuredClone(result));
     runtimeMessages.push({ tool: call.name, result });
   }
 
