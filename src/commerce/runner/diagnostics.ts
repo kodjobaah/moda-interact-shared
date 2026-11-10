@@ -69,6 +69,8 @@ export type RunnerDiagnostic = Readonly<{
   /** Transport/exception details are from a fixed allowlist, not error.message. */
   transportCode?: RunnerTransportCode;
   exceptionName?: string;
+  validationPhase?: "schema" | "selection" | "observations";
+  exceptionFrames?: readonly string[];
   statusCode?: number;
   providerCode?: number;
   providerStage?: "request" | "binding" | "provider" | "response";
@@ -112,6 +114,8 @@ export function safeRunnerDiagnostic(diagnostic: RunnerDiagnostic): RunnerDiagno
     stage: stages.has(diagnostic.stage) ? diagnostic.stage : "graph.execute",
     reasonCode: reasons.has(diagnostic.reasonCode) ? diagnostic.reasonCode : "UNEXPECTED_EXCEPTION",
     ...(recognizedTransportCodes.has(diagnostic.transportCode ?? "") ? { transportCode: diagnostic.transportCode } : {}),
+    ...(["schema", "selection", "observations"].includes(diagnostic.validationPhase ?? "") ? { validationPhase: diagnostic.validationPhase } : {}),
+    ...(Array.isArray(diagnostic.exceptionFrames) ? { exceptionFrames: diagnostic.exceptionFrames.filter(frame => typeof frame === "string" && frame.length <= 240 && /^[a-zA-Z0-9_./:@<> -]+$/.test(frame)).slice(0, 6) } : {}),
     ...(recognizedExceptionNames.has(diagnostic.exceptionName ?? "") ? { exceptionName: diagnostic.exceptionName } : {}),
     ...(boundedInt(diagnostic.statusCode, 100, 599) === undefined ? {} : { statusCode: diagnostic.statusCode }),
     ...(boundedInt(diagnostic.providerCode, 0, 999999) === undefined ? {} : { providerCode: diagnostic.providerCode }),
@@ -138,14 +142,24 @@ export function safeRunnerDiagnostic(diagnostic: RunnerDiagnostic): RunnerDiagno
 }
 
 /** Extract only known error names and network codes from a bounded cause chain. */
-export function safeRunnerCauseMetadata(error: unknown): Pick<RunnerDiagnostic, "transportCode" | "exceptionName"> {
+export function safeRunnerCauseMetadata(error: unknown): Pick<RunnerDiagnostic, "transportCode" | "exceptionName" | "exceptionFrames"> {
   const visited = new Set<unknown>();
   let current = error;
   let transportCode: RunnerTransportCode | undefined;
   let exceptionName: string | undefined;
+  let exceptionFrames: string[] = [];
   for (let depth = 0; depth < 6 && current instanceof Error && !visited.has(current); depth += 1) {
     visited.add(current);
     try {
+      if (!exceptionFrames.length && typeof current.stack === "string") {
+        // Keep code locations only, never the exception headline, arguments, URLs or query strings.
+        exceptionFrames = current.stack.split("\n").slice(1).flatMap(line => {
+          const match = line.match(/(?:^|[/\\])((?:[^/\\() ]+\/)*(?:[^/\\() ]+\.(?:[cm]?js|tsx?)):\d+:\d+)\)?$/);
+          if (!match) return [];
+          const location = match[1].split('/').slice(-4).join('/');
+          return /^[a-zA-Z0-9_./:@<> -]{1,240}$/.test(location) ? [location] : [];
+        }).slice(0, 6);
+      }
       const code = (current as Error & { code?: unknown }).code;
       if (typeof code === "string" && recognizedTransportCodes.has(code))
         transportCode = code as RunnerTransportCode;
@@ -156,6 +170,7 @@ export function safeRunnerCauseMetadata(error: unknown): Pick<RunnerDiagnostic, 
     }
   }
   return {
+    ...(exceptionFrames.length ? { exceptionFrames } : {}),
     ...(transportCode ? { transportCode } : {}),
     ...(exceptionName ? { exceptionName } : {}),
   };

@@ -9,6 +9,7 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
   return async (state: CommerceTurnGraphStateValue) => {
     if (!state.pendingStep)
       throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "MODEL_RESULT_MISSING" });
+    let validationPhase: "schema" | "selection" | "observations" = "schema";
     try {
       // Natural text may finish a turn, but cannot override mandatory referral
       // after a failed/denied tool. Use trusted, localized host copy instead of
@@ -39,14 +40,17 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
         languageSource: execution.input.language.source,
         checkCancellationAndDeadline: execution.runtime.checkCancellationAndDeadline,
       });
+      validationPhase = "selection";
       const fields = execution.prepared.response.detailsSchema.properties ?? {};
       const supportsSelections = ['productRecommendations', 'productDetailSelections', 'productOptionSelections'].some(key => Object.hasOwn(fields, key));
       const selected = ['productRecommendations', 'productDetailSelections', 'productOptionSelections'].some(key => Array.isArray(final.details[key]) && final.details[key].length > 0);
+      validationPhase = "observations";
       const observedProducts = state.runtimeMessages.some(message => {
         if (message.tool !== 'commerce_search_products' && message.tool !== 'commerce_get_product') return false;
         const result = message.result as { status?: string; data?: { products?: unknown[]; product?: unknown } };
         return result?.status === 'OK' && (Boolean(result.data?.product) || Boolean(result.data?.products?.length));
       });
+      validationPhase = "selection";
       // One correction uses the existing model-step/deadline budget. Never guess
       // selections or replay provider calls on the model's behalf.
       if (!state.requiredReferral && final.answerKind === 'ANSWER' && supportsSelections && observedProducts && !selected && final.details.responseDisposition !== 'SHIPPING_INFORMATION_UNVERIFIED' && !final.details.shippingInformationSelection) {
@@ -57,7 +61,8 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
       return { finalResult: final };
     } catch (error) {
       logModelInvalid(execution.logger, state.modelSteps, error instanceof RunnerFailure ? error.diagnostic.reasonCode : "UNEXPECTED_EXCEPTION");
-      throw error;
+      if (error instanceof RunnerFailure) throw error;
+      throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "UNEXPECTED_EXCEPTION", modelStep: state.modelSteps, validationPhase }, error);
     }
   };
 }

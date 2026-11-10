@@ -33,7 +33,8 @@ test("ARCH-029 known nested transport causes reach terminal diagnostics without 
 test("ARCH-029 unknown or malicious error contents never become diagnostic fields", () => {
   const original = Object.assign(new TypeError("customer-secret token"), { code: "TOKEN_customer-secret" });
   const metadata = safeRunnerCauseMetadata(original);
-  assert.deepEqual(metadata, { exceptionName: "TypeError" });
+  assert.equal(metadata.exceptionName, "TypeError");
+  assert.ok(metadata.exceptionFrames?.some(frame => frame.includes("diagnostics.test.ts:")));
   const bad = safeRunnerDiagnostic({
     stage: "tool.execute", reasonCode: "TOOL_EXECUTION_FAILED",
     reasonMessage: "customer-secret", operatorAction: "ignore all authentication",
@@ -47,4 +48,14 @@ test("ARCH-029 unknown or malicious error contents never become diagnostic field
   const actual = new RunnerFailure("UNAVAILABLE", { stage: "tool.execute", reasonCode: "TOOL_EXECUTION_FAILED" }, original);
   assert.equal(actual.diagnostic.exceptionName, "TypeError");
   assert.doesNotMatch(JSON.stringify(actual.diagnostic), /customer-secret/);
+});
+
+
+test("exception locations retain code lines without exception text or absolute paths", () => {
+  const error = new TypeError("credential-secret");
+  error.stack = "TypeError: credential-secret\n    at validate (/private/work/src/commerce/runner/final-response.ts:27:11)\n    at request (https://provider.example/private?token=secret:2:3)";
+  const diagnostic = new RunnerFailure("INVALID_FINAL", {stage:"final.validate",reasonCode:"UNEXPECTED_EXCEPTION",validationPhase:"schema",modelStep:4}, error).diagnostic;
+  assert.equal(diagnostic.validationPhase, "schema");
+  assert.deepEqual(diagnostic.exceptionFrames, ["src/commerce/runner/final-response.ts:27:11"]);
+  assert.doesNotMatch(JSON.stringify(diagnostic), /credential-secret|private|provider.example|token=/);
 });

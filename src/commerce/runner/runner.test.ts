@@ -1,3 +1,4 @@
+import type { RunnerFailure } from "./failure.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -1461,4 +1462,14 @@ for (const platform of ['SHOPIFY','WOOCOMMERCE'] as const) test(`product selecti
  assert.deepEqual(f.requests[0]!.messages,state.runtimeMessages);
  await assert.rejects(invokeModelNode(execution)(state),error=>(error as {diagnostic:{reasonCode:string}}).diagnostic.reasonCode==='FINAL_PRODUCT_SELECTION_MISSING');
  assert.equal(f.counts().tools,0);
+});
+
+test('final validation exceptions retain their phase, step and code location for every host', async () => {
+ const f=fixture([final()]); const prepared=await prepareCommerceTurn(f.input);
+ prepared.finalSchema={safeParse:()=>{throw new TypeError('provider-secret');}} as never;
+ const execution={input:f.input,prepared,runtime:{checkCancellationAndDeadline:()=>{}},logger:{},stats:{modelSteps:4,remoteCalls:3}} as unknown as Parameters<typeof validateFinalResponseNode>[0];
+ await assert.rejects(validateFinalResponseNode(execution)({...initialCommerceTurnGraphState(),modelSteps:4,pendingStep:final()}), error=>{
+  const diagnostic=(error as RunnerFailure).diagnostic;
+  assert.equal(diagnostic.stage,'final.validate');assert.equal(diagnostic.validationPhase,'schema');assert.equal(diagnostic.modelStep,4);assert.equal(diagnostic.exceptionName,'TypeError');assert.ok(diagnostic.exceptionFrames?.length);assert.doesNotMatch(JSON.stringify(diagnostic),/provider-secret/);return true;
+ });
 });
