@@ -45,6 +45,19 @@ export type AssignmentSelection = {
     outcome: "unavailable";
     reason: TemplateUnavailableReason;
 };
+/** Prefer a personalized assignment only when its customer-name binding can be filled. */
+export function selectGreetingCandidates<T>(rows: T[], bindingsFor: (row: T) => unknown, hasName: boolean): T[] {
+    const named: T[] = [];
+    const neutral: T[] = [];
+    for (const row of rows) {
+        const bindings = bindingsFor(row) as { header?: unknown; body?: unknown } | null;
+        const needsName = [bindings?.header, bindings?.body].some(section =>
+            Array.isArray(section) && section.some(binding => binding?.variable === 'customer.firstName'));
+        (needsName ? named : neutral).push(row);
+    }
+    return hasName && named.length ? named : neutral;
+}
+
 /** Selection is pure except for bounded diagnostics on caught parsing errors. */
 export function selectRecoveryAssignment(input: {
     shop: ShopSelectionRow;
@@ -61,6 +74,8 @@ export function selectRecoveryAssignment(input: {
     platformFallbackEnabled: boolean;
     platformFallbackLanguageTag: string | null;
     headerFormat?: "TEXT" | "IMAGE";
+    checkoutProductHeaderAvailable?: boolean;
+    hasCustomerFirstName?: boolean;
     logger: Pick<StructuredLogger, "warn">;
 }): AssignmentSelection {
     const customer = language(input.conversationLanguageTag, input.logger, "conversation");
@@ -119,9 +134,12 @@ export function selectRecoveryAssignment(input: {
             : !hasSingleCode && !hasMultipleCodes);
         const mediaRole = parameterBindings.headerMediaRole;
         const headerMatches = (input.headerFormat ?? "TEXT") === "IMAGE"
-            ? headerKind === "IMAGE" && mediaRole === "CHECKOUT_PRODUCT"
+            ? headerKind === "IMAGE" && (mediaRole === "LOGO" || mediaRole === "SQUARE_LOGO" || mediaRole === "COVER_IMAGE" ||
+                (mediaRole === "CHECKOUT_PRODUCT" && input.checkoutProductHeaderAvailable !== false))
             : headerKind === "TEXT" && mediaRole === undefined;
-        return parameterBindings.promotionTarget === input.promotionTarget &&
+        // Published no-offer templates have no promotion target and describe the checkout.
+        const target = parameterBindings.promotionTarget ?? (input.offer === "NO_OFFER" ? "CHECKOUT" : undefined);
+        return target === input.promotionTarget &&
             headerMatches && identifiesShop && checkoutOfferBindingMatches;
     });
     if (input.stage === "INITIAL" && !input.promotionTarget) {
@@ -147,13 +165,16 @@ export function selectRecoveryAssignment(input: {
         return { outcome: "unavailable", reason: initialBindingFailure };
     }
     for (const choice of choices) {
-        const candidates: AssignedVariantRow[] = [];
+        let candidates: AssignedVariantRow[] = [];
         for (const variant of initialCandidates) {
             const tag = language(variant.languageTag, input.logger, "persisted-assignment");
             if (!tag)
                 return { outcome: "unavailable", reason: "LOCALE_UNAVAILABLE" };
             if (tag === choice.tag)
                 candidates.push(variant);
+        }
+        if (input.stage === "INITIAL" && input.hasCustomerFirstName !== undefined) {
+            candidates = selectGreetingCandidates(candidates, row => row.metaRegistration?.parameterBindingsSnapshot, input.hasCustomerFirstName);
         }
         if (candidates.length > 1)
             return { outcome: "unavailable", reason: "AMBIGUOUS_ASSIGNMENT" };
