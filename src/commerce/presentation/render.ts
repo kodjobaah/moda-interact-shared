@@ -6,14 +6,15 @@ import { recommendationMessages } from "./messages.js";
 
 export type RenderRecommendationProduct = Readonly<{
   title: string;
-  url: string;
   quantity: number;
-  scope: "PRODUCT_ONLY" | "ADD_TO_BASKET" | "REPLACE_BASKET_LINE";
   currentPrice: string | null;
   currency: string | null;
   regularPrice?: string | null;
   offerTerms?: readonly Readonly<{ kind: "percent" | "amount" | "free-shipping"; value?: string; currency?: string; code?: string | null; automatic?: boolean }> [];
-}>;
+} & (
+  { scope: "PRODUCT_ONLY"; url: string | null } |
+  { scope: "ADD_TO_BASKET" | "REPLACE_BASKET_LINE"; url: string }
+)>;
 
 export function renderRecommendationReply(input: {
   locale: ModaSupportedLanguageTag;
@@ -65,7 +66,7 @@ export function renderRecommendationReply(input: {
       if (offer.automatic) lines.push(t("automatic"));
       if (offer.kind !== "free-shipping") lines.push(t("checkoutQualification"));
     }
-    lines.push(t("productLink", { url: product.url }));
+    if (product.url !== null) lines.push(t("productLink", { url: product.url }));
   }
   if (input.includeNoVerifiedOffer && (input.products?.length ?? 0) > 0) lines.push(t("noVerifiedOffer"));
   if ((input.products?.length ?? 0) === 0 && !input.policyUrl && input.requiresShipping == null) {
