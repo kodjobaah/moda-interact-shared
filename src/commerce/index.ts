@@ -20,3 +20,5 @@ export * from "./purpose-output";
 export * from "./product-context";
 
 export * from "./product-facts.js";
+
+export * from "./recommendation-selection.js";

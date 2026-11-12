@@ -11,6 +11,12 @@ import {createHash} from 'node:crypto';
 import * as c from '@modainteract/moda-interact-shared/commerce';
 import {runCommerceTurn,runnerVersion} from '@modainteract/moda-interact-shared/commerce/runner';
 const digest=s=>createHash('sha256').update(s).digest('hex');
+const rec={scope:'PRODUCT_ONLY',basketLineId:null,productId:'installed-product',variantId:null,quantity:1,promotionKind:'NONE',offerIds:[]};
+assert.deepEqual(c.readCommerceRecommendationSelection({productRecommendations:[rec],responseDisposition:'STANDARD'}),{responseDisposition:'STANDARD'});
+assert.deepEqual(c.readCommerceRecommendationSelection({productRecommendationVersion:'1',productRecommendations:[rec]}).productRecommendations,[rec]);
+assert.equal(c.isCommerceShippingObservationForSelection({selection:{productId:null,variantId:null},observation:{},provider:'SHOPIFY'}),false);
+for(const name of ['hasCommerceAcceptedProductSelection','hasCanonicalCommerceRecommendationContract','readCommerceObservedShippingSelections'])assert.equal(typeof c[name],'function');
+
 const promptValidation=c.validateStoreCategoryPromptTemplate({source:'Base {% if mappings.shoes %}shoe{% endif %}',availableConditionKeys:['shoes']});
 assert.equal(promptValidation.valid,true);
 const promptContext=c.createStoreCategoryPromptContext({availableConditionKeys:['shoes'],selectedConditionKeys:['shoes']});

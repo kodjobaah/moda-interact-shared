@@ -1,4 +1,5 @@
-import { PRODUCT_SELECTION_FIELDS, hasObservedProducts, productSelectionFields } from "../../product-selection.js";
+import { hasCommerceAcceptedProductSelection } from "../../../recommendation-selection.js";
+import { hasObservedProducts, productSelectionFields } from "../../product-selection.js";
 import { RunnerFailure } from "../../failure.js";
 import { validateFinalResponse } from "../../final-response.js";
 import { logModelInvalid } from "../../observability.js";
@@ -43,13 +44,13 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
       });
       validationPhase = "selection";
       const supportsSelections = productSelectionFields(execution.prepared.response).length > 0;
-      const selected = PRODUCT_SELECTION_FIELDS.some(key => Array.isArray(final.details[key]) && final.details[key].length > 0);
+      const selected = hasCommerceAcceptedProductSelection(final.details, execution.prepared.response, state.runtimeMessages, execution.input.platform);
       validationPhase = "observations";
       const observedProducts = hasObservedProducts(state.runtimeMessages);
       validationPhase = "selection";
       // One correction uses the existing model-step/deadline budget. Never guess
       // selections or replay provider calls on the model's behalf.
-      if (!state.requiredReferral && final.answerKind === 'ANSWER' && supportsSelections && observedProducts && !selected && final.details.responseDisposition !== 'SHIPPING_INFORMATION_UNVERIFIED' && !final.details.shippingInformationSelection) {
+      if (!state.requiredReferral && final.answerKind === 'ANSWER' && supportsSelections && observedProducts && !selected) {
         if (state.selectionRepairUsed) throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "FINAL_PRODUCT_SELECTION_MISSING", modelStep: state.modelSteps });
         logModelInvalid(execution.logger, state.modelSteps, 'MISSING_PRODUCT_SELECTION_REPAIR');
         return { selectionRepairUsed: true, pendingStep: null, finalResult: null };
