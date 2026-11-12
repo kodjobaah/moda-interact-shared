@@ -4,7 +4,14 @@ import { HashSchema, DateSchema } from '../primitives.js';
 const text = z.string().min(1).max(512);
 export const SemanticKeySchema = z.enum(['customer.firstName', 'shop.name', 'shop.categoryName', 'checkout.url', 'checkout.itemsSummary', 'offer.code', 'offer.codes', 'offer.description', 'promotion.productName', 'promotion.productUrl', 'promotion.offerDescription', 'promotion.code', 'shopBrand.brandName', 'shopBrand.logoAltText', 'shopBrand.logoWidth', 'shopBrand.logoHeight', 'shopBrand.squareLogoAltText', 'shopBrand.logoUrl', 'shopBrand.squareLogoUrl', 'shopBrand.coverImageUrl']);
 const slots = z.array(z.strictObject({ position: z.number().int().positive(), variable: SemanticKeySchema }));
-export const FrozenBindingsSchema = z.strictObject({ schemaVersion: z.literal(1).optional(), promotionTarget: z.enum(['CHECKOUT', 'ALTERNATIVE_PRODUCT']).optional(), headerMediaRole: z.enum(['LOGO', 'SQUARE_LOGO', 'COVER_IMAGE', 'CHECKOUT_PRODUCT']).optional(), header: slots.max(1).optional(), body: slots.max(10), buttons: z.array(z.strictObject({ index: z.number().int().min(0).max(1), subType: z.literal('url'), variable: z.enum(['checkout.url', 'promotion.productUrl']) })).max(2) });
+export const FrozenBindingsSchema = z.strictObject({ sourceHash: HashSchema.optional(), localeContentHash: HashSchema.optional(), schemaVersion: z.literal(1).optional(), promotionTarget: z.enum(['CHECKOUT', 'ALTERNATIVE_PRODUCT']).optional(), headerMediaRole: z.enum(['LOGO', 'SQUARE_LOGO', 'COVER_IMAGE', 'CHECKOUT_PRODUCT']).optional(), header: slots.max(1).optional(), body: slots.max(10), buttons: z.array(z.strictObject({ index: z.number().int().min(0).max(1), subType: z.literal('url'), variable: z.enum(['checkout.url', 'promotion.productUrl']) })).max(2) }).superRefine((value, context) => {
+    if (value.sourceHash !== undefined || value.localeContentHash !== undefined) {
+        if (value.schemaVersion !== 1 || value.headerMediaRole !== undefined ||
+            value.sourceHash === undefined || value.localeContentHash === undefined) {
+            context.addIssue({ code: 'custom', message: 'Legacy TEXT registration metadata requires schemaVersion 1 and both digests.' });
+        }
+    }
+});
 export const ComponentSchema = z.union([
     z.strictObject({ type: z.literal('HEADER'), format: z.literal('TEXT'), text: z.string().min(1).max(60), example: z.strictObject({ header_text: z.array(z.string().max(200)).max(1) }).optional() }),
     z.strictObject({ type: z.literal('HEADER'), format: z.literal('IMAGE'), example: z.strictObject({ header_handle: z.array(z.string().max(2048)).max(1) }).optional() }),

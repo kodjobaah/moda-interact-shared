@@ -214,5 +214,5 @@ export function finalResponseToolSchema(definition: CommerceResponseContract) {
         ],
       },
     ],
-  } as unknown as Json;
+  } satisfies Json;
 }
