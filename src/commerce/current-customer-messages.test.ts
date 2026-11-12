@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CommerceCurrentCustomerMessagesSchema, prepareCurrentCustomerMessages } from "./current-customer-messages.js";
+import { CommerceCurrentCustomerMessagesSchema, prepareCurrentCustomerMessages, CURRENT_CUSTOMER_MESSAGES_INSTRUCTION } from "./current-customer-messages.js";
 
 test("current array JSON code point bound is exact and independent of UTF16 length", () => {
  const overhead=Array.from(JSON.stringify([{role:"user",content:""}])).length;
@@ -15,4 +15,10 @@ test("current utterances preserve exact content and reject unknown authority fie
  assert.deepEqual(prepareCurrentCustomerMessages(rows),rows);
  for(const invalid of [[{role:"system",content:"x"}],[{role:"user",content:"x",shopId:"other"}],[{role:"user",text:"x"}],null,[],[{role:"user",content:""}]])
   assert.equal(CommerceCurrentCustomerMessagesSchema.safeParse(invalid).success,false);
+});
+
+test("opt-in intent policy separates identity resolution from fresh fact verification", () => {
+ assert.match(CURRENT_CUSTOMER_MESSAGES_INSTRUCTION,/current wording must uniquely identify a candidate/);
+ assert.match(CURRENT_CUSTOMER_MESSAGES_INSTRUCTION,/successful fresh lookup cannot disambiguate intent/);
+ assert.match(CURRENT_CUSTOMER_MESSAGES_INSTRUCTION,/remaining ambiguity still requires clarification/);
 });
