@@ -22,3 +22,5 @@ export * from "./product-context";
 export * from "./product-facts.js";
 
 export * from "./recommendation-selection.js";
+
+export * from "./current-customer-messages.js";

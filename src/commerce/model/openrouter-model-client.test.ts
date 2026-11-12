@@ -382,3 +382,40 @@ test("empty history retains system, current context and tool-result ordering", a
   assert.match(captured.messages[1].content, /^Trusted commerce context JSON/);
   assert.match(captured.messages[2].content, /^Trusted commerce Tool result JSON/);
 });
+
+test("explicit current customer messages follow context and precede tool data", async () => {
+  const { invoke, captured } = harness();
+  await invoke({ ...request, currentCustomerMessages: [{ role: "user", content: "How about the new board?" }] }, new AbortController().signal);
+  assert.deepEqual(captured.messages.map((m: any) => m._getType()), ["system", "human", "ai", "human", "human", "human"]);
+  assert.equal(captured.messages[4].content, "How about the new board?");
+  assert.match(captured.messages[0].content, /present customer objective/);
+  assert.match(captured.messages[5].content, /^Trusted commerce Tool result JSON/);
+});
+
+test("current customer boundary rejects malformed input before provider invocation", async () => {
+  for (const current of [null, [], [{role:"user",content:""}], [{role:"assistant",content:"bad"}], [{role:"user",content:3}], [{role:"user",content:"x",source:"trusted"}], [{role:"user",content:"x".repeat(32000)}]]) {
+    const h = harness();
+    await assert.rejects(h.invoke({...request,currentCustomerMessages:current} as any,new AbortController().signal));
+    assert.equal(h.captured.messages,undefined);
+  }
+});
+
+test("current budget permits many rows and long Unicode utterances without lower history caps", async () => {
+  for (const rows of [Array.from({length:21},()=>({role:"user" as const,content:"new"})), [{role:"user" as const,content:"a".repeat(17000)}], [{role:"user" as const,content:"😀".repeat(17000)}]]) {
+    const h=harness(); await h.invoke({...request,currentCustomerMessages:rows},new AbortController().signal);
+    assert.equal(h.captured.messages[4].content,rows[0].content);
+  }
+  const h=harness();
+  await assert.rejects(h.invoke({...request,context:{large:"x".repeat(131050)},currentCustomerMessages:[{role:"user",content:"hello"}]},new AbortController().signal));
+  assert.equal(h.captured.messages,undefined);
+});
+
+ test("malformed current customer errors never retain raw validation causes", async () => {
+ const h=harness();
+ await assert.rejects(h.invoke({...request,currentCustomerMessages:[{role:"user",content:"PRIVATE_CURRENT_PAYLOAD",PRIVATE_UNKNOWN_KEY:"x"}]} as any,new AbortController().signal),error=>{
+  let current:any=error; let depth=0;
+  while(current && depth++<10){assert.doesNotMatch(String(current.message)+JSON.stringify(current.diagnostic??{}),/PRIVATE_CURRENT_PAYLOAD|PRIVATE_UNKNOWN_KEY/); current=current.cause;}
+  assert.ok(depth<10); return true;
+ });
+ assert.equal(h.captured.messages,undefined);
+ });

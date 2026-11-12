@@ -1,3 +1,4 @@
+import { prepareCurrentCustomerMessages, CURRENT_CUSTOMER_MESSAGES_INSTRUCTION, type CommerceCurrentCustomerMessages } from "../current-customer-messages.js";
 import { mergeConversationProductContext, type CommerceConversationProductContext } from "../product-context.js";
 import { ToolDescriptorSchema } from "../definitions.js";
 import { satisfies } from "semver";
@@ -27,6 +28,7 @@ export type CommerceTurnBudgets = {
 };
 
 export type PreparedCommerceTurn = {
+  currentCustomerMessages?: CommerceCurrentCustomerMessages;
   productContext: CommerceConversationProductContext | null;
   executionPurpose?: RunCommerceTurnInput["executionPurpose"];
   turn: ReturnType<typeof CommerceTurnIdentitySchema.parse>;
@@ -108,22 +110,26 @@ export function prepareCommerceTurn(input: RunCommerceTurnInput): PreparedCommer
     if (!Number.isSafeInteger(budgets[key]) || budgets[key] < 1)
       throw new RunnerFailure("INVALID_INPUT", { stage: "preflight.validate", reasonCode: "BUDGET_INVALID" });
   }
+  let currentCustomerMessages: CommerceCurrentCustomerMessages | undefined;
+  try { currentCustomerMessages = input.currentCustomerMessages === undefined ? undefined : prepareCurrentCustomerMessages(input.currentCustomerMessages); }
+  catch { throw new RunnerFailure("INVALID_INPUT", { stage: "preflight.validate", reasonCode: "CONTEXT_INVALID" }); }
   if (
     input.hostInstructions.some((text) => typeof text !== "string") ||
     input.history.length > 20 ||
     Array.from(canonicalJson(input.history)).length > 32000 ||
-    jsonBytes(input.context) + jsonBytes(input.history) > 131072
+    jsonBytes(input.context) + jsonBytes(input.history) + (currentCustomerMessages === undefined ? 0 : jsonBytes(currentCustomerMessages)) > 131072
   ) throw new RunnerFailure("INVALID_INPUT", { stage: "preflight.validate", reasonCode: "CONTEXT_INVALID" });
   let productContext: CommerceConversationProductContext | null = null;
   try {
     if(input.productContext && !input.platform) throw new Error("platform required");
     if(input.platform) productContext = mergeConversationProductContext(input.productContext ?? null, [], {shopId:turn.shopId,conversationId:turn.conversationId,platform:input.platform,now:input.dependencies.now()});
   } catch(error) { throw new RunnerFailure("INVALID_INPUT", {stage:"preflight.validate",reasonCode:"CONTEXT_INVALID"},error); }
-  const instructions = composeTrustedInstructions(
+  const baseInstructions = composeTrustedInstructions(
     input.hostInstructions,
     response.instructions,
     input.executionPurpose ? [manifest.purposeProfile!.behaviourPrompt] : manifest.featureBehaviours.map((feature) => feature.behaviourPrompt),
   );
+  const instructions = currentCustomerMessages === undefined ? baseInstructions : [...baseInstructions, CURRENT_CUSTOMER_MESSAGES_INSTRUCTION];
   if (instructions.join("").length > 64000)
     throw new RunnerFailure("INVALID_INPUT", { stage: "preflight.validate", reasonCode: "CONTEXT_INVALID" });
 
@@ -139,5 +145,5 @@ export function prepareCommerceTurn(input: RunCommerceTurnInput): PreparedCommer
   }
   if (manifest.builtInTools.some(tool => !registered.has(tool.name)))
     throw new RunnerFailure("INCOMPATIBLE_VERSION", {stage: "preflight.validate", reasonCode: "TOOL_REGISTRATION_INVALID"});
-  return { productContext, ...(input.executionPurpose ? { executionPurpose: input.executionPurpose } : {}), turn, grant, manifest, response, finalSchema, budgets, instructions, registered };
+  return { ...(currentCustomerMessages === undefined ? {} : { currentCustomerMessages }), productContext, ...(input.executionPurpose ? { executionPurpose: input.executionPurpose } : {}), turn, grant, manifest, response, finalSchema, budgets, instructions, registered };
 }

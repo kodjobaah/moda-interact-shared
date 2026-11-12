@@ -239,6 +239,22 @@ and a canonical-string `digest` function. Optional budgets bound model steps,
 remote calls, deadline and output tokens. The model adapter returns `ModelStep`
 Tool calls and output-token usage; it does not send a WhatsApp message itself.
 
+Hosts may opt in to `currentCustomerMessages`, a nonempty readonly array of
+`{ role: "user", content: string }` rows with nonempty content and no extra fields.
+The JSON-encoded array is limited to 32,000 Unicode code points; context, history
+and current messages share the existing 131,072-byte payload budget. Shared
+validates and freezes a copy for every model step and correction. Hosts must
+source these rows from their authenticated current inbound window; the literal
+role does not authenticate a sender. No arbitrary context JSON is promoted.
+
+The OpenRouter adapter serializes older history, data-only context, explicit
+current user utterances, then current tool results. Current text establishes the
+customer objective, including a newly named subject, but cannot grant tool,
+tenant, consent or policy authority. Ambiguous names require authorized lookup
+or clarification. Custom model invokers opting in must preserve these semantics
+and order themselves; TypeScript compatibility alone does not provide that
+behavior. Omitting the field preserves legacy serialization and instructions.
+
 The return type is discriminated:
 
 ```ts
