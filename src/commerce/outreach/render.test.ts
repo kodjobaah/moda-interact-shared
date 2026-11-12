@@ -1,3 +1,4 @@
+import { providerObservationHash } from './provider-observation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -12,7 +13,7 @@ async function input() {
         throw new Error('not ready');
     return renderFixture(r);
 }
-function rehash(i: Awaited<ReturnType<typeof input>>) { const r = i.preparedProjection!.variant.metaRegistration!; const h = createHash('sha256').update(stable({ schemaVersion: 1, family: 'META_RECOVERY', category: 'MARKETING', components: r.componentsSnapshot, parameterBindings: r.parameterBindingsSnapshot })).digest('hex'); r.submittedContentHash = h; r.lastObservedContentHash = h; r.locale.contentHash = h; }
+function rehash(i: Awaited<ReturnType<typeof input>>) { const r = i.preparedProjection!.variant.metaRegistration!; const h = createHash('sha256').update(stable({ schemaVersion: 1, family: 'META_RECOVERY', category: 'MARKETING', components: r.componentsSnapshot, parameterBindings: r.parameterBindingsSnapshot })).digest('hex'); r.submittedContentHash = h; r.lastObservedContentHash = providerObservationHash(r.componentsSnapshot)!; r.locale.contentHash = h; }
 test('frozen provider parameter/body/button/provenance golden', async () => {
     const i = await input();
     const r = renderInitialOutreachPreview(i);
@@ -236,3 +237,47 @@ test('brand BODY media retains exact validated URL bytes rather than boundedText
     if(parsed.success){const validatedUrl=parsed.data.preparedBrandMedia!.logo!.httpsUrl;const r=renderInitialOutreachPreview(i);assert.equal(r.kind,'ready');if(r.kind==='ready'){assert.equal(r.renderedText,'Generic merchant | 2 × Custom label | '+validatedUrl);assert.deepEqual(r.parameters[0],{type:'body',parameters:['Generic merchant','2 × Custom label',validatedUrl].map(text=>({type:'text',text}))});}}
     else assert.deepEqual(renderInitialOutreachPreview(i),{kind:'refused',reasonCode:'INVALID_REQUEST'});
 });
+
+test('legacy TEXT audit metadata preserves the original compiled digest and can render', async () => {
+    const i = await input();
+    const registration = i.preparedProjection!.variant.metaRegistration!;
+    const originalDigest = registration.submittedContentHash;
+    registration.parameterBindingsSnapshot = {...registration.parameterBindingsSnapshot,
+        schemaVersion: 1, sourceHash: 'b'.repeat(64), localeContentHash: originalDigest};
+    assert.equal(InitialOutreachRenderInputSchema.safeParse(i).success, true);
+    const result = renderInitialOutreachPreview(i);
+    assert.equal(result.kind, 'ready');
+    if (result.kind === 'ready') {
+        assert.equal(result.templateProvenance.bindingFingerprint, originalDigest);
+        assert.equal(result.templateProvenance.submittedContentHash, originalDigest);
+    }
+    registration.parameterBindingsSnapshot.body[0]!.variable = 'shop.name';
+    assert.deepEqual(renderInitialOutreachPreview(i), {kind: 'refused', reasonCode: 'BINDING_FINGERPRINT_MISMATCH'});
+});
+
+test('legacy metadata cannot substitute a different locale digest', async () => {
+    const i = await input();
+    const registration = i.preparedProjection!.variant.metaRegistration!;
+    registration.parameterBindingsSnapshot = {...registration.parameterBindingsSnapshot,
+        schemaVersion: 1, sourceHash: 'b'.repeat(64), localeContentHash: 'a'.repeat(64)};
+    assert.deepEqual(renderInitialOutreachPreview(i), {kind: 'refused', reasonCode: 'BINDING_FINGERPRINT_MISMATCH'});
+});
+
+for (const malformed of ['missing-source', 'missing-locale', 'invalid-source', 'invalid-locale', 'missing-version', 'image-role', 'unknown-field'] as const) {
+    test(`legacy metadata rejects ${malformed}`, async () => {
+        const i = await input();
+        const registration = i.preparedProjection!.variant.metaRegistration!;
+        const bindings: Record<string, unknown> = {...registration.parameterBindingsSnapshot,
+            schemaVersion: 1, sourceHash: 'b'.repeat(64), localeContentHash: registration.submittedContentHash};
+        if (malformed === 'missing-source') delete bindings.sourceHash;
+        if (malformed === 'missing-locale') delete bindings.localeContentHash;
+        if (malformed === 'invalid-source') bindings.sourceHash = 'invalid';
+        if (malformed === 'invalid-locale') bindings.localeContentHash = 'invalid';
+        if (malformed === 'missing-version') delete bindings.schemaVersion;
+        if (malformed === 'image-role') bindings.headerMediaRole = 'LOGO';
+        if (malformed === 'unknown-field') bindings.untrustedAudit = true;
+        registration.parameterBindingsSnapshot = bindings as typeof registration.parameterBindingsSnapshot;
+        assert.equal(InitialOutreachRenderInputSchema.safeParse(i).success, false);
+        assert.deepEqual(renderInitialOutreachPreview(i), {kind: 'refused', reasonCode: 'INVALID_REQUEST'});
+    });
+}

@@ -1,3 +1,4 @@
+import { providerObservationHash } from "./provider-observation.js";
 import { canonicaliseLanguageTag } from "../../internationalization.js";
 import type { StructuredLogger } from "../../logging/index.js";
 import type { AssignedVariantRow, RecoveryStage, SelectionSource, ShopSelectionRow, TemplateUnavailableReason, VerifiedOfferPresentation, } from "./template-types.js";
@@ -217,7 +218,7 @@ export function selectRecoveryAssignment(input: {
         }
         if (registration.driftDetectedAt ||
             (registration.lastObservedContentHash !== null &&
-                registration.lastObservedContentHash !== registration.submittedContentHash) ||
+                registration.lastObservedContentHash !== providerObservationHash(registration.componentsSnapshot)) ||
             (registration.lastObservedCategory !== null &&
                 registration.lastObservedCategory !== registration.category)) {
             return { outcome: "unavailable", reason: "PROVIDER_DRIFT" };

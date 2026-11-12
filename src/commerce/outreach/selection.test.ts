@@ -1,3 +1,4 @@
+import { providerObservationHash } from './provider-observation.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {selectRecoveryAssignment} from './selection.js';
@@ -14,6 +15,7 @@ test('brand logo assignment is eligible without a checkout product image', async
     const bindings = registration.parameterBindingsSnapshot;
     bindings.headerMediaRole = 'LOGO';
     bindings.schemaVersion = 1;
+    registration.lastObservedContentHash = providerObservationHash(registration.componentsSnapshot)!;
     const query = {...input, headerFormat: 'IMAGE' as const, checkoutProductHeaderAvailable: false};
     assert.equal(selectRecoveryAssignment(query).outcome, 'selected');
     bindings.headerMediaRole = 'CHECKOUT_PRODUCT';
@@ -38,3 +40,28 @@ test('greeting selection uses a name only when present and preserves neutral-onl
     input.variants.pop();
     assert.equal(choose(true), neutral.id);
 });
+
+test('provider observations compare rendered components rather than the immutable authoring digest', async () => {
+    const input = await setup();
+    const registration = input.variants[0]!.metaRegistration!;
+    assert.notEqual(registration.lastObservedContentHash, registration.submittedContentHash);
+    assert.equal(selectRecoveryAssignment(input).outcome, 'selected');
+    const body = registration.componentsSnapshot.find(component => component.type === 'BODY')!;
+    if (body.type !== 'BODY') throw new Error('fixture body');
+    body.example = {body_text: [['Different submission-only sample']]};
+    assert.equal(selectRecoveryAssignment(input).outcome, 'selected');
+    body.text += ' Changed provider text';
+    assert.deepEqual(selectRecoveryAssignment(input), {outcome: 'unavailable', reason: 'PROVIDER_DRIFT'});
+});
+
+for (const drift of ['observed-category', 'drift-marker', 'provider-identity'] as const) {
+    test(`approved assignments still reject ${drift}`, async () => {
+        const input = await setup();
+        const registration = input.variants[0]!.metaRegistration!;
+        if (drift === 'observed-category') registration.lastObservedCategory = 'UTILITY';
+        if (drift === 'drift-marker') registration.driftDetectedAt = new Date().toISOString();
+        if (drift === 'provider-identity') registration.providerTemplateId = 'different-provider-id';
+        assert.deepEqual(selectRecoveryAssignment(input), {outcome: 'unavailable',
+            reason: drift === 'provider-identity' ? 'IDENTITY_MISMATCH' : 'PROVIDER_DRIFT'});
+    });
+}

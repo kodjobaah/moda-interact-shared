@@ -42,7 +42,15 @@ function parseFrozenBindings(raw: unknown): FrozenBindings {
     // digest only when it was actually stored: older TEXT snapshots omit it.
     if (raw.schemaVersion !== undefined && raw.schemaVersion !== 1)
         return invalid();
-    if (Object.keys(raw).some((key) => !["schemaVersion", "promotionTarget", "headerMediaRole", "header", "body", "buttons"].includes(key)))
+    // Legacy TEXT registrations add audit metadata after the compiled locale
+    // digest is frozen. Validate the complete pair, but hash the original
+    // semantic projection (whose TEXT bindings have no schemaVersion).
+    const hasLegacyMetadata = raw.sourceHash !== undefined || raw.localeContentHash !== undefined;
+    if (hasLegacyMetadata && (raw.schemaVersion !== 1 || raw.headerMediaRole !== undefined ||
+        typeof raw.sourceHash !== "string" || !/^[a-f0-9]{64}$/.test(raw.sourceHash) ||
+        typeof raw.localeContentHash !== "string" || !/^[a-f0-9]{64}$/.test(raw.localeContentHash)))
+        return invalid();
+    if (Object.keys(raw).some((key) => !["schemaVersion", "sourceHash", "localeContentHash", "promotionTarget", "headerMediaRole", "header", "body", "buttons"].includes(key)))
         return invalid();
     if (raw.headerMediaRole !== undefined &&
         (raw.schemaVersion !== 1 || !MEDIA_ROLES.includes(raw.headerMediaRole as RecoveryTemplateHeaderMediaRole) ||
@@ -68,7 +76,7 @@ function parseFrozenBindings(raw: unknown): FrozenBindings {
         buttons.push({ index: position, subType: "url", variable });
     }
     return {
-        ...(raw.schemaVersion === 1 ? { schemaVersion: 1 as const } : {}),
+        ...(raw.schemaVersion === 1 && !hasLegacyMetadata ? { schemaVersion: 1 as const } : {}),
         ...(raw.promotionTarget !== undefined ? { promotionTarget: raw.promotionTarget as "CHECKOUT" | "ALTERNATIVE_PRODUCT" } : {}),
         ...(raw.headerMediaRole !== undefined ? { headerMediaRole: raw.headerMediaRole as RecoveryTemplateHeaderMediaRole } : {}),
         header: parseTextBindings(raw.header ?? [], 1),
@@ -160,7 +168,10 @@ export function prepareFrozenComponents(input: {
     if (!/^[0-9a-f]{64}$/.test(registration.submittedContentHash) ||
         !registration.locale.contentHash ||
         registration.locale.contentHash !== registration.submittedContentHash ||
-        fingerprint !== registration.submittedContentHash) {
+        fingerprint !== registration.submittedContentHash ||
+        (obj(registration.parameterBindingsSnapshot) &&
+            registration.parameterBindingsSnapshot.localeContentHash !== undefined &&
+            registration.parameterBindingsSnapshot.localeContentHash !== registration.submittedContentHash)) {
         throw new BindingUnavailable("BINDING_FINGERPRINT_MISMATCH");
     }
     if (registration.category !== "MARKETING")
