@@ -1578,3 +1578,28 @@ test('discovery exhaustion reserves the next model step for finalization with ob
  const result=await resolveAvailableToolsNode(execution)({...initialCommerceTurnGraphState(),modelSteps:2,remoteCalls:4,runtimeMessages:[{tool:'commerce_search_products',result:{status:'OK',data:{products:[{productId:'tree'}]}}}]} as never);
  assert.equal(result.selectionRepairUsed,true);assert.deepEqual(result.availableTools,[]);
 });
+
+for (const platform of ["SHOPIFY", "WOOCOMMERCE"] as const) test(`schema correction restates the exact final envelope for ${platform}`, async () => {
+  const good = { ...exampleFinal, answerKind: "ANSWER" as const, referralReason: null };
+  const f = fixture([final({ ...good, replyText: null }), final(good)]); f.input.platform = platform;
+  const result = await runCommerceTurn(f.input);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(f.requests.length, 2);
+  const forced = f.requests[1]!;
+  assert.equal(forced.requiredToolName, "finalResponse");
+  assert.ok(forced.instructions.some(text => text.includes("ANSWER") && text.includes("JSON null") && text.includes("REFER_TO_STORE")));
+});
+test("common forced guidance preserves a mandatory tool-revoked referral", async () => {
+  const referral = { ...exampleFinal, answerKind: "REFER_TO_STORE" as const, referralReason: "TOOL_REVOKED" as const, details: {}, evidenceIds: [] };
+  for (const corrected of [referral, { ...referral, answerKind: "ANSWER" as const, referralReason: null }]) {
+    const f = fixture([call(), final({ ...referral, replyText: null }), final(corrected)], true);
+    let executions = 0;
+    f.input.dependencies.tools[0]!.execute = async () => { executions++; return { contractVersion: "commerce.v1", status: "ERROR", code: "DENIED", retryable: false }; };
+    const result = await runCommerceTurn(f.input);
+    assert.equal(f.requests.length, 3);
+    assert.equal(f.requests[2]!.requiredToolName, "finalResponse");
+    assert.equal(executions, 1);
+    if (corrected.answerKind === "REFER_TO_STORE") assert.equal(result.ok, true, JSON.stringify(result));
+    else expectFailure(result, "INVALID_FINAL", "FINAL_REFERRAL_REQUIRED");
+  }
+});

@@ -123,3 +123,53 @@ test("observed generic policy constrains any explicit shipping placeholder to it
   const selectedShipping = choices.find(choice => choice.required.includes("shippingInformationSelection"));
   assert.deepEqual(selectedShipping?.properties?.shippingInformationSelection, { anyOf: [{ properties: { productId: { const: null }, variantId: { const: null } } }] });
 });
+
+async function forcedEnvelope(referralReason: unknown, answerKind: "ANSWER" | "REFER_TO_STORE" = "ANSWER", omitted = false) {
+  const { invokeModelNode } = await import("./graph/nodes/invoke-model.js");
+  const { node, state, execution } = fixture({ responseDisposition: "STANDARD", productRecommendations: [recommendation] });
+  const correction = await node(state);
+  const requests: Array<{ requiredToolName?: string; instructions: readonly string[]; tools: readonly { name: string }[] }> = [];
+  const args: Record<string, unknown> = { ...state.pendingStep.calls[0].arguments, answerKind, referralReason,
+    details: answerKind === "ANSWER" ? { productRecommendationVersion: "1", productRecommendations: [recommendation] } : {} };
+  if (omitted) delete args.referralReason;
+  Object.assign(execution.prepared, { instructions: [], budgets: { remoteCalls: 9, modelSteps: 4, outputTokens: 100, deadlineMs: 1000 } });
+  Object.assign(execution.input, { signal: new AbortController().signal, context: {}, history: [] });
+  Object.assign(execution.input.dependencies, { model: { invoke: async (request: typeof requests[number]) => { requests.push(request); return { ...state.pendingStep, calls: [{ name: "finalResponse", arguments: args }] }; } } });
+  Object.assign(execution.runtime, { bounded: async (fn: (signal: AbortSignal) => Promise<unknown>) => fn(execution.input.signal) });
+  Object.assign(execution, { stats: { modelSteps: 3, remoteCalls: 0 } });
+  return { requests, args, complete: async () => {
+    const repaired = await invokeModelNode(execution)({ ...state, ...correction });
+    return node({ ...state, ...correction, ...repaired });
+  } };
+}
+test("one product-selection correction accepts an actual JSON-null ANSWER envelope", async () => {
+  const f = await forcedEnvelope(null);
+  const result = await f.complete();
+  assert.equal(result.finalResult?.referralReason, null);
+  assert.deepEqual(result.finalResult?.details.productRecommendations, [recommendation]);
+  assert.equal(f.requests.length, 1);
+  assert.deepEqual(f.requests[0]!.tools.map(tool => tool.name), ["finalResponse"]);
+  assert.ok(f.requests[0]!.instructions.some(text => text.includes("ANSWER") && text.includes("JSON null") && text.includes("REFER_TO_STORE")));
+});
+test("allowed referrals remain valid during product-selection correction", async () => {
+  const { ReferralReasonSchema } = await import("../response.js");
+  for (const reason of ReferralReasonSchema.options) {
+    const f = await forcedEnvelope(reason, "REFER_TO_STORE");
+    assert.equal((await f.complete()).finalResult?.referralReason, reason);
+    assert.equal(f.requests.length, 1);
+  }
+});
+test("malformed or omitted referral reasons terminate after the existing correction without coercion", async () => {
+  for (const reason of ["null", "NONE", "", "UNKNOWN_REASON", undefined, false, 0, "TOOL_UNAVAILABLE"]) {
+    const f = await forcedEnvelope(reason, "ANSWER", reason === undefined);
+    await assert.rejects(f.complete(), error => {
+      const failure = error as { code: string; diagnostic: { reasonCode: string; issuePaths?: readonly string[] } };
+      assert.equal(failure.code, "INVALID_FINAL");
+      assert.equal(failure.diagnostic.reasonCode, "FINAL_SCHEMA_INVALID");
+      assert.ok(failure.diagnostic.issuePaths?.includes("referralReason"));
+      return true;
+    });
+    assert.equal(f.requests.length, 1);
+    assert.equal(f.args.referralReason, reason);
+  }
+});

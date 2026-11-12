@@ -143,13 +143,9 @@ export function finalResponseToolSchema(definition: CommerceResponseContract) {
     answerKind: { enum: ["ANSWER", "REFER_TO_STORE"] },
     replyText: { type: "string", minLength: 1, maxLength: 4096 },
     referralReason: {
-      enum: [
-        null,
-        "INSUFFICIENT_TOOLS",
-        "UNVERIFIABLE_FACTS",
-        "TOOL_UNAVAILABLE",
-        "TOOL_REVOKED",
-      ],
+      type: ["string", "null"],
+      enum: [null, ...ReferralReasonSchema.options],
+      description: "For ANSWER use JSON null, not a string. For REFER_TO_STORE use exactly one allowed referral reason.",
     },
     detectedLanguageTag: { type: ["string", "null"], maxLength: 128 },
     detectedLanguageConfidence: {
@@ -179,14 +175,14 @@ export function finalResponseToolSchema(definition: CommerceResponseContract) {
           {
             properties: {
               answerKind: { const: "ANSWER" },
-              referralReason: { type: "null" },
+              referralReason: { type: "null", const: null },
               details: contract.detailsSchema,
             },
           },
           {
             properties: {
               answerKind: { const: "REFER_TO_STORE" },
-              referralReason: { enum: ReferralReasonSchema.options },
+              referralReason: { type: "string", enum: ReferralReasonSchema.options },
               evidenceIds: { maxItems: 0 },
               details: {
                 type: "object",
