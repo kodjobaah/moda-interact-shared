@@ -1,3 +1,4 @@
+import { hasCanonicalCommerceRecommendationContract, readCommerceObservedShippingSelections } from "../recommendation-selection.js";
 import type { CommerceResponseContract } from '../response.js';
 import type { CommerceRuntimeMessage } from './graph/state.js';
 
@@ -15,14 +16,35 @@ export function productSelectionFields(contract: CommerceResponseContract) {
   return PRODUCT_SELECTION_FIELDS.filter(key => Object.hasOwn(properties, key));
 }
 /** Preserve the pinned contract; add a current-turn ANSWER constraint, never fabricated selections. */
-export function productSelectionConstraint(contract: CommerceResponseContract) {
+export function productSelectionConstraint(
+  contract: CommerceResponseContract, messages: readonly CommerceRuntimeMessage[] = [],
+  provider?: "SHOPIFY" | "WOOCOMMERCE",
+) {
   const fields = productSelectionFields(contract);
+  const properties = contract.detailsSchema.properties ?? {};
+  const canonical = hasCanonicalCommerceRecommendationContract(contract);
+  const shipping = canonical ? readCommerceObservedShippingSelections(messages, provider) : [];
+  const shippingAvailable = !canonical || shipping.length > 0;
+  const genericPolicyAvailable = !canonical || shipping.some(pair => pair.productId === null && pair.variantId === null);
   return { anyOf: [
     {properties: {answerKind: {const: 'REFER_TO_STORE'}}},
     {properties: {details: {anyOf: [
-      ...fields.map(key => ({required: [key], properties: {[key]: {type: 'array', minItems: 1}}})),
-      ...(Object.hasOwn(contract.detailsSchema.properties ?? {}, 'shippingInformationSelection') ? [{required: ['shippingInformationSelection']}] : []),
-      ...(Object.hasOwn(contract.detailsSchema.properties ?? {}, 'responseDisposition') ? [{required: ['responseDisposition'], properties: {responseDisposition: {const: 'SHIPPING_INFORMATION_UNVERIFIED'}}}] : []),
+      ...fields.map(key => ({
+        required: key === "productRecommendations" && canonical ? [key, "productRecommendationVersion"] : [key],
+        properties: { [key]: {type: 'array', minItems: 1},
+          ...(key === "productRecommendations" && canonical ? {productRecommendationVersion: {const: "1"}} : {}) },
+      })),
+      ...(shippingAvailable && Object.hasOwn(properties, 'shippingInformationSelection') && (!canonical || Object.hasOwn(properties, 'responseDisposition')) ? [{
+        required: canonical ? ['shippingInformationSelection', 'responseDisposition'] : ['shippingInformationSelection'],
+        ...(canonical ? {properties: {
+          responseDisposition: {enum: ['STANDARD', 'OUT_OF_SCOPE_REDIRECT', 'SHIPPING_INFORMATION_UNVERIFIED']},
+          shippingInformationSelection: {anyOf: shipping.map(pair => ({properties: {productId: {const: pair.productId}, variantId: {const: pair.variantId}}}))},
+        }} : {}),
+      }] : []),
+      ...(genericPolicyAvailable && Object.hasOwn(properties, 'responseDisposition') ? [{required: ['responseDisposition'], properties: {
+        responseDisposition: {const: 'SHIPPING_INFORMATION_UNVERIFIED'},
+        ...(canonical && Object.hasOwn(properties, 'shippingInformationSelection') ? {shippingInformationSelection: {properties: {productId: {const: null}, variantId: {const: null}}}} : {}),
+      }}] : []),
     ]}}},
   ]};
 }
