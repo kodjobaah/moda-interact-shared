@@ -1,3 +1,4 @@
+import type { CommerceCurrentCustomerMessages } from "../current-customer-messages.js";
 import type { RunnerDiagnostic } from "./diagnostics.js";
 import type { Digest } from "../canonical-json.js";
 import type { CommerceFinalResponse } from "../response.js";
@@ -27,6 +28,8 @@ export type ModelRequest = {
   instructions: readonly string[];
   context: unknown;
   history: readonly unknown[];
+  /** Explicit host-attested current customer objective; custom invokers must preserve its role/order. */
+  currentCustomerMessages?: CommerceCurrentCustomerMessages;
   messages: readonly unknown[];
   tools: Array<{ name: string; description: string; inputSchema: unknown }>;
   maxOutputTokens: number;
@@ -51,6 +54,8 @@ export type RunCommerceTurnInput = {
   hostInstructions: readonly string[];
   context: unknown;
   history: readonly unknown[];
+  /** Explicit host-attested current customer objective; custom invokers must preserve its role/order. */
+  currentCustomerMessages?: CommerceCurrentCustomerMessages;
   language: { tag: string | null; source: string | null };
   signal: AbortSignal;
   dependencies: {
