@@ -2491,3 +2491,23 @@ owns controlled composition. Product-bearing shipping observations latch that ho
 without a selection; policy-only observations alone may retain ordinary grounded answers.
 Expected limitations never clear a terminal tool error. The default empty response contract,
 hard-referral envelope and two-tool discount built-in allowlist remain unchanged.
+
+### Prepared conversation brand images
+
+`commerce/presentation` exports additive `ConversationBrandImageOriginSchema`,
+`ConversationPreparedBrandImageSchema`, `ConversationBrandImageDeliveryPlanSchema`
+and `ConversationMediaDeliveryPlanSchema`. The old product `IMAGE` plan/schema
+and its digest are unchanged. `BRAND_IMAGE` carries shop/domain/role and current
+source generation/fingerprint, plus exact READY media identity in the existing
+`shop-brands/<domain>/<role>/sha256-<content>.<extension>` namespace. It contains
+no product identifiers. The generic digest binds the complete parsed plan.
+
+`buildConversationBrandImageDeliveryPlan` accepts an existing legacy plan and
+explicit host-current provenance/public origin. A product image keeps priority;
+missing, stale or invalid branding media and captions above 1,024 Unicode code
+points preserve the complete original text plan. No second message, truncation,
+fetch or transform occurs. The host must independently authorize and revalidate
+current same-tenant READY state, including its durable media evidence, before
+freezing/dispatch. A structurally valid self-declared origin grants no permission
+and proves neither network safety nor current authorization. Background adopts
+this additive contract only after its exact package release.

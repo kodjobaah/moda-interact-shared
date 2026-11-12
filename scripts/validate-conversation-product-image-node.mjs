@@ -9,5 +9,6 @@ const browser=await build({entryPoints:['dist/commerce/presentation/index.js'],b
 assert.ok(!Object.keys(browser.metafile.inputs).some(path=>/node:|sharp|@aws-sdk|prisma|\/logging\/|\/observability\/|langchain/.test(path)));
 const context=vm.createContext({Intl,URL,TextEncoder,TextDecoder,structuredClone,console});vm.runInContext(browser.outputFiles[0].text,context,{timeout:10000});
 assert.equal(vm.runInContext('typeof Presentation.prepareConversationProductImage',context),'undefined');
+for(const name of ['ConversationBrandImageOriginSchema','ConversationPreparedBrandImageSchema','ConversationMediaDeliveryPlanSchema','buildConversationBrandImageDeliveryPlan','digestConversationMediaDeliveryPlan']) assert.equal(vm.runInContext(`typeof Presentation.${name}`,context),name.endsWith('Schema')?'object':'function');
 assert.equal(vm.runInContext("Presentation.buildConversationDeliveryPlan({body:'Answer',shopId:'shop',displayedPairs:[]}).plan.body",context),'Answer');
 console.log('Node media public exports and browser isolation passed without provider I/O');
