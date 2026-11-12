@@ -17,3 +17,5 @@ export * from "./facts.js";
 export * from "./fact-messages.js";
 
 export * from "./product-image.js";
+
+export * from "./brand-image.js";
