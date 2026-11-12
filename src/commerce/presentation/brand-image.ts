@@ -22,7 +22,7 @@ export const ConversationPreparedBrandImageSchema = z.strictObject({
  status: z.literal('READY'), kind: z.literal('R2_DERIVATIVE'),
  publicOrigin: PublicOrigin, publicUrl: SafeHttps, objectKey: z.string().min(1).max(400),
  contentSha256: HashSchema, contentType: z.enum(['image/jpeg', 'image/png']),
- sizeBytes: z.number().int().min(1).max(5 * 1024 * 1024 - 1), width: z.literal(1125), height: z.literal(600), verifiedAt: DateSchema,
+ sizeBytes: z.number().int().min(1).max(5 * 1024 * 1024 - 1), width: z.literal(1125), height: z.literal(600), verifiedAt: DateSchema.max(64),
 }).superRefine((image, context) => {
  const extension = image.contentType === 'image/jpeg' ? 'jpg' : 'png';
  const expectedKey = `shop-brands/${image.origin.shopDomain}/${image.origin.role.toLowerCase()}/sha256-${image.contentSha256}.${extension}`;
