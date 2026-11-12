@@ -1,12 +1,15 @@
 import { hasCanonicalCommerceRecommendationContract } from "../../../recommendation-selection.js";
 import { hasObservedProducts, productSelectionConstraint, productSelectionFields } from "../../product-selection.js";
-import { finalResponseToolSchema } from "../../../response.js";
+import { finalResponseToolSchema, ReferralReasonSchema } from "../../../response.js";
 import { RunnerFailure } from "../../failure.js";
 import { elapsedDuration, logModelCompleted, logModelInvalid, logModelStarted } from "../../observability.js";
 import { validateModelStep, routeModelStep } from "../../model-step.js";
 import type { CommerceTurnGraphExecution } from "../graph.js";
 import type { CommerceTurnGraphStateValue } from "../state.js";
 import type { ModelStep } from "../../types.js";
+
+const FORCED_FINAL_RESPONSE_ENVELOPE_INSTRUCTION =
+  `Return every required finalResponse envelope field. For ANSWER, referralReason must be JSON null, not the string "null", "NONE", an empty string or an omitted field. For REFER_TO_STORE, referralReason must be exactly one allowed reason: ${ReferralReasonSchema.options.join(", ")}; evidenceIds must be [] and details must be {}. Preserve mandatory referral decisions. Never invent a reason or substitute another value for JSON null.`;
 
 export function invokeModelNode(execution: CommerceTurnGraphExecution) {
   return async (state: CommerceTurnGraphStateValue) => {
@@ -25,7 +28,7 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
     try {
       raw = await execution.runtime.bounded((signal) => execution.input.dependencies.model.invoke({
         ...(state.selectionRepairUsed ? { requiredToolName: "finalResponse" as const } : {}),
-        instructions: state.selectionRepairUsed ? [...execution.prepared.instructions, ...selectionInstruction,
+        instructions: state.selectionRepairUsed ? [...execution.prepared.instructions, ...selectionInstruction, FORCED_FINAL_RESPONSE_ENVELOPE_INSTRUCTION,
           ...(state.schemaRepairIssues?.length ? [
             `Your previous finalResponse failed schema validation at: ${state.schemaRepairIssues.join(", ")}. Return a corrected finalResponse matching the pinned schema. replyText must be a nonempty string in the effective conversation language. Use exactly one product selection mode: recommendations OR details OR options. For stock, restock dates, attributes and descriptions use productDetailSelections; do not also populate recommendations. Omit unused optional selection fields. Reuse current verified tool results and exact product selections. Preserve mandatory referral reasons. Do not invent facts or make provider calls.`,
           ] : ["Successful product results are already available. Further identical reads cannot add facts. Return finalResponse now: put exact observed product/variant selections in the appropriate pinned details fields. If the pinned contract exposes the canonical recommendation version, supply productRecommendationVersion '1' together with productRecommendations. Shipping-only selections require a recognized disposition and matching successful current-turn shipping information; a placeholder is not evidence. Preserve the customer objective, select only relevant observed products, and never invent identifiers or promotions. Reuse current tool results; do not repeat searches merely to repair the response format."]) ] : [...execution.prepared.instructions, ...selectionInstruction],

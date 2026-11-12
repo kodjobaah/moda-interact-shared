@@ -11,6 +11,10 @@ import {createHash} from 'node:crypto';
 import * as c from '@modainteract/moda-interact-shared/commerce';
 import {runCommerceTurn,runnerVersion} from '@modainteract/moda-interact-shared/commerce/runner';
 const digest=s=>createHash('sha256').update(s).digest('hex');
+const providerEnvelope=c.finalResponseToolSchema(c.EMPTY_RESPONSE_CONTRACT);
+assert.deepEqual(providerEnvelope.properties.referralReason.type,['string','null']);
+assert.deepEqual(providerEnvelope.properties.referralReason.enum,[null,...c.ReferralReasonSchema.options]);
+
 const rec={scope:'PRODUCT_ONLY',basketLineId:null,productId:'installed-product',variantId:null,quantity:1,promotionKind:'NONE',offerIds:[]};
 assert.deepEqual(c.readCommerceRecommendationSelection({productRecommendations:[rec],responseDisposition:'STANDARD'}),{responseDisposition:'STANDARD'});
 assert.deepEqual(c.readCommerceRecommendationSelection({productRecommendationVersion:'1',productRecommendations:[rec]}).productRecommendations,[rec]);

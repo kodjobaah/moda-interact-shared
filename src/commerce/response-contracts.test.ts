@@ -100,3 +100,21 @@ test('provider-facing final tool exposes pinned selections without making them m
  assert.equal(finalResponseSchema(contract as unknown as typeof EMPTY_RESPONSE_CONTRACT).safeParse({...exampleFinal,answerKind:'REFER_TO_STORE',referralReason:'UNVERIFIABLE_FACTS',evidenceIds:[],details:{}}).success,true);
  assert.ok(PLATFORM_INSTRUCTIONS.some(text=>text.includes('Do not supply only replyText or empty details')));
 });
+
+test("provider referralReason is explicitly nullable-string with unchanged branch values", async () => {
+  const { finalResponseToolSchema, EMPTY_RESPONSE_CONTRACT, ReferralReasonSchema, finalResponseSchema } = await import("./response.js");
+  const schema = finalResponseToolSchema(EMPTY_RESPONSE_CONTRACT);
+  assert.deepEqual(schema.properties.referralReason.type, ["string", "null"]);
+  assert.deepEqual(schema.properties.referralReason.enum, [null, ...ReferralReasonSchema.options]);
+  assert.match(schema.properties.referralReason.description, /JSON null/);
+  const branches = schema.allOf[0]!.oneOf as unknown as Array<{ properties: { referralReason: { type: string; const?: null; enum?: readonly string[] } } }>;
+  assert.equal(branches[0]!.properties.referralReason.type, "null");
+  assert.equal(branches[0]!.properties.referralReason.const, null);
+  assert.equal(branches[1]!.properties.referralReason.type, "string");
+  assert.deepEqual(branches[1]!.properties.referralReason.enum, ReferralReasonSchema.options);
+  const base = { answerKind: "ANSWER", replyText: "Synthetic answer", referralReason: null, detectedLanguageTag: null, detectedLanguageConfidence: null, evidenceIds: [], details: {} };
+  const validator = finalResponseSchema(EMPTY_RESPONSE_CONTRACT);
+  assert.equal(validator.safeParse(base).success, true);
+  for (const reason of ReferralReasonSchema.options) assert.equal(validator.safeParse({ ...base, answerKind: "REFER_TO_STORE", referralReason: reason }).success, true);
+  for (const value of ["null", "NONE", "", "UNKNOWN_REASON", undefined, false, 0, {}, []]) assert.equal(validator.safeParse({ ...base, referralReason: value }).success, false);
+});
