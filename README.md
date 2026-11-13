@@ -2521,9 +2521,15 @@ this additive contract only after its exact package release.
 `{schemaVersion: 1, kind: 'RECOVERY_MULTIPART', parts: [{role, plan}]}`.
 It does not widen the legacy single-message schemas or alter their digests.
 
-Allowed role orders are `ANSWER`, `HEADER → ANSWER`, `HEADER → PRODUCT`, and
+Allowed role orders are `HEADER`, `ANSWER`, `HEADER → ANSWER`, `HEADER → PRODUCT`, and
 `HEADER → PRODUCT → ANSWER`. A header may use verified logo/square-logo media
 or text; a product uses the existing product-image plan; an answer uses text.
+A single HEADER can carry shop details, the complete answer and its checkout footer,
+with a verified logo when the complete caption fits the existing 1,024-codepoint
+limit. Product media remains a separate PRODUCT part. Old readers reject this
+new HEADER-only order: publish and deploy compatible readers, then drain or
+quiesce old workers before a producer emits it. Existing frozen plans remain
+readable unchanged.
 Short answers can accompany the product image. Longer answers use the third
 text part without truncation. The host composes parts from its trusted header
 and footer boundaries; this package does not strip or interpret authored text.

@@ -25,7 +25,7 @@ export const RecoveryMultipartDeliveryPartSchema = z.discriminatedUnion('role', 
     context.addIssue({ code: 'custom', path: ['plan', 'body'], message: 'RECOVERY_PART_BODY_INVALID' });
 });
 export type RecoveryMultipartDeliveryPart = z.infer<typeof RecoveryMultipartDeliveryPartSchema>;
-const allowedOrders = new Set(['ANSWER', 'HEADER,ANSWER', 'HEADER,PRODUCT', 'HEADER,PRODUCT,ANSWER']);
+const allowedOrders = new Set(['HEADER', 'ANSWER', 'HEADER,ANSWER', 'HEADER,PRODUCT', 'HEADER,PRODUCT,ANSWER']);
 /** Additive manifest only. The host retains logical text and original authorization receipts. */
 export const RecoveryMultipartDeliveryPlanSchema = z.strictObject({
   schemaVersion: z.literal(1), kind: z.literal('RECOVERY_MULTIPART'),
