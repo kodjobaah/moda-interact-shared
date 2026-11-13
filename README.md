@@ -2511,3 +2511,28 @@ current same-tenant READY state, including its durable media evidence, before
 freezing/dispatch. A structurally valid self-declared origin grants no permission
 and proves neither network safety nor current authorization. Background adopts
 this additive contract only after its exact package release.
+
+### Ordered recovery message layout
+
+`commerce/presentation` adds `RecoveryMultipartDeliveryPlanSchema`,
+`RecoveryMultipartDeliveryPartSchema`, `MAX_RECOVERY_DELIVERY_PARTS` (3),
+`buildRecoveryMultipartDeliveryPlan`, `parseRecoveryMultipartDeliveryPlan` and
+`digestRecoveryMultipartDeliveryPlan` in 5.13.8. This is an additive manifest:
+`{schemaVersion: 1, kind: 'RECOVERY_MULTIPART', parts: [{role, plan}]}`.
+It does not widen the legacy single-message schemas or alter their digests.
+
+Allowed role orders are `ANSWER`, `HEADER → ANSWER`, `HEADER → PRODUCT`, and
+`HEADER → PRODUCT → ANSWER`. A header may use verified logo/square-logo media
+or text; a product uses the existing product-image plan; an answer uses text.
+Short answers can accompany the product image. Longer answers use the third
+text part without truncation. The host composes parts from its trusted header
+and footer boundaries; this package does not strip or interpret authored text.
+
+The builder and parser require the trusted recovery checkout URL explicitly and
+check that every physical part ends with that exact URL on its own final line.
+The schema and digest validate structure and bind bytes; they do not establish
+tenant authority, current media, consent, sender identity, billing, ordering of
+provider requests or delivery state. Hosts retain the complete logical answer,
+original authorization receipts, one logical billing reservation and independent
+durable delivery evidence for each part. Those responsibilities stay outside
+this pure browser-safe contract.

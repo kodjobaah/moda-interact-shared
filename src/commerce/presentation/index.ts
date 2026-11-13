@@ -19,3 +19,5 @@ export * from "./fact-messages.js";
 export * from "./product-image.js";
 
 export * from "./brand-image.js";
+
+export * from "./recovery-multipart.js";
