@@ -1,6 +1,6 @@
 {
   "name": "@modainteract/moda-interact-shared",
-  "version": "5.13.9",
+  "version": "5.13.10",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
