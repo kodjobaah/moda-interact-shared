@@ -2570,3 +2570,62 @@ must re-read the exact immutable selected SHARED definition and locale, verify
 status/current identity and source/content hashes, and supply tenant-verified
 saved website/checkout values. Older wrappers and frozen Meta registrations
 without this optional reference retain their original rendering and hashes.
+
+### Trusted recovery composite contract (unreleased)
+
+The browser-safe presentation entrypoint additionally exports
+`RecoveryCompositeProvenanceSchema`, `RecoveryPreparedCompositeImageSchema`,
+`RecoveryCompositeImagePlanSchema`, `ConversationCompositeMediaDeliveryPlanSchema`,
+`buildRecoveryCompositeImagePlan`, `parseRecoveryCompositeImagePlan`, and the
+composite plan/render-identity digest functions. `COMPOSITE_IMAGE` is a distinct
+opt-in schemaVersion 1 carrier. Existing TEXT, IMAGE, BRAND_IMAGE and multipart
+validators and digests remain unchanged; published 5.13.10 readers reject this
+new kind. No renderer, producer activation or release is included here.
+
+V1 uses a white 1125px-wide canvas: a 300px header containing a logo within
+180×180 at (48,60), full canonical header text beside it in the 813×252 box at
+(264,24), including its authored divider, rendered literally exactly once. No separate
+graphic divider or ornament is added. An optional product occupies the
+1125×600 contain box below at (0,300); resulting height is 900, or 300 with
+explicit `product: null`. Assets must not be cropped. Header input is bounded
+to 512 Unicode codepoints and six lines, preserving authored whitespace.
+A renderer must return full-text fallback when text/glyphs cannot fit legibly;
+these bounds do not prove raster fit. No bitmap renderer or font is supplied.
+
+Provenance binds the trusted LOGO/SQUARE_LOGO generation/fingerprint and actual
+input byte SHA, optional verified product shop/platform/pair and actual input
+byte SHA, same tenant, exact rendered common header, common-reference SHA,
+immutable V1 layout/renderer identity and `fontAssetSha256`. The latter is the
+SHA-256 of a canonical ordered font-asset manifest including shaping settings;
+the common-reference SHA hashes the complete independently verified canonical
+common reference with `stableJson`, not merely a header string. Changing fixed
+layout/encoding/render behavior requires a new renderer identity. Font fallback
+must be explicit and pinned. Header inputs come only from the verified common
+shop-name/website renderer; no customer, answer or checkout data belongs in the
+reusable bitmap or render identity.
+
+The output key is
+`conversation-composites/v1/{SHA256(shopId)}/{renderIdentitySha256}/{contentSha256}.jpg`.
+Schema checks require the exact trusted origin/key URL, matching key hash suffix,
+JPEG, the product-dependent fixed dimensions and a positive size below 5 MiB.
+The trusted parser also recomputes tenant/render hashes using the supplied
+browser-safe SHA-256 callback. Structural validation does not attest actual
+image bytes, current provenance, public reachability or tenant authorization.
+The Node producer must verify input/output bytes and public delivery separately.
+
+Hosts supply original, independently verified `headerText` (in provenance),
+`answerText`, `footerText`, complete original `logicalBody`, trusted checkout URL,
+expected provenance/public origin, and a verified renderer/probe output hash/size
+receipt. `body` is exactly `answerText + footerText`; `logicalBody` must equal
+`headerText + answerText + footerText`. Boundaries already own all spacing: the
+builder/parser do not trim, normalize, insert separators, count URLs globally or
+infer equivalence by substring. The footer retains the existing exact trusted
+checkout URL final-line validation. `boundarySha256` binds these exact canonical
+boundaries, caption and logical body; the plan digest additionally binds the
+complete image/provenance metadata. Caption is limited to 1024 Unicode codepoints
+and logical text to the existing 4096 UTF-16-unit bound; text is never truncated.
+
+Background retains current brand/product attestation, common-reference selection,
+moderation/history using complete logical text, authorization/consent, billing,
+frozen receipts and provider delivery. New readers must be published, adopted
+and deployed with old workers drained before a producer emits this carrier.
