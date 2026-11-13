@@ -7,8 +7,8 @@ import { stableJson, type PresentationDigest } from './wrapper-projection.js';
 /** V1 geometry is immutable. Contain assets; render full authored header once, with no added ornament. */
 export const RECOVERY_COMPOSITE_LAYOUT_V1 = Object.freeze({
   width: 1125, headerHeight: 300, productHeight: 600,
-  logoLeft: 48, logoTop: 48, logoWidth: 180, logoHeight: 180,
-  textLeft: 264, textTop: 48, textWidth: 813, textHeight: 180,
+  logoLeft: 48, logoTop: 60, logoWidth: 180, logoHeight: 180,
+  textLeft: 264, textTop: 24, textWidth: 813, textHeight: 252,
   productLeft: 0, productTop: 300, productWidth: 1125,
 } as const);
 const Sha256 = z.string().regex(/^[a-f0-9]{64}$/);

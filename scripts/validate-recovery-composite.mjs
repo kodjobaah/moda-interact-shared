@@ -48,7 +48,7 @@ writeFileSync('vector.json',JSON.stringify({plan,trusted}));
 `);
  execFileSync(process.execPath,[join(root,'smoke.mjs')],{cwd:root,stdio:'pipe'});
  await writeFile(join(root,'types.ts'),`import {RECOVERY_COMPOSITE_LAYOUT_V1,RecoveryCompositeImagePlanSchema,parseRecoveryCompositeImagePlan,type RecoveryCompositeImagePlan,type RecoveryCompositeTrustedContext,type RecoveryCompositeProvenance} from '@modainteract/moda-interact-shared/commerce/presentation';
-const check=(p:RecoveryCompositeImagePlan,t:RecoveryCompositeTrustedContext)=>parseRecoveryCompositeImagePlan(p,t,()=> 'a'.repeat(64));void check;void RecoveryCompositeImagePlanSchema;const width:1125=RECOVERY_COMPOSITE_LAYOUT_V1.width;void width;const p:RecoveryCompositeProvenance['product']=null;void p;`);
+const check=(p:RecoveryCompositeImagePlan,t:RecoveryCompositeTrustedContext)=>parseRecoveryCompositeImagePlan(p,t,()=> 'a'.repeat(64));void check;void RecoveryCompositeImagePlanSchema;const width:1125=RECOVERY_COMPOSITE_LAYOUT_V1.width;const textHeight:252=RECOVERY_COMPOSITE_LAYOUT_V1.textHeight;void width;void textHeight;const p:RecoveryCompositeProvenance['product']=null;void p;`);
  execFileSync(process.execPath,[resolve('node_modules/typescript/bin/tsc'),'--noEmit','--strict','--skipLibCheck','--module','NodeNext','--moduleResolution','NodeNext','--target','ES2022',join(root,'types.ts')],{cwd:root,stdio:'pipe'});
  await writeFile(join(root,'browser.mjs'),`export * from '@modainteract/moda-interact-shared/commerce/presentation';`);
  const bundled=await build({absWorkingDir:root,entryPoints:['browser.mjs'],bundle:true,platform:'browser',format:'iife',globalName:'Presentation',write:false,metafile:true});
@@ -56,6 +56,8 @@ const check=(p:RecoveryCompositeImagePlan,t:RecoveryCompositeTrustedContext)=>pa
  const vector=JSON.parse(await readFile(join(root,'vector.json'),'utf8'));
  const context=vm.createContext({Intl,URL,TextEncoder,TextDecoder,structuredClone,raw:vector.plan,trusted:vector.trusted});
  vm.runInContext(bundled.outputFiles[0].text,context,{timeout:10000});
+ assert.equal(vm.runInContext('Presentation.RECOVERY_COMPOSITE_LAYOUT_V1.textTop',context),24);
+ assert.equal(vm.runInContext('Presentation.RECOVERY_COMPOSITE_LAYOUT_V1.textHeight',context),252);
  assert.equal(vm.runInContext('Presentation.RecoveryCompositeImagePlanSchema.safeParse(raw).success',context),true);
  // Browser parser executes every cryptographic comparison using the precomputed exact SHA results.
  const digestInputs=new Map(); const hash=v=>{const out=createHash('sha256').update(v).digest('hex');digestInputs.set(v,out);return out;};

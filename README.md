@@ -2583,8 +2583,8 @@ validators and digests remain unchanged; published 5.13.10 readers reject this
 new kind. No renderer, producer activation or release is included here.
 
 V1 uses a white 1125px-wide canvas: a 300px header containing a logo within
-180×180 at (48,48), full canonical header text beside it in the 813×180 box at
-(264,48), including its authored divider, rendered literally exactly once. No separate
+180×180 at (48,60), full canonical header text beside it in the 813×252 box at
+(264,24), including its authored divider, rendered literally exactly once. No separate
 graphic divider or ornament is added. An optional product occupies the
 1125×600 contain box below at (0,300); resulting height is 900, or 300 with
 explicit `product: null`. Assets must not be cropped. Header input is bounded

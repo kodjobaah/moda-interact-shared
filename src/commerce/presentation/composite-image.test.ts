@@ -103,3 +103,9 @@ test('layout preserves the full authored header once and prescribes no extra gra
  assert.equal(plan.logicalBody,p.headerText+plan.body);
  assert.equal(Object.keys(RECOVERY_COMPOSITE_LAYOUT_V1).some(key=>key.startsWith('divider')),false);
 });
+
+test('readable header reserves an independent 813 by 252 text box and vertically centered modest logo',()=>{
+ assert.equal(RECOVERY_COMPOSITE_LAYOUT_V1.textTop,24);assert.equal(RECOVERY_COMPOSITE_LAYOUT_V1.textHeight,252);
+ assert.equal(RECOVERY_COMPOSITE_LAYOUT_V1.textWidth,813);assert.equal(RECOVERY_COMPOSITE_LAYOUT_V1.logoTop,60);
+ assert.equal(RECOVERY_COMPOSITE_LAYOUT_V1.logoHeight,180);assert.equal(RECOVERY_COMPOSITE_LAYOUT_V1.headerHeight,300);
+});
