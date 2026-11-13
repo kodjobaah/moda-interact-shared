@@ -3,7 +3,7 @@ import type { ConversationProductImageBinding } from "./product-image.js";
 export type WrapperSource = "AI" | "HUMAN";
 export type WrapperAudience = "SHARED" | WrapperSource;
 export type WrapperVariable =
-  | "customer.firstName" | "shop.name" | "checkout.url"
+  | "customer.firstName" | "shop.name" | "shop.websiteUrl" | "checkout.url"
   | "shopBrand.brandName" | "shopBrand.logoUrl" | "shopBrand.logoAltText"
   | "shopBrand.logoWidth" | "shopBrand.logoHeight" | "shopBrand.squareLogoUrl"
   | "shopBrand.squareLogoAltText" | "shopBrand.coverImageUrl";

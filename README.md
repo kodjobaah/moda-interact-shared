@@ -2536,3 +2536,31 @@ provider requests or delivery state. Hosts retain the complete logical answer,
 original authorization receipts, one logical billing reservation and independent
 durable delivery evidence for each part. Those responsibilities stay outside
 this pure browser-safe contract.
+
+### Common recovery website binding and reference
+
+Version 5.13.9 adds the canonical text semantic `shop.websiteUrl` to recovery
+bindings and existing prepared wrapper tokens. Outreach hosts may provide the
+separate optional `variables.shopWebsiteUrl`; wrapper hosts provide
+`context.variables['shop.websiteUrl']`. The supplied value must be a canonical
+single-line HTTPS origin (an optional root slash is allowed), without credentials,
+ports, paths, query or fragment. Old inputs may omit it. Selecting the binding
+without a usable saved value fails through existing unavailable-variable handling;
+the renderer never derives it from a checkout URL or overloads `shop.name`.
+
+`commerce/presentation` also exports `CommonRecoveryLayoutReference` and
+`readCommonRecoveryLayoutReference(raw, sha256)`. The exact reference contains
+`schemaVersion`, `definitionId`, `sourceHash`, `localeId`, `languageTag`,
+`contentHash` and `prepared`. It reuses `readPreparedWrapper` and its existing
+`sha256(stableJson(prepared))` convention. The common projection has one body
+response slot, no product-image binding, one name and website header token,
+an empty static footer, and a checkout conditional ending in the checkout URL
+on its own final line.
+This parser creates no frame or content: the Admin-owned immutable SHARED
+wrapper revision remains the sole common layout source.
+
+A parsed reference is a snapshot, not authorization. Admin and Background hosts
+must re-read the exact immutable selected SHARED definition and locale, verify
+status/current identity and source/content hashes, and supply tenant-verified
+saved website/checkout values. Older wrappers and frozen Meta registrations
+without this optional reference retain their original rendering and hashes.

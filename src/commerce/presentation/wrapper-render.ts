@@ -1,3 +1,4 @@
+import { isShopWebsiteUrl } from "../../shop-website-url.js";
 import { ConversationProductImageBindingSchema } from "./product-image.js";
 import type { PreparedToken, PreparedWrapper, VerifiedWrapperContext, WrapperRefusal } from "./wrapper-contracts.js";
 
@@ -18,7 +19,7 @@ function valueFor(token: PreparedToken, context: VerifiedWrapperContext): string
   if (token.kind !== "variable") return null;
   const value = context.variables[token.name];
   if (typeof value !== "string" || !value.trim() || value.length > MAX_VARIABLE_LENGTH ||
-      hasDisallowedTextControl(value)) return null;
+      hasDisallowedTextControl(value) || (token.name === "shop.websiteUrl" && !isShopWebsiteUrl(value))) return null;
   return value;
 }
 function renderTokens(tokens: readonly PreparedToken[], context: VerifiedWrapperContext, response: string):

@@ -3,6 +3,7 @@ import { z } from "zod";
 export const RecoveryTemplateSemanticKeySchema = z.enum([
   "customer.firstName",
   "shop.name",
+  "shop.websiteUrl",
   "shop.categoryName",
   "checkout.url",
   "checkout.itemsSummary",

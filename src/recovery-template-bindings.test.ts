@@ -33,6 +33,7 @@ const alternativeProductProjection = {
 const expectedSemanticKeys = [
   "customer.firstName",
   "shop.name",
+  "shop.websiteUrl",
   "shop.categoryName",
   "checkout.url",
   "checkout.itemsSummary",
