@@ -40,7 +40,7 @@ test('missing logo uses text header, no-product replies and whole TEXT fallback 
     assert.deepEqual(build(parts).parts,parts);
 });
 test('order is bounded and contiguous by manifest array; duplicate or incomplete roles are refused', () => {
-  for(const parts of [[],[header],[product()],[product(),header],[answer(),header],[header,header],[header,product(),product()],[header,answer(),product()],[header,product(),answer(),answer()]])
+  for(const parts of [[],[product()],[product(),header],[answer(),header],[header,header],[header,product(),product()],[header,answer(),product()],[header,product(),answer(),answer()]])
     assert.equal(RecoveryMultipartDeliveryPlanSchema.safeParse(raw(parts)).success,false,JSON.stringify(parts.map(part=>part.role)));
   assert.equal(RecoveryMultipartDeliveryPlanSchema.safeParse({...raw([answer()]),ordinal:0}).success,false);
   assert.equal(RecoveryMultipartDeliveryPlanSchema.safeParse({...raw([answer()]),schemaVersion:2}).success,false);
@@ -89,4 +89,40 @@ test('multipart is additive and digests bind exact roles, order, bodies and veri
   assert.notEqual(digest,digestRecoveryMultipartDeliveryPlan(build([header,{role:'PRODUCT',plan:{schemaVersion:1,kind:'IMAGE',body:product().plan.body,image:changedImage}}]),hash));
   const legacy=answer().plan;
   assert.equal(digestConversationMediaDeliveryPlan(legacy,hash),digestConversationDeliveryPlan(ConversationDeliveryPlanSchema.parse(legacy),hash));
+});
+
+test('one complete branded or text HEADER preserves the answer and trusted footer', () => {
+  const body = `Example shop\nhttps://shop.example\nComplete answer${footer}`;
+  for (const plan of [
+    {...header.plan, body},
+    {schemaVersion:1 as const,kind:'TEXT' as const,body},
+    {...header.plan,body,image:{...brandImage,origin:{...brandImage.origin,role:'SQUARE_LOGO' as const},objectKey:brandImage.objectKey.replace('/logo/','/square_logo/'),publicUrl:brandImage.publicUrl.replace('/logo/','/square_logo/')}},
+  ]) {
+    const parts: RecoveryMultipartDeliveryPart[] = [{role:'HEADER',plan}];
+    assert.deepEqual(build(parts),raw(parts));
+    assert.deepEqual(parseRecoveryMultipartDeliveryPlan(raw(parts),checkoutUrl),raw(parts));
+  }
+});
+test('single HEADER retains Unicode caption, footer and verified-media boundaries', () => {
+  const exact = '😀'.repeat(1024-Array.from(footer).length)+footer;
+  const single = (body:string) => [{...header,plan:{...header.plan,body}}];
+  assert.equal(build(single(exact)).parts[0]!.plan.body,exact);
+  assert.throws(()=>build(single('😀'+exact)));
+  for (const body of ['No footer',`Answer\n${checkoutUrl} `,`Answer\n${checkoutUrl}\n`,`Answer\nhttps://other.example/recover`,`bad\u0000${footer}`])
+    assert.throws(()=>build(single(body)));
+  for (const image of [
+    {...brandImage,status:'PENDING'},
+    {...brandImage,publicUrl:'https://evil.example/logo.jpg'},
+    {...brandImage,origin:{...brandImage.origin,role:'COVER_IMAGE'}},
+    {...brandImage,contentSha256:'invalid'},
+  ]) assert.equal(RecoveryMultipartDeliveryPlanSchema.safeParse(raw([{...header,plan:{...header.plan,image}}])).success,false);
+  assert.throws(()=>parseRecoveryMultipartDeliveryPlan(raw(single(exact)),'https://other.example/recover'));
+});
+
+test('all previously valid orders preserve exact serialized bytes and digest inputs', () => {
+  for (const parts of [[answer()],[header,answer()],[header,product()],[header,product(),answer()]]) {
+    const original=raw(parts);
+    assert.equal(stableJson(build(parts)),stableJson(original));
+    assert.equal(digestRecoveryMultipartDeliveryPlan(build(parts),hash),hash(stableJson(original)));
+  }
 });
