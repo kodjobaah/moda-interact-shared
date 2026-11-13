@@ -50,3 +50,19 @@ test('common checkout final line remains consumable by the ordered footer contra
   const p={...prepared,conditionals:[{when:'checkout.available',tokens}]};assert.equal(readCommonRecoveryLayoutReference(ref(p),sha).kind,'ok');
  }
 });
+
+test('valid-hash common references reject every non-common header/conditional variable without changing generic wrappers',()=>{
+ const otherVariables=['customer.firstName','shopBrand.brandName','shopBrand.logoUrl','shopBrand.logoAltText','shopBrand.logoWidth','shopBrand.logoHeight','shopBrand.squareLogoUrl','shopBrand.squareLogoAltText','shopBrand.coverImageUrl'] as const;
+ for(const name of otherVariables){
+  const token={kind:'variable' as const,name};
+  const header={...prepared,header:[...prepared.header,token]};
+  const conditional={...prepared,conditionals:[{when:'checkout.available' as const,tokens:[token,{kind:'text' as const,value:'\n'},...prepared.conditionals[0]!.tokens]}]};
+  for(const [where,p] of [['header',header],['conditional',conditional]] as const){
+   const input=ref(p);assert.equal(readPreparedWrapper({schemaVersion:1,prepared:p},input.contentHash,sha).kind,'ok',`generic ${where} ${name}`);
+   assert.deepEqual(readCommonRecoveryLayoutReference(input,sha),{kind:'invalid'},`${where} ${name}`);
+  }
+ }
+ const extraName={...prepared,conditionals:[{when:'checkout.available' as const,tokens:[{kind:'variable' as const,name:'shop.name' as const},{kind:'text' as const,value:'\n'},...prepared.conditionals[0]!.tokens]}]};
+ const extraWebsite={...prepared,conditionals:[{when:'checkout.available' as const,tokens:[{kind:'variable' as const,name:'shop.websiteUrl' as const},{kind:'text' as const,value:'\n'},...prepared.conditionals[0]!.tokens]}]};
+ for(const p of [extraName,extraWebsite])assert.deepEqual(readCommonRecoveryLayoutReference(ref(p),sha),{kind:'invalid'});
+});

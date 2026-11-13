@@ -2553,8 +2553,8 @@ the renderer never derives it from a checkout URL or overloads `shop.name`.
 `schemaVersion`, `definitionId`, `sourceHash`, `localeId`, `languageTag`,
 `contentHash` and `prepared`. It reuses `readPreparedWrapper` and its existing
 `sha256(stableJson(prepared))` convention. The common projection has one body
-response slot, no product-image binding, one name and website header token,
-an empty static footer, and a checkout conditional ending in the checkout URL
+response slot, no product-image binding, only literal text plus one name and website header token each,
+an empty static footer, and a conditional containing only literal text and the checkout URL
 on its own final line.
 This parser creates no frame or content: the Admin-owned immutable SHARED
 wrapper revision remains the sole common layout source.
