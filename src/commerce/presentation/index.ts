@@ -23,3 +23,5 @@ export * from "./brand-image.js";
 export * from "./recovery-multipart.js";
 
 export * from "./common-recovery-layout.js";
+
+export * from "./composite-image.js";

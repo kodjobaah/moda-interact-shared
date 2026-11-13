@@ -171,6 +171,7 @@
     "validate:commerce-presentation": "node scripts/validate-commerce-presentation.mjs",
     "validate:commerce-outreach": "node scripts/validate-commerce-outreach.mjs",
     "validate:conversation-product-image-node": "node scripts/validate-conversation-product-image-node.mjs",
+    "validate:recovery-composite": "node scripts/validate-recovery-composite.mjs",
     "validate:recovery-multipart": "node scripts/validate-recovery-multipart.mjs",
     "validate:common-recovery-layout": "node scripts/validate-recovery-multipart.mjs"
   },
