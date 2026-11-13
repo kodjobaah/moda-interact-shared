@@ -39,6 +39,9 @@ test('caption Unicode boundary counts codepoints without truncating logical text
  const plan=build(fixture(provenance,exact));assert.equal(Array.from(plan.body).length,1024);
  assert.throws(()=>build(fixture(provenance,'😀'+exact)));
  const answer='Authored URL https://else.example and divider ──────────';assert.ok(build(fixture(provenance,answer)).body.startsWith(answer));
+ const authored=`Use ${checkoutUrl} as mentioned in the answer`;const same=fixture(provenance,authored),samePlan=build(same);
+ assert.equal(samePlan.body,authored+same.trusted.footerText);
+ assert.deepEqual(parseRecoveryCompositeImagePlan(samePlan,same.trusted,hash),samePlan);
 });
 test('mixed tenants, forged logo roles, absent product field, unknown keys, control and oversize inputs fail',()=>{
  const changes=[{...provenance,shopId:'foreign'},{...provenance,product:{...provenance.product!,shopId:'foreign'}},{...provenance,logo:{...logo,origin:{...logo.origin,role:'COVER_IMAGE'}}},{...provenance,logo:{...logo,contentSha256:'bad'}},{...provenance,product:undefined},{...provenance,headerText:'bad\u0000'},{...provenance,headerText:'x'.repeat(513)},{...provenance,headerText:'a\n'.repeat(7)},{...provenance,extra:true}];
