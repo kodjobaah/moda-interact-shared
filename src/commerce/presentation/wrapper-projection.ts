@@ -2,7 +2,7 @@ import { ConversationProductImageBindingSchema } from "./product-image.js";
 import type { PreparedToken, PreparedWrapper, WrapperVariable } from "./wrapper-contracts.js";
 
 const VARIABLES = new Set<WrapperVariable>([
-  "customer.firstName", "shop.name", "checkout.url", "shopBrand.brandName",
+  "customer.firstName", "shop.name", "shop.websiteUrl", "checkout.url", "shopBrand.brandName",
   "shopBrand.logoUrl", "shopBrand.logoAltText", "shopBrand.logoWidth",
   "shopBrand.logoHeight", "shopBrand.squareLogoUrl", "shopBrand.squareLogoAltText",
   "shopBrand.coverImageUrl",

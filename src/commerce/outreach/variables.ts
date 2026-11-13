@@ -1,3 +1,4 @@
+import { isShopWebsiteUrl } from '../../shop-website-url.js';
 import type { SendableOutreachOffer } from './sendable-offer.js';
 import type { z } from 'zod';
 import { SemanticKeySchema } from './template-contracts.js';
@@ -46,6 +47,11 @@ export class PreparedVariableResolver {
         switch (key) {
             case 'customer.firstName': return boundedText(i.variables.customerFirstName, 200);
             case 'shop.name': return boundedText(i.variables.shopName, 200);
+            case 'shop.websiteUrl': {
+                const value = i.variables.shopWebsiteUrl;
+                if (!isShopWebsiteUrl(value)) throw new BindingUnavailable('BINDING_VALUE_UNAVAILABLE');
+                return value;
+            }
             case 'shop.categoryName': return boundedText(i.variables.shopCategory, 200);
             case 'checkout.url': return i.variables.checkoutUrl;
             case 'checkout.itemsSummary': {

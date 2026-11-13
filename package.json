@@ -1,6 +1,6 @@
 {
   "name": "@modainteract/moda-interact-shared",
-  "version": "5.13.8",
+  "version": "5.13.9",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -171,7 +171,8 @@
     "validate:commerce-presentation": "node scripts/validate-commerce-presentation.mjs",
     "validate:commerce-outreach": "node scripts/validate-commerce-outreach.mjs",
     "validate:conversation-product-image-node": "node scripts/validate-conversation-product-image-node.mjs",
-    "validate:recovery-multipart": "node scripts/validate-recovery-multipart.mjs"
+    "validate:recovery-multipart": "node scripts/validate-recovery-multipart.mjs",
+    "validate:common-recovery-layout": "node scripts/validate-recovery-multipart.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1143.0",
