@@ -8,17 +8,19 @@ import {
 /** Independently re-decode the final *encoded* bytes; neither extensions nor encoder claims suffice. */
 export async function verifyEncodedBrandImage(
   bytes: Buffer, contentType: ShopBrandImageMime,
+  dimensions: Readonly<{width: number; height: number}> = SHOP_BRAND_CANVAS,
 ): Promise<VerifiedBrandImage> {
-  if (!bytes.length || bytes.length >= SHOP_BRAND_MAX_OUTPUT_BYTES ||
+  if (!Number.isSafeInteger(dimensions.width) || !Number.isSafeInteger(dimensions.height) ||
+      dimensions.width <= 0 || dimensions.height <= 0 || dimensions.width * dimensions.height > 40_000_000 || !bytes.length || bytes.length >= SHOP_BRAND_MAX_OUTPUT_BYTES ||
       (contentType !== "image/jpeg" && contentType !== "image/png")) {
     throw new ShopBrandMediaError("OUTPUT_TOO_LARGE");
   }
   try {
-    const actual = await sharp(bytes, { limitInputPixels: SHOP_BRAND_CANVAS.width * SHOP_BRAND_CANVAS.height + 1,
+    const actual = await sharp(bytes, { limitInputPixels: dimensions.width * dimensions.height + 1,
       failOn: "error", animated: false }).metadata();
     const format = contentType === "image/jpeg" ? "jpeg" : "png";
-    if (actual.format !== format || actual.width !== SHOP_BRAND_CANVAS.width ||
-        actual.height !== SHOP_BRAND_CANVAS.height || (actual.pages ?? 1) !== 1 ||
+    if (actual.format !== format || actual.width !== dimensions.width ||
+        actual.height !== dimensions.height || (actual.pages ?? 1) !== 1 ||
         actual.exif || actual.xmp || actual.iptc || actual.icc || actual.orientation && actual.orientation !== 1) {
       throw new ShopBrandMediaError("OUTPUT_VERIFICATION_FAILED");
     }

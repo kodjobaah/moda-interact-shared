@@ -97,7 +97,9 @@ export async function putGuardedImmutableR2Object(input: Readonly<{
   }
   const transport = typeof input.transportOrFactory === "function"
     ? await input.transportOrFactory() : input.transportOrFactory;
+  const active = () => { if (input.signal?.aborted) throw new ShopBrandMediaError("SOURCE_TIMEOUT", true); };
   const head = async (): Promise<HeadObjectCommandOutput | null> => {
+    active();
     try { return input.signal
       ? await transport.head({ Bucket: bucket, Key: objectKey }, input.signal)
       : await transport.head({ Bucket: bucket, Key: objectKey }); }
@@ -105,6 +107,7 @@ export async function putGuardedImmutableR2Object(input: Readonly<{
   };
   let existing = await head();
   if (existing === null) {
+    active();
     try {
       const putInput = {
         Bucket: bucket, Key: objectKey, Body: image.bytes,

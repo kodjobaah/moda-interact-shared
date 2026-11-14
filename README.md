@@ -2629,3 +2629,56 @@ Background retains current brand/product attestation, common-reference selection
 moderation/history using complete logical text, authorization/consent, billing,
 frozen receipts and provider delivery. New readers must be published, adopted
 and deployed with old workers drained before a producer emits this carrier.
+
+### Recovery composite Node renderer and preparer (unreleased)
+
+`commerce/presentation/node` exports `createRecoveryCompositeImageRenderer` and
+`prepareRecoveryCompositeImage`. The renderer consumes separately trusted,
+metadata-free 1125×600 logo/product derivatives with exact input SHA-256 values.
+It contains them within the accepted V1 geometry and paints the full authored
+header literally once. It adds no decorative divider, answer or checkout text.
+Product absence must be explicit; failure of a selected product returns omission,
+never a misleading header-only success. Callers retain full TEXT fallback.
+
+The package explicitly includes `assets/recovery-composite`: official DejaVu
+Sans 2.37, its complete Bitstream Vera/DejaVu/Arev license, a generated 5,918-scalar
+cmap coverage manifest and source/hash/typography provenance. It is not OFL.
+Font SHA-256 is `7da195a74c55bef988d0d48f9508bd5d849425c1770dba5d7bfc6ce9ed848954`;
+license SHA-256 is `7a083b136e64d064794c3419751e5c7dd10d2f64c108fe5ba161eae5e5958a93`.
+Assets stay outside `dist`, survive `tsup clean`, and resolve from the package's
+bounded ancestor chain after bundling. No installed system font is required.
+Missing/tampered files, unsupported scalars or measured overflow cause omission.
+Pango markup is escaped, text stays at fixed DejaVu Sans 44/dpi72 with no autofit,
+shrinking, trimming or application normalization. Encoding is metadata-free white
+JPEG quality86/mozjpeg/4:2:0, verified independently after encoding.
+
+`RECOVERY_COMPOSITE_FONT_ASSET_MANIFEST_SHA256` identifies static packaged assets;
+`RECOVERY_COMPOSITE_RENDER_PROFILE` captures all `sharp.versions`, platform,
+architecture, Node and fixed rendering settings. The runtime-bound
+`RECOVERY_COMPOSITE_FONT_MANIFEST_SHA256` hashes both. Use it as provenance's
+`fontAssetSha256`. Determinism is within the same pinned runtime; host and Alpine
+shaping can differ and therefore receive different render/output identities.
+Freeze the original runtime/manifest and output receipt with delivery evidence.
+Replay preserves the original immutable plan, not a rerender or substitution of
+the current runtime hash; current brand/product/common/control attestation stays
+an independent host responsibility.
+
+The preparer accepts only explicit trusted brand and optional verified-product
+prepared descriptors from the configured public origin, validates identity/key
+and fetched bytes/type/length, then reuses pinned HTTPS, guarded immutable PUT/HEAD
+and exact public GET hash verification. Its single optional-media budget is
+`min(5000ms, originalDeadline-now-1000ms)` across both sources and all later work;
+abort, omission and transport cleanup preserve that envelope. Injectable ports do
+not authorize source/model URLs. Credentials/configuration lookup, database reads,
+authorization and provider sends remain host-owned. Immutable HEAD deduplicates
+writes after rendering; no pre-render cache service is implemented.
+
+For recovery engine opt-in, `RecoveryCompositeMultipartDeliveryPlanSchema` accepts
+existing legacy multipart bytes or exactly one HEADER whose plan is COMPOSITE_IMAGE.
+`parseRecoveryCompositeMultipartDeliveryPlan(raw, {checkoutUrl, composite}, sha256)`
+requires the independent original trusted composite context for that new shape and
+invokes the composite parser; legacy plans delegate to the unchanged old parser.
+`buildRecoveryCompositeMultipartDeliveryPlan` and its digest share that carrier.
+No extra parts/roles/fields/version, composite-plus-product or composite tails are
+allowed. Old published 5.13.10 readers reject the new shape. The original multipart
+schema/parser/digest remain unchanged. Publication and consumer rollout are separate.
