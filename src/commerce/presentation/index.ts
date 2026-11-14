@@ -25,3 +25,5 @@ export * from "./recovery-multipart.js";
 export * from "./common-recovery-layout.js";
 
 export * from "./composite-image.js";
+
+export * from "./composite-recovery.js";
