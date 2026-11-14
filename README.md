@@ -2571,114 +2571,50 @@ status/current identity and source/content hashes, and supply tenant-verified
 saved website/checkout values. Older wrappers and frozen Meta registrations
 without this optional reference retain their original rendering and hashes.
 
-### Trusted recovery composite contract (unreleased)
+### Profile-driven composite V2 (unreleased)
 
-The browser-safe presentation entrypoint additionally exports
-`RecoveryCompositeProvenanceSchema`, `RecoveryPreparedCompositeImageSchema`,
-`RecoveryCompositeImagePlanSchema`, `ConversationCompositeMediaDeliveryPlanSchema`,
-`buildRecoveryCompositeImagePlan`, `parseRecoveryCompositeImagePlan`, and the
-composite plan/render-identity digest functions. `COMPOSITE_IMAGE` is a distinct
-opt-in schemaVersion 1 carrier. Existing TEXT, IMAGE, BRAND_IMAGE and multipart
-validators and digests remain unchanged; published 5.13.10 readers reject this
-new kind. No renderer, producer activation or release is included here.
+V2 accepts a complete immutable `RecoveryCompositeProfile` snapshot and canonical
+SHA from the selected saved common template. Shared does not select that template,
+read an environment/database policy, or supply operational geometry defaults.
+The source AST owns optional `compositeProfile`; deterministic preparation carries
+`compositeProfile` and `compositeProfileSha256`. `readPreparedWrapper` accepts both
+or neither, explicitly verifies the pair, and hashes the entire prepared snapshot.
+The existing common-reference reader propagates it. Absent fields leave old
+prepared values/hashes unchanged; old .11 readers reject the new optional fields.
+Translations must carry the profile unchanged. Hosts enforce immutable source,
+locale and final current-reference authority; no second layout policy is inferred.
 
-V1 uses a white 1125px-wide canvas: a 300px header containing a logo within
-180×180 at (48,60), full canonical header text beside it in the 813×252 box at
-(264,24), including its authored divider, rendered literally exactly once. No separate
-graphic divider or ornament is added. An optional product occupies the
-1125×600 contain box below at (0,300); resulting height is 900, or 300 with
-explicit `product: null`. Assets must not be cropped. Header input is bounded
-to 512 Unicode codepoints and six lines, preserving authored whitespace.
-A renderer must return full-text fallback when text/glyphs cannot fit legibly;
-these bounds do not prove raster fit. No bitmap renderer or font is supplied.
+`RecoveryCompositeProfileSchema` and new V2 wire schemas parse structure only.
+`assertRecoveryCompositeProfileSafety` explicitly checks finite safe integers,
+positive allocated dimensions/font, nonnegative coordinates/spacing, rectangle
+containment in both applicable canvases, and a two-million-pixel output cap.
+A separate conservative text work/allocation guard bounds raw input and Pango
+work, with actual pre-buffer raster dimension checking. Shared does not enforce
+operational size ranges, font/spacing ratios, nonoverlap, logo placement, relative
+output heights or product order. Admin authoring owns those presentation rules,
+defaults, approval and preview; Background owns selected-template eligibility and
+freeze/current-reference checks. Structural validity is never active authority.
 
-Provenance binds the trusted LOGO/SQUARE_LOGO generation/fingerprint and actual
-input byte SHA, optional verified product shop/platform/pair and actual input
-byte SHA, same tenant, exact rendered common header, common-reference SHA,
-immutable V1 layout/renderer identity and `fontAssetSha256`. The latter is the
-SHA-256 of a canonical ordered font-asset manifest including shaping settings;
-the common-reference SHA hashes the complete independently verified canonical
-common reference with `stableJson`, not merely a header string. Changing fixed
-layout/encoding/render behavior requires a new renderer identity. Font fallback
-must be explicit and pinned. Header inputs come only from the verified common
-shop-name/website renderer; no customer, answer or checkout data belongs in the
-reusable bitmap or render identity.
+The profile contains explicit canvas width, header-only/product heights, named
+logo/text/product rectangles, supported bundled fontId, font size and line spacing.
+Every V2 renderer call supplies it: left-logo and top/centered-logo layouts require
+no package edit. V2 uses the same contained assets, escaped literal header, fixed
+DPI72/white/JPEG and no autofit/trim/crop/normalization. It has a geometry-free font
+resource identity, separately bound with profile SHA and actual runtime identity.
+The public .11 artifact remains immutable; its unused fixed composite APIs are removed from this source.
 
-The output key is
-`conversation-composites/v1/{SHA256(shopId)}/{renderIdentitySha256}/{contentSha256}.jpg`.
-Schema checks require the exact trusted origin/key URL, matching key hash suffix,
-JPEG, the product-dependent fixed dimensions and a positive size below 5 MiB.
-The trusted parser also recomputes tenant/render hashes using the supplied
-browser-safe SHA-256 callback. Structural validation does not attest actual
-image bytes, current provenance, public reachability or tenant authorization.
-The Node producer must verify input/output bytes and public delivery separately.
+V2 provenance/prepared image/plan use explicit schemaVersion2 and a separate
+`conversation-composites/v2` namespace. `parseRecoveryCompositeImagePlanV2` binds
+independently supplied profile/provenance/output receipts and exact host-supplied
+caption, answer/footer metadata and independent logical text. It enforces technical caption/resource limits but
+chooses no concatenation, checkout placement, footer policy or URL-count rule.
+The current multipart parser delegates established non-composite branches and
+admits exactly one V2 composite HEADER through the trusted V2 parser.
 
-Hosts supply original, independently verified `headerText` (in provenance),
-`answerText`, `footerText`, complete original `logicalBody`, trusted checkout URL,
-expected provenance/public origin, and a verified renderer/probe output hash/size
-receipt. `body` is exactly `answerText + footerText`; `logicalBody` must equal
-`headerText + answerText + footerText`. Boundaries already own all spacing: the
-builder/parser do not trim, normalize, insert separators, count URLs globally or
-infer equivalence by substring. The footer retains the existing exact trusted
-checkout URL final-line validation. `boundarySha256` binds these exact canonical
-boundaries, caption and logical body; the plan digest additionally binds the
-complete image/provenance metadata. Caption is limited to 1024 Unicode codepoints
-and logical text to the existing 4096 UTF-16-unit bound; text is never truncated.
-
-Background retains current brand/product attestation, common-reference selection,
-moderation/history using complete logical text, authorization/consent, billing,
-frozen receipts and provider delivery. New readers must be published, adopted
-and deployed with old workers drained before a producer emits this carrier.
-
-### Recovery composite Node renderer and preparer (unreleased)
-
-`commerce/presentation/node` exports `createRecoveryCompositeImageRenderer` and
-`prepareRecoveryCompositeImage`. The renderer consumes separately trusted,
-metadata-free 1125×600 logo/product derivatives with exact input SHA-256 values.
-It contains them within the accepted V1 geometry and paints the full authored
-header literally once. It adds no decorative divider, answer or checkout text.
-Product absence must be explicit; failure of a selected product returns omission,
-never a misleading header-only success. Callers retain full TEXT fallback.
-
-The package explicitly includes `assets/recovery-composite`: official DejaVu
-Sans 2.37, its complete Bitstream Vera/DejaVu/Arev license, a generated 5,918-scalar
-cmap coverage manifest and source/hash/typography provenance. It is not OFL.
-Font SHA-256 is `7da195a74c55bef988d0d48f9508bd5d849425c1770dba5d7bfc6ce9ed848954`;
-license SHA-256 is `7a083b136e64d064794c3419751e5c7dd10d2f64c108fe5ba161eae5e5958a93`.
-Assets stay outside `dist`, survive `tsup clean`, and resolve from the package's
-bounded ancestor chain after bundling. No installed system font is required.
-Missing/tampered files, unsupported scalars or measured overflow cause omission.
-Pango markup is escaped, text stays at fixed DejaVu Sans 44/dpi72 with no autofit,
-shrinking, trimming or application normalization. Encoding is metadata-free white
-JPEG quality86/mozjpeg/4:2:0, verified independently after encoding.
-
-`RECOVERY_COMPOSITE_FONT_ASSET_MANIFEST_SHA256` identifies static packaged assets;
-`RECOVERY_COMPOSITE_RENDER_PROFILE` captures all `sharp.versions`, platform,
-architecture, Node and fixed rendering settings. The runtime-bound
-`RECOVERY_COMPOSITE_FONT_MANIFEST_SHA256` hashes both. Use it as provenance's
-`fontAssetSha256`. Determinism is within the same pinned runtime; host and Alpine
-shaping can differ and therefore receive different render/output identities.
-Freeze the original runtime/manifest and output receipt with delivery evidence.
-Replay preserves the original immutable plan, not a rerender or substitution of
-the current runtime hash; current brand/product/common/control attestation stays
-an independent host responsibility.
-
-The preparer accepts only explicit trusted brand and optional verified-product
-prepared descriptors from the configured public origin, validates identity/key
-and fetched bytes/type/length, then reuses pinned HTTPS, guarded immutable PUT/HEAD
-and exact public GET hash verification. Its single optional-media budget is
-`min(5000ms, originalDeadline-now-1000ms)` across both sources and all later work;
-abort, omission and transport cleanup preserve that envelope. Injectable ports do
-not authorize source/model URLs. Credentials/configuration lookup, database reads,
-authorization and provider sends remain host-owned. Immutable HEAD deduplicates
-writes after rendering; no pre-render cache service is implemented.
-
-For recovery engine opt-in, `RecoveryCompositeMultipartDeliveryPlanSchema` accepts
-existing legacy multipart bytes or exactly one HEADER whose plan is COMPOSITE_IMAGE.
-`parseRecoveryCompositeMultipartDeliveryPlan(raw, {checkoutUrl, composite}, sha256)`
-requires the independent original trusted composite context for that new shape and
-invokes the composite parser; legacy plans delegate to the unchanged old parser.
-`buildRecoveryCompositeMultipartDeliveryPlan` and its digest share that carrier.
-No extra parts/roles/fields/version, composite-plus-product or composite tails are
-allowed. Old published 5.13.10 readers reject the new shape. The original multipart
-schema/parser/digest remain unchanged. Publication and consumer rollout are separate.
+Node APIs are `getRecoveryCompositeRuntimeIdentityV2` (synchronous),
+`createRecoveryCompositeImageRendererV2({profile,profileSha256})` and
+`prepareRecoveryCompositeImageV2` with independent profile/hash plus existing
+trusted derivative/R2/deadline fields and V2 provenance. Common raster/font and
+preparation mechanics are reused; Node fallback keeps the original single budget
+and immutable upload/public proof. Missing or tampered profile cannot select a
+fallback policy. No profile/configuration source is chosen inside Shared.

@@ -1,31 +1,21 @@
-import { createHash } from 'node:crypto';
-import { isIP } from 'node:net';
-import { ConversationPreparedBrandImageSchema, type ConversationPreparedBrandImage } from '../brand-image.js';
-import { ConversationPreparedProductImageSchema, type ConversationPreparedProductImage } from '../product-image.js';
-import { RecoveryCompositeProvenanceSchema, RecoveryPreparedCompositeImageSchema, RECOVERY_COMPOSITE_LAYOUT_V1 as layout, digestRecoveryCompositeRenderIdentity, type RecoveryCompositeProvenance, type RecoveryPreparedCompositeImage } from '../composite-image.js';
-import { stableJson } from '../wrapper-projection.js';
-import { createRecoveryCompositeImageRenderer, RecoveryCompositeRenderError, type RecoveryCompositeRenderInput, type RecoveryCompositeRenderedImage } from './composite-renderer.js';
-import { type ShopBrandR2Credentials, type SafeFetcher, type PublicMediaProbe, ShopBrandMediaError } from './contracts.js';
-import { createSafeImageFetcher } from './safe-fetch.js';
-import { createBrandR2S3Transport, putGuardedImmutableR2Object, isValidMediaBucket, type BrandR2Transport } from './r2-writer.js';
-import { createShopBrandPublicMediaProbe } from './public-probe.js';
-import { isPublicIpAddress } from './network-policy.js';
-import { conversationProductObjectKey } from './product-image.js';
-import { verifyEncodedBrandImage } from './metadata-verifier.js';
-
-export type RecoveryCompositePreparationStage = 'CONFIGURATION' | 'SOURCE' | 'TRANSFORM' | 'R2' | 'PUBLIC_PROBE' | 'READY';
-export type RecoveryCompositeOmission = 'CONFIGURATION_UNAVAILABLE' | 'UNSAFE_IMAGE_SOURCE' | 'SOURCE_UNAVAILABLE' | 'SOURCE_IDENTITY_INVALID' | 'FONT_UNAVAILABLE' | 'UNSUPPORTED_HEADER' | 'HEADER_OVERFLOW' | 'IMAGE_TRANSFORM_FAILED' | 'R2_UNAVAILABLE' | 'PUBLIC_IMAGE_UNAVAILABLE' | 'MEDIA_DEADLINE';
-export type RecoveryCompositePreparationInput = {
-  provenance: RecoveryCompositeProvenance; logo: ConversationPreparedBrandImage;
-  product: {image: ConversationPreparedProductImage; platform:'SHOPIFY'|'WOOCOMMERCE'} | null;
-  publicOrigin:string; bucketName:string; r2:ShopBrandR2Credentials; signal?:AbortSignal; deadlineAt?:number;
-};
-export type RecoveryCompositePreparationDependencies = {
-  fetcher?:SafeFetcher; renderer?:{render(input:RecoveryCompositeRenderInput):Promise<RecoveryCompositeRenderedImage>};
-  transportFactory?:(credentials:ShopBrandR2Credentials)=>BrandR2Transport; probe?:PublicMediaProbe; now?:()=>number;
-};
-export type RecoveryCompositePreparation = {kind:'READY';image:RecoveryPreparedCompositeImage;stage:'READY';durationMs:number;textBounds:Readonly<{width:number;height:number}>}
-  | {kind:'OMITTED';reason:RecoveryCompositeOmission;stage:RecoveryCompositePreparationStage;durationMs:number};
+import {createHash} from 'node:crypto';
+import {isIP} from 'node:net';
+import {ConversationPreparedBrandImageSchema,type ConversationBrandImageOrigin,type ConversationPreparedBrandImage} from '../brand-image.js';
+import {ConversationPreparedProductImageSchema,type ConversationPreparedProductImage} from '../product-image.js';
+import {stableJson} from '../wrapper-projection.js';
+import type {VerifiedBrandImage} from './contracts.js';
+import {ShopBrandMediaError} from './contracts.js';
+import {RecoveryCompositeRenderError} from './composite-render-errors.js';
+import {createSafeImageFetcher} from './safe-fetch.js';
+import {createBrandR2S3Transport,putGuardedImmutableR2Object,isValidMediaBucket,type BrandR2Transport} from './r2-writer.js';
+import {createShopBrandPublicMediaProbe} from './public-probe.js';
+import {isPublicIpAddress} from './network-policy.js';
+import {verifyEncodedBrandImage} from './metadata-verifier.js';
+import type {RecoveryCompositePreparationInput,RecoveryCompositePreparationDependencies,RecoveryCompositePreparationStage,RecoveryCompositeOmission} from './composite-preparation-types.js';
+export type CompositeCoreProvenance={shopId:string;logo:{origin:{kind:string;shopId:string;shopDomain:string;role:string;sourceGeneration:number;sourceFingerprint:string};contentSha256:string};product:{shopId:string;platform:string;productId:string;variantId:string|null;contentSha256:string}|null};
+export type CompositeCoreRendered={image:VerifiedBrandImage;textBounds:Readonly<{width:number;height:number}>};
+export type CompositeCoreResult<I>={kind:'READY';image:I;stage:'READY';durationMs:number;textBounds:Readonly<{width:number;height:number}>}|{kind:'OMITTED';reason:RecoveryCompositeOmission;stage:RecoveryCompositePreparationStage;durationMs:number};
+export type CompositeCoreStrategy<P,R,I>={namespace:'v2';parseProvenance(raw:unknown):P;render(input:{provenance:P;logoBytes:Buffer;productBytes:Buffer|null;signal?:AbortSignal}):Promise<R>;dimensions(p:P):{width:number;height:number};textLimits(p:P):{width:number;height:number};matches(p:P,rendered:R):boolean;renderIdentity(p:P):string;prepareOutput(raw:unknown):I;parseLogo(raw:unknown):import('../brand-image.js').ConversationPreparedBrandImage;parseProduct(raw:unknown):ConversationPreparedProductImage;productKey(p:CompositeCoreProvenance['product']&{},image:ConversationPreparedProductImage):string};
 const hash=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
 class Deadline extends Error {}
 function bounded<T>(operation:()=>Promise<T>,signal:AbortSignal):Promise<T> {
@@ -43,11 +33,10 @@ function configuredOrigin(value:string):string|null {
     return url.origin;
   }catch{return null;}
 }
-/** One optional attempt across BOTH sources, rendering, immutable upload and public GET proof; no host policy lookup. */
-export async function prepareRecoveryCompositeImage(input:RecoveryCompositePreparationInput,deps:RecoveryCompositePreparationDependencies={}):Promise<RecoveryCompositePreparation> {
-  const now=deps.now??Date.now,start=now();let stage:RecoveryCompositePreparationStage='CONFIGURATION';
+export async function prepareCompositeImageCore<P extends CompositeCoreProvenance,R extends CompositeCoreRendered,I extends {publicUrl:string}>(input:Omit<RecoveryCompositePreparationInput,'provenance'>&{provenance:P},deps:Pick<RecoveryCompositePreparationDependencies,'fetcher'|'transportFactory'|'probe'|'now'>,strategy:CompositeCoreStrategy<P,R,I>,startedAt?:number):Promise<CompositeCoreResult<I>> {
+  const now=deps.now??Date.now,start=startedAt??now();let stage:RecoveryCompositePreparationStage='CONFIGURATION';
   const duration=()=>{const elapsed=now()-start;return Number.isFinite(elapsed)?Math.max(0,Math.min(5000,elapsed)):0;};
-  const omitted=(reason:RecoveryCompositeOmission):RecoveryCompositePreparation=>({kind:'OMITTED',reason,stage,durationMs:duration()});
+  const omitted=(reason:RecoveryCompositeOmission):CompositeCoreResult<I>=>({kind:'OMITTED',reason,stage,durationMs:duration()});
   const budget=input.deadlineAt===undefined?5000:Math.min(5000,input.deadlineAt-start-1000);
   if(!Number.isFinite(start)||!Number.isFinite(budget)||budget<=0||input.signal?.aborted)return omitted('MEDIA_DEADLINE');
   const origin=configuredOrigin(input.publicOrigin);
@@ -55,16 +44,21 @@ export async function prepareRecoveryCompositeImage(input:RecoveryCompositePrepa
     const endpoint=new URL(input.r2.endpoint);
     if(!origin||!isValidMediaBucket(input.bucketName)||!input.r2.accessKeyId||!input.r2.secretAccessKey||endpoint.protocol!=='https:'||endpoint.username||endpoint.password||endpoint.search||endpoint.hash)return omitted('CONFIGURATION_UNAVAILABLE');
   }catch{return omitted('CONFIGURATION_UNAVAILABLE');}
-  const provenance=RecoveryCompositeProvenanceSchema.safeParse(input.provenance),logo=ConversationPreparedBrandImageSchema.safeParse(input.logo);
-  if(!provenance.success||!logo.success)return omitted('UNSAFE_IMAGE_SOURCE');
+  let parsed:P;try{parsed=strategy.parseProvenance(input.provenance);}catch{return omitted('UNSAFE_IMAGE_SOURCE');}
+  const provenance={data:parsed};
+  let logo:ReturnType<typeof ConversationPreparedBrandImageSchema.safeParse>;
+  try{logo={success:true,data:strategy.parseLogo(input.logo)};}catch{return omitted('UNSAFE_IMAGE_SOURCE');}
+  if(!logo.success)return omitted('UNSAFE_IMAGE_SOURCE');
   if(stableJson(logo.data.origin)!==stableJson(provenance.data.logo.origin)||logo.data.contentSha256!==provenance.data.logo.contentSha256||logo.data.publicOrigin!==origin)return omitted('SOURCE_IDENTITY_INVALID');
   let product:ConversationPreparedProductImage|null=null;
   if(provenance.data.product===null) {if(input.product!==null)return omitted('SOURCE_IDENTITY_INVALID');}
   else {
     if(!input.product)return omitted('SOURCE_IDENTITY_INVALID');
-    const p=ConversationPreparedProductImageSchema.safeParse(input.product.image),expected=provenance.data.product;
+    let p:ReturnType<typeof ConversationPreparedProductImageSchema.safeParse>;
+    try{p={success:true,data:strategy.parseProduct(input.product.image)};}catch{return omitted('SOURCE_IDENTITY_INVALID');}
+    const expected=provenance.data.product;
     if(!p.success||input.product.platform!==expected.platform||p.data.shopId!==expected.shopId||p.data.productId!==expected.productId||p.data.variantId!==expected.variantId||p.data.contentSha256!==expected.contentSha256)return omitted('SOURCE_IDENTITY_INVALID');
-    const expectedKey=conversationProductObjectKey({kind:'SOURCE',shopId:expected.shopId,platform:expected.platform,productId:expected.productId,variantId:expected.variantId,sourceUrl:p.data.publicUrl},expected.contentSha256);
+    const expectedKey=strategy.productKey(expected,p.data);
     if(p.data.objectKey!==expectedKey||p.data.publicUrl!==`${origin}/${expectedKey}`)return omitted('SOURCE_IDENTITY_INVALID');
     product=p.data;
   }
@@ -81,14 +75,14 @@ export async function prepareRecoveryCompositeImage(input:RecoveryCompositePrepa
     };
     const logoBytes=await fetchSource(logo.data);check();
     const productBytes=product?await fetchSource(product):null;check();stage='TRANSFORM';
-    const rendered=await bounded(()=>(deps.renderer??createRecoveryCompositeImageRenderer()).render({provenance:provenance.data,logoBytes,productBytes,signal:controller.signal}),controller.signal);check();
+    const rendered=await bounded(()=>strategy.render({provenance:provenance.data,logoBytes,productBytes,signal:controller.signal}),controller.signal);check();
     // Re-decode final encoded output even when a host injects a renderer; preserve the old verifier default.
-    const dimensions={width:1125,height:product?900:300};
+    const dimensions=strategy.dimensions(provenance.data),limits=strategy.textLimits(provenance.data);
     const verified=await bounded(()=>verifyEncodedBrandImage(rendered.image.bytes,'image/jpeg',dimensions),controller.signal);check();
-    if(!Number.isSafeInteger(rendered.textBounds.width)||!Number.isSafeInteger(rendered.textBounds.height)||rendered.textBounds.width<=0||rendered.textBounds.height<=0||rendered.textBounds.width>layout.textWidth||rendered.textBounds.height>layout.textHeight||rendered.image.contentSha256!==verified.contentSha256||rendered.image.sizeBytes!==verified.sizeBytes||rendered.image.contentType!==verified.contentType||rendered.fontAssetSha256!==provenance.data.fontAssetSha256)throw new RecoveryCompositeRenderError('IMAGE_TRANSFORM_FAILED');
-    const tenantSha256=hash(provenance.data.shopId),renderIdentitySha256=digestRecoveryCompositeRenderIdentity(provenance.data,hash);
-    const objectKey=`conversation-composites/v1/${tenantSha256}/${renderIdentitySha256}/${verified.contentSha256}.jpg`;
-    const prepared=RecoveryPreparedCompositeImageSchema.parse({schemaVersion:1,provenance:provenance.data,tenantSha256,renderIdentitySha256,publicOrigin:origin,publicUrl:`${origin}/${objectKey}`,objectKey,contentSha256:verified.contentSha256,contentType:verified.contentType,byteLength:verified.sizeBytes,width:verified.width,height:verified.height});
+    if(!Number.isSafeInteger(rendered.textBounds.width)||!Number.isSafeInteger(rendered.textBounds.height)||rendered.textBounds.width<=0||rendered.textBounds.height<=0||rendered.textBounds.width>limits.width||rendered.textBounds.height>limits.height||rendered.image.contentSha256!==verified.contentSha256||rendered.image.sizeBytes!==verified.sizeBytes||rendered.image.contentType!==verified.contentType||!strategy.matches(provenance.data,rendered))throw new RecoveryCompositeRenderError('IMAGE_TRANSFORM_FAILED');
+    const tenantSha256=hash(provenance.data.shopId),renderIdentitySha256=strategy.renderIdentity(provenance.data);
+    const objectKey=`conversation-composites/${strategy.namespace}/${tenantSha256}/${renderIdentitySha256}/${verified.contentSha256}.jpg`;
+    const prepared=strategy.prepareOutput({schemaVersion:1,provenance:provenance.data,tenantSha256,renderIdentitySha256,publicOrigin:origin,publicUrl:`${origin}/${objectKey}`,objectKey,contentSha256:verified.contentSha256,contentType:verified.contentType,byteLength:verified.sizeBytes,width:verified.width,height:verified.height});
     stage='R2';transport=(deps.transportFactory??createBrandR2S3Transport)(input.r2);check();
     await bounded(()=>putGuardedImmutableR2Object({transportOrFactory:transport!,bucket:input.bucketName,objectKey,image:verified,expectedDimensions:dimensions,acceptsKey:key=>key===objectKey,signal:controller.signal}),controller.signal);check();
     stage='PUBLIC_PROBE';const probe=deps.probe??createShopBrandPublicMediaProbe(createSafeImageFetcher({maxRedirects:0,maxBytes:5*1024*1024-1}));
