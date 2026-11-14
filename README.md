@@ -2558,10 +2558,13 @@ the renderer never derives it from a checkout URL or overloads `shop.name`.
 `readCommonRecoveryLayoutReference(raw, sha256)`. The exact reference contains
 `schemaVersion`, `definitionId`, `sourceHash`, `localeId`, `languageTag`,
 `contentHash` and `prepared`. It reuses `readPreparedWrapper` and its existing
-`sha256(stableJson(prepared))` convention. The common projection has one body
-response slot, no product-image binding, only literal text plus one name and website header token each,
-an empty static footer, and a conditional containing only literal text and the checkout URL
-on its own final line.
+`sha256(stableJson(prepared))` convention. The common projection has one exact body response slot and no product-image
+binding. Supported token/conditional structure, bounded prepared data and canonical
+hashes are verified without requiring name/website header tokens, an empty footer,
+checkout uniqueness or checkout-last formatting. The existing prepared-token
+context grammar remains unchanged. Website and other supported variables can be
+supplied in technically valid alternate sections, including the existing checkout
+conditional; Admin and Background own placement and mandatory-content policy.
 This parser creates no frame or content: the Admin-owned immutable SHARED
 wrapper revision remains the sole common layout source.
 
