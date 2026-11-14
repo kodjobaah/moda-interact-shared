@@ -35,3 +35,12 @@ test('native SDK refuses orphan or unanswered transcript before invoking the pro
  await assert.rejects(invoker.invoke({...base,toolTranscript:[],messages:[{tool:'read_product',result}]},new AbortController().signal));
  assert.equal(calls,0);
 });
+test('actual SDK plaintext repair keeps exact assistant text then fixed system feedback without fake calls or a customer message',async()=>{
+ const original=globalThis.fetch;let body:any;globalThis.fetch=async(_url,options)=>{body=JSON.parse(options!.body as string);return new Response(JSON.stringify(completion([],'Done')),{headers:{'Content-Type':'application/json'}});};
+ try{
+  const invoker=createOpenRouterInvoker({provider:'openai',providerModelId:'fixture',configurationSchemaVersion:1,configuration:{},credential:'offline-fixture'});
+  const toolTranscript=[{role:'assistant',text:'Actual unsuccessful completion',calls:[]},{role:'runner-feedback',reasonCode:'FINAL_PRODUCT_SELECTION_MISSING'}] as unknown as CurrentTurnTransportMessage[];
+  await invoker.invoke({...base,toolTranscript,requiredToolName:'finalResponse',tools:[{name:'finalResponse',description:'Final',inputSchema:{type:'object',properties:{},additionalProperties:false}}]},new AbortController().signal);
+  const tail=body.messages.slice(-2);assert.deepEqual(tail.map((m:any)=>m.role),['assistant','system']);assert.equal(tail[0].content,'Actual unsuccessful completion');assert.ok(!tail[0].tool_calls?.length);assert.match(tail[1].content,/FINAL_PRODUCT_SELECTION_MISSING/);assert.match(tail[1].content,/mechanical/);assert.ok(!tail[1].content.includes('Actual unsuccessful completion'));assert.equal(body.tool_choice.function.name,'finalResponse');assert.equal(body.messages.filter((m:any)=>m.role==='user'&&m.content==='A different current product question').length,1);
+ }finally{globalThis.fetch=original;}
+});

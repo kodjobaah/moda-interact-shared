@@ -1,4 +1,4 @@
-import {appendCurrentTurnTool,type CurrentTurnToolPayload} from '../../tool-transcript.js';
+import {appendCurrentTurnTool,appendCurrentTurnRunnerFeedback,type CurrentTurnToolPayload} from '../../tool-transcript.js';
 import { hasCommerceAcceptedProductSelection } from "../../../recommendation-selection.js";
 import { hasObservedProducts, productSelectionFields } from "../../product-selection.js";
 import { RunnerFailure } from "../../failure.js";
@@ -12,8 +12,12 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
   return async (state: CommerceTurnGraphStateValue):Promise<Partial<CommerceTurnGraphStateValue>> => {
     if (!state.pendingStep)
       throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "MODEL_RESULT_MISSING" });
-    const withOutcome=(payload:CurrentTurnToolPayload)=>execution.input.toolProtocol==='native'&&state.pendingStep!.calls.length===1
-      ? {toolTranscript:appendCurrentTurnTool(state.toolTranscript,state.pendingStep!.calls[0]!,payload)}:{};
+    const withOutcome=(payload:CurrentTurnToolPayload)=>{
+      if(execution.input.toolProtocol!=='native')return {};
+      if(state.pendingStep!.calls.length===1)return {toolTranscript:appendCurrentTurnTool(state.toolTranscript,state.pendingStep!.calls[0]!,payload)};
+      if(payload.kind==='runner-feedback'&&(payload.reasonCode==='FINAL_SCHEMA_INVALID'||payload.reasonCode==='FINAL_PRODUCT_SELECTION_MISSING'))return {toolTranscript:appendCurrentTurnRunnerFeedback(state.toolTranscript,{reasonCode:payload.reasonCode,...(payload.issuePaths===undefined?{}:{issuePaths:payload.issuePaths})})};
+      return {};
+    };
     let validationPhase: "schema" | "selection" | "observations" = "schema";
     try {
       // Natural text may finish a turn, but cannot override mandatory referral

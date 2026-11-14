@@ -2634,6 +2634,10 @@ before model work. Existing custom/offline invokers may omit the option.
 nonblank IDs unique throughout the current turn; none are generated, normalized
 or derived from names/indexes. The JSON-only `CurrentTurnTransportMessage` records
 assistant text/calls and exactly one matching terminal tool outcome per call.
+A distinct `runner-feedback` row acknowledges actual plain-text validation repair
+without a fake call ID; the SDK emits fixed host-authored SystemMessage feedback
+after the exact assistant text. Only existing validator reasons/allowlisted issue
+paths are included; model/customer content is never promoted to system text.
 `readCurrentTurnTransportTranscript` rejects malformed, unanswered, mismatched or
 reused IDs. The technical ceiling is 1 MiB with no truncation; snapshots are copied
 and frozen. Native arguments/results retain their canonical values. Provider

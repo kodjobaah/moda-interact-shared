@@ -1,4 +1,4 @@
-import {readCurrentTurnTransportTranscript,assertCurrentTurnTransportObservations,isNativeToolCallId,nativeToolPayloadContent} from '../runner/tool-transcript.js';
+import {readCurrentTurnTransportTranscript,assertCurrentTurnTransportObservations,isNativeToolCallId,nativeToolPayloadContent,nativeRunnerFeedbackContent} from '../runner/tool-transcript.js';
 import { prepareCurrentCustomerMessages, CURRENT_CUSTOMER_MESSAGES_INSTRUCTION } from "../current-customer-messages.js";
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from "@langchain/core/messages";
 import { ChatOpenRouter, OpenRouterError } from "@langchain/openrouter";
@@ -174,7 +174,8 @@ function requestMessages(request: ModelRequest) {
     let transcript;try{transcript=readCurrentTurnTransportTranscript(request.toolTranscript);assertCurrentTurnTransportObservations(transcript,request.messages);}catch{throw unavailable({stage:'request',reason:'MODEL_REQUEST_TOOL_RESULT_INVALID'});}
     for(const row of transcript){
       if(row.role==='assistant')messages.push(new AIMessage({content:row.text??'',tool_calls:row.calls.map(call=>({id:call.id,name:call.name,args:call.arguments,type:'tool_call' as const}))}));
-      else messages.push(new ToolMessage({tool_call_id:row.callId,name:row.name,content:nativeToolPayloadContent(row.payload,row.name)}));
+      else if(row.role==='tool')messages.push(new ToolMessage({tool_call_id:row.callId,name:row.name,content:nativeToolPayloadContent(row.payload,row.name)}));
+      else messages.push(new SystemMessage(nativeRunnerFeedbackContent(row)));
     }
     return messages;
   }

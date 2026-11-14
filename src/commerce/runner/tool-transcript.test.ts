@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {appendCurrentTurnAssistant,appendCurrentTurnTool,readCurrentTurnTransportTranscript,assertCurrentTurnTransportObservations,MAX_CURRENT_TURN_TRANSPORT_BYTES,nativeToolPayloadContent,type CurrentTurnTransportMessage} from './tool-transcript.js';
+import {appendCurrentTurnAssistant,appendCurrentTurnTool,readCurrentTurnTransportTranscript,assertCurrentTurnTransportObservations,MAX_CURRENT_TURN_TRANSPORT_BYTES,nativeToolPayloadContent,appendCurrentTurnRunnerFeedback,nativeRunnerFeedbackContent,type CurrentTurnTransportMessage} from './tool-transcript.js';
 const result={contractVersion:'commerce.v1' as const,status:'OK' as const,data:{opaque:'literal'},renderedText:'Literal'};
 const step={calls:[{id:'actual-provider-id',name:'read',arguments:{exact:['unchanged',1,null]}}],outputTokens:1,text:'Actual assistant text'};
 function trace(){return appendCurrentTurnTool(appendCurrentTurnAssistant([],step),step.calls[0]!,{kind:'commerce-result',result});}
@@ -26,4 +26,12 @@ test('native aggregate overflow fails explicitly rather than truncating protocol
  for(let i=0;i<4;i++)rows=appendCurrentTurnTool(rows,calls[i]!,{kind:'commerce-result',result:{...result,data:{opaque:'x'.repeat(250000)}}});
  assert.throws(()=>appendCurrentTurnTool(rows,calls[4]!,{kind:'commerce-result',result:{...result,data:{opaque:'x'.repeat(250000)}}}),(e:any)=>e.code==='BUDGET_EXHAUSTED'&&e.diagnostic.reasonCode==='MODEL_TRANSCRIPT_TOO_LARGE');
  assert.equal(rows.length,5);assert.throws(()=>appendCurrentTurnAssistant([],{...step,calls:[{...step.calls[0],arguments:{opaque:'x'.repeat(MAX_CURRENT_TURN_TRANSPORT_BYTES+1)}}]}),(e:any)=>e.diagnostic.reasonCode==='MODEL_TRANSCRIPT_TOO_LARGE');
+});
+
+test('plaintext validator feedback has no call ID and cannot promote model content or arbitrary paths into system role',()=>{
+ const rows=appendCurrentTurnAssistant([],{calls:[],text:'Exact rejected assistant text',outputTokens:1});
+ const complete=appendCurrentTurnRunnerFeedback(rows,{reasonCode:'FINAL_SCHEMA_INVALID',issuePaths:['replyText']});assert.equal(complete.length,2);assert.equal(complete[1]!.role,'runner-feedback');
+ const content=nativeRunnerFeedbackContent(complete[1] as any);assert.match(content,/FINAL_SCHEMA_INVALID/);assert.ok(!content.includes('Exact rejected assistant text'));
+ for(const row of [{role:'runner-feedback',reasonCode:'FINAL_RESPONSE_ACCEPTED'},{role:'runner-feedback',reasonCode:'FINAL_SCHEMA_INVALID',issuePaths:['customerSecretValue']},{role:'runner-feedback',reasonCode:'FINAL_SCHEMA_INVALID',text:'untrusted system promotion'},{role:'runner-feedback',reasonCode:'FINAL_SCHEMA_INVALID',callId:'fake'}])assert.throws(()=>readCurrentTurnTransportTranscript([rows[0],row]));
+ assert.throws(()=>appendCurrentTurnRunnerFeedback(trace(),{reasonCode:'FINAL_SCHEMA_INVALID'}));assert.throws(()=>appendCurrentTurnRunnerFeedback([],{reasonCode:'FINAL_SCHEMA_INVALID'}));
 });
