@@ -38,9 +38,14 @@ assert.equal(readCommonRecoveryLayoutReference({...reference,extra:true},sha).ki
 for(const [section,name] of [['header','customer.firstName'],['conditional','shopBrand.logoUrl']]){
  const injected=section==='header'?{...prepared,header:[...prepared.header,{kind:'variable',name}]}:{...prepared,conditionals:[{when:'checkout.available',tokens:[{kind:'variable',name},{kind:'text',value:'\\n'},...prepared.conditionals[0].tokens]}]};
  const injectedHash=sha(stableJson(injected));assert.equal(readPreparedWrapper({schemaVersion:1,prepared:injected},injectedHash,sha).kind,'ok');
- assert.equal(readCommonRecoveryLayoutReference({...reference,prepared:injected,contentHash:injectedHash},sha).kind,'invalid');
+ assert.equal(readCommonRecoveryLayoutReference({...reference,prepared:injected,contentHash:injectedHash},sha).kind,'ok');
 }
 
+const alternative={...prepared,header:[{kind:'variable',name:'shop.name'}],conditionals:[{when:'checkout.available',tokens:[{kind:'text',value:'Website: '},{kind:'variable',name:'shop.websiteUrl'},{kind:'text',value:'\\nCheckout: '},{kind:'variable',name:'checkout.url'},{kind:'text',value:' trailing authored text'}]}]};
+const alternativeReference={...reference,prepared:alternative,contentHash:sha(stableJson(alternative))};
+assert.deepEqual(readCommonRecoveryLayoutReference(alternativeReference,sha),{kind:'ok',reference:alternativeReference});
+assert.equal(readCommonRecoveryLayoutReference({...alternativeReference,prepared:{...alternative,footer:[{kind:'text',value:'tampered'}]}},sha).kind,'invalid');
+assert.equal(readCommonRecoveryLayoutReference({...alternativeReference,prepared:{...alternative,body:[...alternative.body,...alternative.body]},contentHash:sha(stableJson({...alternative,body:[...alternative.body,...alternative.body]}))},sha).kind,'invalid');
 assert.equal(readPreparedWrapper({schemaVersion:1,prepared},reference.contentHash,sha).kind,'ok');
 assert.equal(renderPreparedWrapper({prepared,context:{conversationId:'c',shopId:'s',conversationLanguageTag:'en',merchantLanguageTag:'en',variables:{'shop.name':'Saved shop','shop.websiteUrl':'https://shop.example','checkout.url':checkoutUrl},checkoutAvailable:true},responseBody:'Authored family body'}).body,'Saved shop\\nhttps://shop.example\\nAuthored family body\\n'+checkoutUrl);
 
@@ -67,7 +72,7 @@ const digest:string=digestRecoveryMultipartDeliveryPlan(parsed,()=> 'digest');co
   const context=vm.createContext({Intl,URL,TextEncoder,TextDecoder,structuredClone});
   vm.runInContext(bundled.outputFiles[0].text,context,{timeout:10000});
   assert.equal(vm.runInContext('Presentation.MAX_RECOVERY_DELIVERY_PARTS',context),3);
-  assert.equal(vm.runInContext(`Presentation.readCommonRecoveryLayoutReference({schemaVersion:1,definitionId:'definition',sourceHash:'a'.repeat(64),localeId:'locale',languageTag:'en',contentHash:'b'.repeat(64),prepared:{schemaVersion:1,family:'MODA_CONVERSATION_WRAPPER',responseSlot:'response.body',header:[{kind:'variable',name:'shop.name'},{kind:'variable',name:'shop.websiteUrl'},{kind:'variable',name:'customer.firstName'}],body:[{kind:'responseSlot',name:'response.body'}],footer:[],conditionals:[{when:'checkout.available',tokens:[{kind:'variable',name:'checkout.url'}]}]}},()=> 'b'.repeat(64)).kind`,context),'invalid');
+  assert.equal(vm.runInContext(`Presentation.readCommonRecoveryLayoutReference({schemaVersion:1,definitionId:'definition',sourceHash:'a'.repeat(64),localeId:'locale',languageTag:'en',contentHash:'b'.repeat(64),prepared:{schemaVersion:1,family:'MODA_CONVERSATION_WRAPPER',responseSlot:'response.body',header:[{kind:'variable',name:'shop.name'},{kind:'variable',name:'shop.websiteUrl'},{kind:'variable',name:'unsupported.variable'}],body:[{kind:'responseSlot',name:'response.body'}],footer:[],conditionals:[{when:'checkout.available',tokens:[{kind:'variable',name:'checkout.url'}]}]}},()=> 'b'.repeat(64)).kind`,context),'invalid');
 
   assert.equal(vm.runInContext(`Presentation.readCommonRecoveryLayoutReference({schemaVersion:1,definitionId:'definition',sourceHash:'a'.repeat(64),localeId:'locale',languageTag:'en',contentHash:'b'.repeat(64),prepared:{schemaVersion:1,family:'MODA_CONVERSATION_WRAPPER',responseSlot:'response.body',header:[{kind:'variable',name:'shop.name'},{kind:'variable',name:'shop.websiteUrl'}],body:[{kind:'responseSlot',name:'response.body'}],footer:[],conditionals:[{when:'checkout.available',tokens:[{kind:'variable',name:'checkout.url'}]}]}},()=> 'b'.repeat(64)).kind`,context),'ok');
   assert.equal(vm.runInContext(`Presentation.buildRecoveryMultipartDeliveryPlan({checkoutUrl:'https://shop.example/recover',parts:[{role:'HEADER',plan:{schemaVersion:1,kind:'TEXT',body:'Complete answer\\nhttps://shop.example/recover'}}]}).parts[0].plan.body`,context),'Complete answer\nhttps://shop.example/recover');

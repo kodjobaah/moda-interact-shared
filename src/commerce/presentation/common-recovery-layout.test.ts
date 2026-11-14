@@ -20,49 +20,52 @@ test('reference envelope is exact, bounded, canonical and hash checked',()=>{
  assert.deepEqual(readCommonRecoveryLayoutReference({...ref(),prepared:{...prepared,header:[{kind:'text',value:'Tampered'}]}},sha),{kind:'invalid'});
  assert.deepEqual(readCommonRecoveryLayoutReference(ref(),()=>{throw Error('digest unavailable')}),{kind:'invalid'});
 });
-test('common projection requires exact body slot, separate media, one name/site header and checkout URL last',()=>{
+test('common projection keeps only the separate-media frame and exact single response slot',()=>{
  const invalids:unknown[]=[
   {...prepared,family:'META_RECOVERY'},
+  {...prepared,body:[]},
   {...prepared,body:[{kind:'text',value:'extra'},...prepared.body]},
+  {...prepared,body:[...prepared.body,...prepared.body]},
+  {...prepared,header:[{kind:'responseSlot',name:'response.body'}]},
+  {...prepared,footer:[{kind:'responseSlot',name:'response.body'}]},
   {...prepared,productImage:{variable:'response.productImage',placement:'BEFORE_BODY',optional:true}},
-  {...prepared,header:prepared.header.filter(t=>t.kind!=='variable'||t.name!=='shop.name')},
-  {...prepared,header:prepared.header.filter(t=>t.kind!=='variable'||t.name!=='shop.websiteUrl')},
-  {...prepared,header:[...prepared.header,{kind:'variable',name:'shop.name'}]},
-  {...prepared,header:[...prepared.header,{kind:'variable',name:'shop.websiteUrl'}]},
-  {...prepared,footer:[{kind:'text',value:'after checkout'}]},
-  {...prepared,conditionals:[]},
-  {...prepared,conditionals:[{when:'checkout.available',tokens:[{kind:'text',value:'No URL'}]}]},
-  {...prepared,conditionals:[{when:'checkout.available',tokens:[{kind:'text',value:'Checkout: '},{kind:'variable',name:'checkout.url'}]}]},
-  {...prepared,conditionals:[{when:'checkout.available',tokens:[{kind:'variable',name:'checkout.url'},{kind:'text',value:'after URL'}]}]},
-  {...prepared,conditionals:[{when:'checkout.available',tokens:[{kind:'variable',name:'checkout.url'},{kind:'variable',name:'checkout.url'}]}]},
+  {...prepared,header:[{kind:'variable',name:'unsupported.variable'}]},
+  {...prepared,header:[{kind:'text',value:'{{shop.name}}'}]},
+  {...prepared,header:Array.from({length:81},()=>({kind:'text',value:''}))},
+  {...prepared,header:[{kind:'text',value:'x'.repeat(1501)}]},
+  {...prepared,conditionals:[...prepared.conditionals,...prepared.conditionals]},
+  {...prepared,conditionals:[{when:'unsupported.condition',tokens:[]}]},
  ];
  for(const value of invalids)assert.deepEqual(readCommonRecoveryLayoutReference(ref(value),sha),{kind:'invalid'},JSON.stringify(value));
 });
-test('ordinary old wrapper projections remain valid without being silently upgraded to a common reference',()=>{
- const legacy={...prepared,header:[{kind:'text' as const,value:'Legacy header'}],conditionals:[]};
- assert.equal(readPreparedWrapper({schemaVersion:1,prepared:legacy},sha(stableJson(legacy)),sha).kind,'ok');
- assert.deepEqual(readCommonRecoveryLayoutReference(ref(legacy),sha),{kind:'invalid'});
- assert.equal(readCommonRecoveryLayoutReference({...ref(),sourceHash:'b'.repeat(64),definitionId:'other-definition'},sha).kind,'ok'); // Host re-read, not the parser, establishes selected-source authority.
+test('alternative name/website/footer/checkout formatting is snapshot data, never Shared placement policy',()=>{
+ const alternatives:PreparedWrapper[]=[
+  {...prepared,header:[]},
+  {...prepared,header:[{kind:'text',value:'Authored header'}],footer:[{kind:'variable',name:'shop.name'},{kind:'variable',name:'shop.websiteUrl'}],conditionals:[]},
+  {...prepared,header:[{kind:'variable',name:'shop.name'},{kind:'variable',name:'shop.name'}],footer:[{kind:'text',value:'Authored footer'}]},
+  {...prepared,header:[{kind:'variable',name:'shop.name'}],conditionals:[{when:'checkout.available',tokens:[{kind:'text',value:'Website: '},{kind:'variable',name:'shop.websiteUrl'},{kind:'text',value:'\nCheckout: '},{kind:'variable',name:'checkout.url'}]}]},
+  {...prepared,conditionals:[]},
+  {...prepared,conditionals:[{when:'checkout.available',tokens:[{kind:'text',value:'No URL selected'}]}]},
+  {...prepared,conditionals:[{when:'checkout.available',tokens:[{kind:'text',value:'Checkout: '},{kind:'variable',name:'checkout.url'},{kind:'text',value:' Authored trailing text'}]}]},
+  {...prepared,conditionals:[{when:'checkout.available',tokens:[{kind:'variable',name:'checkout.url'},{kind:'variable',name:'checkout.url'}]}]},
+ ];
+ for(const p of alternatives){const input=ref(p),before=stableJson(input),read=readCommonRecoveryLayoutReference(input,sha);assert.equal(read.kind,'ok');if(read.kind==='ok')assert.deepEqual(read.reference,input);assert.equal(stableJson(input),before);}
+ const p=alternatives[3]!;const read=readCommonRecoveryLayoutReference(ref(p),sha);assert.equal(read.kind,'ok');if(read.kind!=='ok')return;
+ const rendered=renderPreparedWrapper({prepared:read.reference.prepared,context:{conversationId:'c',shopId:'s',conversationLanguageTag:'en',merchantLanguageTag:'en',variables:{'shop.name':'Saved shop','shop.websiteUrl':'https://shop.example','checkout.url':'https://shop.example/recover?key=synthetic'},checkoutAvailable:true},responseBody:'Complete answer'});
+ assert.deepEqual(rendered,{kind:'rendered',body:'Saved shop\nComplete answer\nWebsite: https://shop.example\nCheckout: https://shop.example/recover?key=synthetic'});
 });
-
-test('common checkout final line remains consumable by the ordered footer contract without a duplicate formatter',()=>{
- for(const tokens of [[{kind:'variable',name:'checkout.url'}],[{kind:'text',value:''},{kind:'variable',name:'checkout.url'}],[{kind:'text',value:'Checkout:'},{kind:'text',value:'\n'},{kind:'variable',name:'checkout.url'}]]){
-  const p={...prepared,conditionals:[{when:'checkout.available',tokens}]};assert.equal(readCommonRecoveryLayoutReference(ref(p),sha).kind,'ok');
- }
+test('a parsed snapshot does not establish selected source, audience, activation or tenant authority',()=>{
+ const ordinary={...prepared,header:[{kind:'text' as const,value:'Ordinary header'}],conditionals:[]};
+ assert.equal(readPreparedWrapper({schemaVersion:1,prepared:ordinary},sha(stableJson(ordinary)),sha).kind,'ok');
+ assert.equal(readCommonRecoveryLayoutReference(ref(ordinary),sha).kind,'ok');
+ assert.equal(readCommonRecoveryLayoutReference({...ref(),sourceHash:'b'.repeat(64),definitionId:'other-definition'},sha).kind,'ok');
 });
-
-test('valid-hash common references reject every non-common header/conditional variable without changing generic wrappers',()=>{
- const otherVariables=['customer.firstName','shopBrand.brandName','shopBrand.logoUrl','shopBrand.logoAltText','shopBrand.logoWidth','shopBrand.logoHeight','shopBrand.squareLogoUrl','shopBrand.squareLogoAltText','shopBrand.coverImageUrl'] as const;
- for(const name of otherVariables){
+test('supported variable placements parse without a common-specific allowlist; generic contextual grammar stays intact',()=>{
+ const names=['customer.firstName','shopBrand.brandName','shopBrand.logoUrl','shopBrand.logoAltText','shopBrand.logoWidth','shopBrand.logoHeight','shopBrand.squareLogoUrl','shopBrand.squareLogoAltText','shopBrand.coverImageUrl','shop.name','shop.websiteUrl'] as const;
+ for(const name of names){
   const token={kind:'variable' as const,name};
-  const header={...prepared,header:[...prepared.header,token]};
-  const conditional={...prepared,conditionals:[{when:'checkout.available' as const,tokens:[token,{kind:'text' as const,value:'\n'},...prepared.conditionals[0]!.tokens]}]};
-  for(const [where,p] of [['header',header],['conditional',conditional]] as const){
-   const input=ref(p);assert.equal(readPreparedWrapper({schemaVersion:1,prepared:p},input.contentHash,sha).kind,'ok',`generic ${where} ${name}`);
-   assert.deepEqual(readCommonRecoveryLayoutReference(input,sha),{kind:'invalid'},`${where} ${name}`);
-  }
+  for(const p of [{...prepared,header:[...prepared.header,token]},{...prepared,footer:[token]},{...prepared,conditionals:[{when:'checkout.available' as const,tokens:[token,...prepared.conditionals[0]!.tokens]}]}])assert.equal(readCommonRecoveryLayoutReference(ref(p),sha).kind,'ok',name);
  }
- const extraName={...prepared,conditionals:[{when:'checkout.available' as const,tokens:[{kind:'variable' as const,name:'shop.name' as const},{kind:'text' as const,value:'\n'},...prepared.conditionals[0]!.tokens]}]};
- const extraWebsite={...prepared,conditionals:[{when:'checkout.available' as const,tokens:[{kind:'variable' as const,name:'shop.websiteUrl' as const},{kind:'text' as const,value:'\n'},...prepared.conditionals[0]!.tokens]}]};
- for(const p of [extraName,extraWebsite])assert.deepEqual(readCommonRecoveryLayoutReference(ref(p),sha),{kind:'invalid'});
+ // This is the existing prepared-token context grammar, not a new common placement rule.
+ for(const section of ['header','footer'] as const){const p={...prepared,[section]:[{kind:'variable',name:'checkout.url'}]};assert.deepEqual(readCommonRecoveryLayoutReference(ref(p),sha),{kind:'invalid'});}
 });
