@@ -28,7 +28,7 @@ function pureJson(v:unknown,depth=0,budget={nodes:0,units:0}):void {
  if(Array.isArray(v)){for(let i=0;i<v.length;i++){if(!Object.hasOwn(v,i))fail();pureJson(v[i],depth+1,budget);}return;}
  if(!object(v))fail();for(const [key,descriptor] of Object.entries(Object.getOwnPropertyDescriptors(v))){if(!descriptor.enumerable||!Object.hasOwn(descriptor,'value'))fail();budget.units+=key.length;pureJson(descriptor.value,depth+1,budget);}
 }
-export function assertCurrentTurnTransportBounded(messages:readonly CurrentTurnTransportMessage[]):void {
+export function assertCurrentTurnTransportBounded(messages:unknown):void {
  try{pureJson(messages);if(jsonBytes(messages)>MAX_CURRENT_TURN_TRANSPORT_BYTES)throw new RunnerFailure('BUDGET_EXHAUSTED',{stage:'model.validate',reasonCode:'MODEL_TRANSCRIPT_TOO_LARGE'});}
  catch(error){if(error instanceof RunnerFailure)throw error;fail();}
 }

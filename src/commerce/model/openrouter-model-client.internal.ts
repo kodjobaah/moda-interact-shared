@@ -340,11 +340,12 @@ export function createOpenRouterInvoker(
 
         let bound: BoundChatModel;
         try {
+          if(request.requireToolCall!==undefined&&typeof request.requireToolCall!=="boolean"||request.requireToolCall&&(request.requiredToolName!==undefined||request.tools.length===0))throw new Error("Conflicting or invalid required tool choice");
           if (request.requiredToolName !== undefined && (request.requiredToolName !== "finalResponse" || !request.tools.some(tool => tool.name === request.requiredToolName)))
             throw new Error("Required finalization tool is absent");
           bound = model.bindTools(tools, { tool_choice: request.requiredToolName
             ? { type: "function", function: { name: request.requiredToolName } }
-            : "auto" });
+            : request.requireToolCall ? "required" : "auto" });
         } catch (error) {
           const diagnostic = { stage: "binding", reason: "TOOL_BIND_FAILED" } as const;
           safeDiagnostic(options.onDiagnostic, diagnostic);

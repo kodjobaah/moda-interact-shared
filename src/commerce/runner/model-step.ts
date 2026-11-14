@@ -60,8 +60,8 @@ export function validateModelStep(step: unknown, outputTokenBudget: number): Mod
   }
 }
 
-export function routeModelStep(step: ModelStep): "toolCalls" | "finalResponse" | "textResponse" {
-  const finalCalls = step.calls.filter((call) => call.name === "finalResponse");
+export function routeModelStep(step: ModelStep,terminalNames:readonly string[]=["finalResponse"]): "toolCalls" | "finalResponse" | "textResponse" {
+  const finalCalls = step.calls.filter((call) => terminalNames.includes(call.name));
   if (finalCalls.length > 0) {
     if (finalCalls.length !== 1 || step.calls.length !== 1)
       throw new RunnerFailure("INVALID_FINAL", { stage: "model.route", reasonCode: "MODEL_CALL_ROUTE_INVALID" });

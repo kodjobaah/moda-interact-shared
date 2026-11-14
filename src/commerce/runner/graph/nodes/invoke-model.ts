@@ -1,3 +1,4 @@
+import {immutableTerminalSnapshot,selectTerminalDecisionTools} from '../../terminal-decision.js';
 import {appendCurrentTurnAssistant,readCurrentTurnTransportTranscript} from '../../tool-transcript.js';
 import { hasCanonicalCommerceRecommendationContract } from "../../../recommendation-selection.js";
 import { hasObservedProducts, productSelectionConstraint, productSelectionFields } from "../../product-selection.js";
@@ -17,6 +18,9 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
     execution.runtime.checkCancellationAndDeadline();
     if(execution.input.toolProtocol==='native')readCurrentTurnTransportTranscript(state.toolTranscript);
     const modelStep = state.modelSteps + 1;
+    const finalizer=state.selectionRepairUsed?execution.prepared.finalizeTerminal:undefined;
+    const selectedTerminalTools=finalizer?selectTerminalDecisionTools(finalizer,{turn:execution.prepared.turn,modelStep,responseContractHash:execution.prepared.manifest.responseContractHash,observations:state.runtimeMessages,requiredReferral:state.requiredReferral},execution.runtime):undefined;
+    const terminalToolNames=selectedTerminalTools?selectedTerminalTools.map(tool=>tool.name):['finalResponse'];
     execution.stats.modelSteps = modelStep;
     const startedAt = execution.input.dependencies.now();
     logModelStarted(execution.logger, { modelStep, availableToolCount: state.availableTools.length });
@@ -29,8 +33,8 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
     let raw: unknown;
     try {
       raw = await execution.runtime.bounded((signal) => execution.input.dependencies.model.invoke({
-        ...(state.selectionRepairUsed ? { requiredToolName: "finalResponse" as const } : {}),
-        instructions: state.selectionRepairUsed ? [...execution.prepared.instructions, ...selectionInstruction, FORCED_FINAL_RESPONSE_ENVELOPE_INSTRUCTION,
+        ...(finalizer?{requireToolCall:true}:state.selectionRepairUsed?{requiredToolName:"finalResponse" as const}:{}),
+        instructions: finalizer ? [...execution.prepared.instructions,"Runner-required terminal completion: call exactly one advertised terminal tool using its supplied schema. Ordinary tools are unavailable. The host validates a separate canonical decision; do not substitute an unadvertised function name."] : state.selectionRepairUsed ? [...execution.prepared.instructions, ...selectionInstruction, FORCED_FINAL_RESPONSE_ENVELOPE_INSTRUCTION,
           ...(state.schemaRepairIssues?.length ? [
             `Your previous finalResponse failed schema validation at: ${state.schemaRepairIssues.join(", ")}. Return a corrected finalResponse matching the pinned schema. replyText must be a nonempty string in the effective conversation language. Use exactly one product selection mode: recommendations OR details OR options. For stock, restock dates, attributes and descriptions use productDetailSelections; do not also populate recommendations. Omit unused optional selection fields. Reuse current verified tool results and exact product selections. Preserve mandatory referral reasons. Do not invent facts or make provider calls.`,
           ] : ["Successful product results are already available. Further identical reads cannot add facts. Return finalResponse now: put exact observed product/variant selections in the appropriate pinned details fields. If the pinned contract exposes the canonical recommendation version, supply productRecommendationVersion '1' together with productRecommendations. Shipping-only selections require a recognized disposition and matching successful current-turn shipping information; a placeholder is not evidence. Preserve the customer objective, select only relevant observed products, and never invent identifiers or promotions. Reuse current tool results; do not repeat searches merely to repair the response format."]) ] : [...execution.prepared.instructions, ...selectionInstruction],
@@ -39,7 +43,7 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
         ...(execution.prepared.currentCustomerMessages === undefined ? {} : { currentCustomerMessages: execution.prepared.currentCustomerMessages }),
         messages: state.runtimeMessages,
         ...(execution.input.toolProtocol==='native'?{toolTranscript:state.toolTranscript}:{}),
-        tools: [
+        tools: selectedTerminalTools?[...selectedTerminalTools]:[
           ...(state.selectionRepairUsed ? [] : state.availableTools).map((descriptor) => ({
             name: descriptor.name,
             description: descriptor.description,
@@ -64,13 +68,14 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
     let observedStep: ModelStep | undefined;
     try {
       step = validateModelStep(raw, execution.prepared.budgets.outputTokens);
+      if(finalizer)step=immutableTerminalSnapshot(step);
       observedStep = step;
       if(execution.input.toolProtocol==='native')toolTranscript=appendCurrentTurnAssistant(toolTranscript,step);
-      routeModelStep(step);
-      if (state.selectionRepairUsed && (step.calls.length !== 1 || step.calls[0]?.name !== "finalResponse"))
+      routeModelStep(step,terminalToolNames);
+      if (state.selectionRepairUsed && (step.calls.length !== 1 || !terminalToolNames.includes(step.calls[0]?.name??'')))
         throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: state.schemaRepairIssues?.length ? "FINAL_SCHEMA_INVALID" : "FINAL_PRODUCT_SELECTION_MISSING", modelStep, ...(state.schemaRepairIssues?.length ? {issuePaths:[...state.schemaRepairIssues]} : {}) });
     } catch (error) {
-      if (state.schemaRepairIssues?.length && error instanceof RunnerFailure && error.code === "INVALID_FINAL")
+      if (!finalizer && state.schemaRepairIssues?.length && error instanceof RunnerFailure && error.code === "INVALID_FINAL")
         throw new RunnerFailure("INVALID_FINAL", {...state.schemaRepairDiagnostic,stage:"final.validate",reasonCode:"FINAL_SCHEMA_INVALID",modelStep,issuePaths:[...state.schemaRepairIssues]});
       logModelInvalid(
         execution.logger, modelStep,
@@ -81,12 +86,12 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
     }
     logModelCompleted(execution.logger, {
       modelStep,
-      requestedToolCount: step.calls.filter((call) => call.name !== "finalResponse").length,
-      finalResponseRequested: step.calls.some((call) => call.name === "finalResponse"),
+      requestedToolCount: step.calls.filter((call) => !terminalToolNames.includes(call.name)).length,
+      finalResponseRequested: step.calls.some((call) => terminalToolNames.includes(call.name)),
       outputTokens: step.outputTokens,
       durationMs: elapsedDuration(execution.input, startedAt),
       providerSummary: step.providerSummary,
     });
-    return { modelSteps: modelStep, pendingStep: step, toolTranscript };
+    return { modelSteps: modelStep, pendingStep: step, toolTranscript,terminalToolNames,terminalProjection:!!finalizer };
   };
 }

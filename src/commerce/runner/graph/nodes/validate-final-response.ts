@@ -1,3 +1,4 @@
+import {projectTerminalDecision} from '../../terminal-decision.js';
 import {appendCurrentTurnTool,appendCurrentTurnRunnerFeedback,type CurrentTurnToolPayload} from '../../tool-transcript.js';
 import { hasCommerceAcceptedProductSelection } from "../../../recommendation-selection.js";
 import { hasObservedProducts, productSelectionFields } from "../../product-selection.js";
@@ -24,7 +25,10 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
       // after a failed/denied tool. Use trusted, localized host copy instead of
       // repeating potentially unsupported claims from the model.
       // The same pinned final schema validates both resulting envelopes.
-      const raw = state.pendingStep.calls.length === 0
+      const projected=state.terminalProjection;
+      const raw = projected
+        ? projectTerminalDecision({port:execution.prepared.finalizeTerminal!,step:state.pendingStep,turn:execution.prepared.turn,modelStep:state.modelSteps,responseContractHash:execution.prepared.manifest.responseContractHash,observations:state.runtimeMessages,requiredReferral:state.requiredReferral,allowedToolNames:state.terminalToolNames,digest:execution.input.dependencies.digest,runtime:execution.runtime})
+        : state.pendingStep.calls.length === 0
         ? {
             answerKind: state.requiredReferral ? "REFER_TO_STORE" : "ANSWER",
             replyText: state.requiredReferral
@@ -58,7 +62,7 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
       // One correction uses the existing model-step/deadline budget. Never guess
       // selections or replay provider calls on the model's behalf.
       if (!state.requiredReferral && final.answerKind === 'ANSWER' && supportsSelections && observedProducts && !selected) {
-        if (state.selectionRepairUsed) throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "FINAL_PRODUCT_SELECTION_MISSING", modelStep: state.modelSteps });
+        if (state.selectionRepairUsed||state.terminalProjection) throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "FINAL_PRODUCT_SELECTION_MISSING", modelStep: state.modelSteps });
         logModelInvalid(execution.logger, state.modelSteps, 'MISSING_PRODUCT_SELECTION_REPAIR');
         return { selectionRepairUsed: true, pendingStep: null, finalResult: null, ...withOutcome({kind:"runner-feedback",reasonCode:"FINAL_PRODUCT_SELECTION_MISSING"}) };
       }
@@ -66,7 +70,7 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
     } catch (error) {
       logModelInvalid(execution.logger, state.modelSteps, error instanceof RunnerFailure ? error.diagnostic.reasonCode : "UNEXPECTED_EXCEPTION");
       if (error instanceof RunnerFailure) {
-        if (error.diagnostic.reasonCode === "FINAL_SCHEMA_INVALID" && !state.selectionRepairUsed) {
+        if (error.diagnostic.reasonCode === "FINAL_SCHEMA_INVALID" && !state.selectionRepairUsed && !state.terminalProjection) {
           return { ...withOutcome({kind:"runner-feedback",reasonCode:"FINAL_SCHEMA_INVALID",...(error.diagnostic.issuePaths?.length?{issuePaths:error.diagnostic.issuePaths}:{})}), selectionRepairUsed: true, schemaRepairDiagnostic:error.diagnostic, schemaRepairIssues: error.diagnostic.issuePaths?.length ? error.diagnostic.issuePaths : ["finalResponse"], pendingStep: null, finalResult: null };
         }
         throw error;

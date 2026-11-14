@@ -1,3 +1,4 @@
+import {prepareTerminalDecisionPort,type TerminalDecisionPort} from './terminal-decision.js';
 import { prepareCurrentCustomerMessages, CURRENT_CUSTOMER_MESSAGES_INSTRUCTION, type CommerceCurrentCustomerMessages } from "../current-customer-messages.js";
 import { mergeConversationProductContext, type CommerceConversationProductContext } from "../product-context.js";
 import { ToolDescriptorSchema } from "../definitions.js";
@@ -28,6 +29,7 @@ export type CommerceTurnBudgets = {
 };
 
 export type PreparedCommerceTurn = {
+  finalizeTerminal?:TerminalDecisionPort;
   currentCustomerMessages?: CommerceCurrentCustomerMessages;
   productContext: CommerceConversationProductContext | null;
   executionPurpose?: RunCommerceTurnInput["executionPurpose"];
@@ -146,5 +148,6 @@ export function prepareCommerceTurn(input: RunCommerceTurnInput): PreparedCommer
   }
   if (manifest.builtInTools.some(tool => !registered.has(tool.name)))
     throw new RunnerFailure("INCOMPATIBLE_VERSION", {stage: "preflight.validate", reasonCode: "TOOL_REGISTRATION_INVALID"});
-  return { ...(currentCustomerMessages === undefined ? {} : { currentCustomerMessages }), productContext, ...(input.executionPurpose ? { executionPurpose: input.executionPurpose } : {}), turn, grant, manifest, response, finalSchema, budgets, instructions, registered };
+  const finalizeTerminal=prepareTerminalDecisionPort(input.dependencies.finalizeTerminal,manifest.responseContractHash,[...registered.keys()],input.toolProtocol==='native');
+  return { ...(finalizeTerminal?{finalizeTerminal}:{}), ...(currentCustomerMessages === undefined ? {} : { currentCustomerMessages }), productContext, ...(input.executionPurpose ? { executionPurpose: input.executionPurpose } : {}), turn, grant, manifest, response, finalSchema, budgets, instructions, registered };
 }

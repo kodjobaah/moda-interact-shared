@@ -27,6 +27,8 @@ export type ModelRequest = {
   toolTranscript?: readonly import("./tool-transcript.js").CurrentTurnTransportMessage[];
   /** Runner-controlled finalization; never supplied by merchant configuration. */
   requiredToolName?: "finalResponse";
+  /** Generic required choice among explicitly advertised terminal tools. */
+  requireToolCall?: boolean;
   instructions: readonly string[];
   context: unknown;
   history: readonly unknown[];
@@ -64,6 +66,7 @@ export type RunCommerceTurnInput = {
   signal: AbortSignal;
   dependencies: {
     model: CommerceModelInvoker;
+    finalizeTerminal?: import("./terminal-decision.js").TerminalDecisionPort;
     tools: RunnerTool[];
     now: () => number;
     digest: Digest;
