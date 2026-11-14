@@ -3,12 +3,11 @@ import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {stableJson} from '../wrapper-projection.js';
 import {RecoveryCompositeRenderError} from './composite-render-errors.js';
-const RECOVERY_COMPOSITE_FONT_ASSET_MANIFEST_SHA256='9213e2b12cdc77c7de70ed5b738e1894efeae4b54657a31373236d2642065b02';
 const fontSha='7da195a74c55bef988d0d48f9508bd5d849425c1770dba5d7bfc6ce9ed848954';
 const licenseSha='7a083b136e64d064794c3419751e5c7dd10d2f64c108fe5ba161eae5e5958a93';
 const hash=(v:string|Buffer)=>createHash('sha256').update(v).digest('hex');
 const fail=(_code:'FONT_UNAVAILABLE'):never=>{throw new RecoveryCompositeRenderError('FONT_UNAVAILABLE');};
-/** Geometry-free V2 catalog. The original packaged V1 manifest is not modified. */
+/** Geometry-free V2 catalog. Pinned font resources contain no layout geometry. */
 export const COMPOSITE_FONT_RESOURCE_V2=Object.freeze({schemaVersion:1,fontId:'DEJAVU_SANS_2_37',fontSha256:fontSha,licenseSha256:licenseSha,coverageSha256:'4f7b61ab9a530ba988efa8b6e87cfed72b7e06a08d0f3422eed89094c7a3e8ed'});
 /** Bounded resolution works from source and from split bundled chunks; no host-font search. */
 async function assetsDirectory(): Promise<URL> {
@@ -31,7 +30,7 @@ export async function loadCompositeFontAssets(directory?: URL) {
     ]);
     const manifest = JSON.parse(manifestBytes.toString('utf8'));
     if (hash(font) !== fontSha || hash(license) !== licenseSha ||
-        hash(stableJson(manifest)) !== RECOVERY_COMPOSITE_FONT_ASSET_MANIFEST_SHA256 || hash(coverageBytes) !== manifest.coverageSha256) return fail('FONT_UNAVAILABLE');
+        stableJson(manifest) !== stableJson(COMPOSITE_FONT_RESOURCE_V2) || hash(coverageBytes) !== manifest.coverageSha256) return fail('FONT_UNAVAILABLE');
     const coverage: unknown = JSON.parse(coverageBytes.toString('utf8'));
     if (!Array.isArray(coverage) || coverage.length !== 5918 || !coverage.every(cp => Number.isInteger(cp) && cp >= 0 && cp <= 0x10ffff)) return fail('FONT_UNAVAILABLE');
     return { fontfile: fileURLToPath(new URL('DejaVuSans.ttf', root)), coverage: new Set<number>(coverage), manifest };

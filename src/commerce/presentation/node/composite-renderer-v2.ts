@@ -17,15 +17,16 @@ export function getRecoveryCompositeRuntimeIdentityV2(input:{profile:RecoveryCom
 export type RecoveryCompositeRenderInputV2={provenance:RecoveryCompositeProvenanceV2;logoBytes:Buffer;productBytes?:Buffer|null;signal?:AbortSignal};
 export type RecoveryCompositeRenderedImageV2={image:VerifiedBrandImage;textBounds:Readonly<{width:number;height:number}>;profileSha256:string;fontResourceSha256:string;runtimeSha256:string};
 export function createRecoveryCompositeImageRendererV2(options:{profile:RecoveryCompositeProfile;profileSha256:string;assetsDirectory?:URL}) {
- const profile=readRecoveryCompositeProfile(options.profile,options.profileSha256,hash),identity=getRecoveryCompositeRuntimeIdentityV2({profile,profileSha256:options.profileSha256});
+ const profileSha256=options.profileSha256,profile=readRecoveryCompositeProfile(options.profile,profileSha256,hash),identity=getRecoveryCompositeRuntimeIdentityV2({profile,profileSha256});
  let assets:ReturnType<typeof loadCompositeFontAssets>|undefined;
  return {identity,async render(input:RecoveryCompositeRenderInputV2):Promise<RecoveryCompositeRenderedImageV2>{
   try{
    if(input.signal?.aborted)throw new RecoveryCompositeRenderError('MEDIA_DEADLINE');
-   const provenance=RecoveryCompositeProvenanceV2Schema.parse(input.provenance);assertRecoveryCompositeProvenanceIdentityV2(provenance,hash);assertRecoveryCompositeTextAllocationV2(profile,provenance.headerText);
-   if(provenance.profileSha256!==options.profileSha256||stableJson(provenance.profile)!==stableJson(profile)||provenance.fontResourceSha256!==identity.fontResourceSha256||provenance.runtimeSha256!==identity.runtimeSha256)throw new RecoveryCompositeRenderError('SOURCE_IDENTITY_INVALID');
-   const rendered=await renderCompositeRaster(input,provenance,profile,{fontSize:profile.fontSize,spacing:profile.textLineSpacingPt},identity.runtime.jpeg,()=>assets??=loadCompositeFontAssets(options.assetsDirectory),true);
-   return {...rendered,profileSha256:options.profileSha256,fontResourceSha256:identity.fontResourceSha256,runtimeSha256:identity.runtimeSha256};
+   const provenance=RecoveryCompositeProvenanceV2Schema.parse(input.provenance);
+   if(provenance.profileSha256!==profileSha256||stableJson(provenance.profile)!==stableJson(profile)||provenance.fontResourceSha256!==identity.fontResourceSha256||provenance.runtimeSha256!==identity.runtimeSha256)throw new RecoveryCompositeRenderError('SOURCE_IDENTITY_INVALID');
+   assertRecoveryCompositeProvenanceIdentityV2(provenance,hash);assertRecoveryCompositeTextAllocationV2(profile,provenance.headerText);
+   const rendered=await renderCompositeRaster(input,provenance,profile,{fontSize:profile.fontSize,spacing:profile.textLineSpacingPt},identity.runtime.jpeg,()=>assets??=loadCompositeFontAssets(options.assetsDirectory));
+   return {...rendered,profileSha256,fontResourceSha256:identity.fontResourceSha256,runtimeSha256:identity.runtimeSha256};
   }catch(error){
    if(input.signal?.aborted)throw new RecoveryCompositeRenderError('MEDIA_DEADLINE');
    if(error instanceof RecoveryCompositeRenderError)throw error;

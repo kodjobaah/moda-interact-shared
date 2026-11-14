@@ -10,13 +10,12 @@ import {createSafeImageFetcher} from './safe-fetch.js';
 import {createBrandR2S3Transport,putGuardedImmutableR2Object,isValidMediaBucket,type BrandR2Transport} from './r2-writer.js';
 import {createShopBrandPublicMediaProbe} from './public-probe.js';
 import {isPublicIpAddress} from './network-policy.js';
-import {conversationProductObjectKey} from './product-image.js';
 import {verifyEncodedBrandImage} from './metadata-verifier.js';
-import type {RecoveryCompositePreparationInput,RecoveryCompositePreparationDependencies,RecoveryCompositePreparationStage,RecoveryCompositeOmission} from './composite-image.js';
+import type {RecoveryCompositePreparationInput,RecoveryCompositePreparationDependencies,RecoveryCompositePreparationStage,RecoveryCompositeOmission} from './composite-preparation-types.js';
 export type CompositeCoreProvenance={shopId:string;logo:{origin:{kind:string;shopId:string;shopDomain:string;role:string;sourceGeneration:number;sourceFingerprint:string};contentSha256:string};product:{shopId:string;platform:string;productId:string;variantId:string|null;contentSha256:string}|null};
 export type CompositeCoreRendered={image:VerifiedBrandImage;textBounds:Readonly<{width:number;height:number}>};
 export type CompositeCoreResult<I>={kind:'READY';image:I;stage:'READY';durationMs:number;textBounds:Readonly<{width:number;height:number}>}|{kind:'OMITTED';reason:RecoveryCompositeOmission;stage:RecoveryCompositePreparationStage;durationMs:number};
-export type CompositeCoreStrategy<P,R,I>={namespace:'v1'|'v2';parseProvenance(raw:unknown):P;render(input:{provenance:P;logoBytes:Buffer;productBytes:Buffer|null;signal?:AbortSignal}):Promise<R>;dimensions(p:P):{width:number;height:number};textLimits(p:P):{width:number;height:number};matches(p:P,rendered:R):boolean;renderIdentity(p:P):string;prepareOutput(raw:unknown):I;parseLogo?(raw:unknown):import('../brand-image.js').ConversationPreparedBrandImage;parseProduct?(raw:unknown):ConversationPreparedProductImage;productKey?(p:CompositeCoreProvenance['product']&{},image:ConversationPreparedProductImage):string};
+export type CompositeCoreStrategy<P,R,I>={namespace:'v2';parseProvenance(raw:unknown):P;render(input:{provenance:P;logoBytes:Buffer;productBytes:Buffer|null;signal?:AbortSignal}):Promise<R>;dimensions(p:P):{width:number;height:number};textLimits(p:P):{width:number;height:number};matches(p:P,rendered:R):boolean;renderIdentity(p:P):string;prepareOutput(raw:unknown):I;parseLogo(raw:unknown):import('../brand-image.js').ConversationPreparedBrandImage;parseProduct(raw:unknown):ConversationPreparedProductImage;productKey(p:CompositeCoreProvenance['product']&{},image:ConversationPreparedProductImage):string};
 const hash=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
 class Deadline extends Error {}
 function bounded<T>(operation:()=>Promise<T>,signal:AbortSignal):Promise<T> {
@@ -48,7 +47,7 @@ export async function prepareCompositeImageCore<P extends CompositeCoreProvenanc
   let parsed:P;try{parsed=strategy.parseProvenance(input.provenance);}catch{return omitted('UNSAFE_IMAGE_SOURCE');}
   const provenance={data:parsed};
   let logo:ReturnType<typeof ConversationPreparedBrandImageSchema.safeParse>;
-  try{logo=strategy.parseLogo?{success:true,data:strategy.parseLogo(input.logo)}:ConversationPreparedBrandImageSchema.safeParse(input.logo);}catch{return omitted('UNSAFE_IMAGE_SOURCE');}
+  try{logo={success:true,data:strategy.parseLogo(input.logo)};}catch{return omitted('UNSAFE_IMAGE_SOURCE');}
   if(!logo.success)return omitted('UNSAFE_IMAGE_SOURCE');
   if(stableJson(logo.data.origin)!==stableJson(provenance.data.logo.origin)||logo.data.contentSha256!==provenance.data.logo.contentSha256||logo.data.publicOrigin!==origin)return omitted('SOURCE_IDENTITY_INVALID');
   let product:ConversationPreparedProductImage|null=null;
@@ -56,10 +55,10 @@ export async function prepareCompositeImageCore<P extends CompositeCoreProvenanc
   else {
     if(!input.product)return omitted('SOURCE_IDENTITY_INVALID');
     let p:ReturnType<typeof ConversationPreparedProductImageSchema.safeParse>;
-    try{p=strategy.parseProduct?{success:true,data:strategy.parseProduct(input.product.image)}:ConversationPreparedProductImageSchema.safeParse(input.product.image);}catch{return omitted('SOURCE_IDENTITY_INVALID');}
+    try{p={success:true,data:strategy.parseProduct(input.product.image)};}catch{return omitted('SOURCE_IDENTITY_INVALID');}
     const expected=provenance.data.product;
     if(!p.success||input.product.platform!==expected.platform||p.data.shopId!==expected.shopId||p.data.productId!==expected.productId||p.data.variantId!==expected.variantId||p.data.contentSha256!==expected.contentSha256)return omitted('SOURCE_IDENTITY_INVALID');
-    const expectedKey=strategy.productKey?strategy.productKey(expected,p.data):conversationProductObjectKey({kind:'SOURCE',shopId:expected.shopId,platform:expected.platform as 'SHOPIFY'|'WOOCOMMERCE',productId:expected.productId,variantId:expected.variantId,sourceUrl:p.data.publicUrl},expected.contentSha256);
+    const expectedKey=strategy.productKey(expected,p.data);
     if(p.data.objectKey!==expectedKey||p.data.publicUrl!==`${origin}/${expectedKey}`)return omitted('SOURCE_IDENTITY_INVALID');
     product=p.data;
   }

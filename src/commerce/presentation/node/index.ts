@@ -8,9 +8,9 @@ export * from './r2-writer.js';
 export * from './public-probe.js';
 export * from './product-image.js';
 
-export * from "./composite-renderer.js";
 
-export * from "./composite-image.js";
 
 export * from "./composite-renderer-v2.js";
 export * from "./composite-image-v2.js";
+export * from './composite-render-errors.js';
+export type {RecoveryCompositePreparationStage,RecoveryCompositeOmission} from './composite-preparation-types.js';

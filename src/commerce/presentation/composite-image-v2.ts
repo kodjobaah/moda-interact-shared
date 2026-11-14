@@ -11,13 +11,13 @@ export const RecoveryPreparedCompositeImageV2Schema=z.strictObject({schemaVersio
 export type RecoveryPreparedCompositeImageV2=z.infer<typeof RecoveryPreparedCompositeImageV2Schema>;
 export const RecoveryCompositeImagePlanV2Schema=z.strictObject({schemaVersion:z.literal(2),kind:z.literal('COMPOSITE_IMAGE'),body:z.string(),logicalBody:z.string(),image:RecoveryPreparedCompositeImageV2Schema,boundarySha256:z.string()});
 export type RecoveryCompositeImagePlanV2=z.infer<typeof RecoveryCompositeImagePlanV2Schema>;
-const Trusted=z.strictObject({provenance:RecoveryCompositeProvenanceV2Schema,publicOrigin:z.string(),answerText:z.string(),footerText:z.string(),logicalBody:z.string(),checkoutUrl:z.string(),output:z.strictObject({contentSha256:z.string(),byteLength:z.number(),width:z.number(),height:z.number(),profileSha256:z.string(),renderIdentitySha256:z.string()})});
+const Trusted=z.strictObject({provenance:RecoveryCompositeProvenanceV2Schema,publicOrigin:z.string(),body:z.string(),answerText:z.string(),footerText:z.string(),logicalBody:z.string(),checkoutUrl:z.string(),output:z.strictObject({contentSha256:z.string(),byteLength:z.number(),width:z.number(),height:z.number(),profileSha256:z.string(),renderIdentitySha256:z.string()})});
 export type RecoveryCompositeTrustedContextV2=z.infer<typeof Trusted>;
 const invalid=():never=>{throw Object.assign(new Error('COMPOSITE_BINDING_INVALID'),{code:'COMPOSITE_BINDING_INVALID'});};
 const shaFormat=(v:string)=>{if(!/^[a-f0-9]{64}$/.test(v))invalid();};
 const digest=(v:string,sha256:PresentationDigest)=>{const h=sha256(v);shaFormat(h);return h;};
 function textSafe(v:string,maxUnits:number):void {
- if(!v.trim()||v.length>maxUnits||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(v)||Array.from(v).some(c=>{const n=c.codePointAt(0)!;return n>=0xd800&&n<=0xdfff;}))invalid();
+ if(v.length>maxUnits||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(v)||Array.from(v).some(c=>{const n=c.codePointAt(0)!;return n>=0xd800&&n<=0xdfff;}))invalid();
 }
 function originSafe(v:string):void {try{const u=new URL(v);if(v!==u.origin||u.protocol!=='https:'||u.username||u.password||u.port||u.search||u.hash)invalid();}catch{invalid();}}
 export function assertRecoveryCompositeProvenanceIdentityV2(p:RecoveryCompositeProvenanceV2,sha256:PresentationDigest):void {
@@ -39,9 +39,7 @@ export function assertRecoveryCompositeOutputIdentityV2(image:RecoveryPreparedCo
 }
 function boundaries(t:RecoveryCompositeTrustedContextV2,sha256:PresentationDigest) {
  textSafe(t.answerText,4096);textSafe(t.footerText,4096);textSafe(t.logicalBody,4096);
- const body=t.answerText+t.footerText;textSafe(body,4096);if(Array.from(body).length>1024||t.logicalBody!==t.provenance.headerText+body)invalid();
- try{const u=new URL(t.checkoutUrl);if(t.checkoutUrl.length>2048||/[\x00-\x20\x7f]/.test(t.checkoutUrl)||u.protocol!=='https:'||u.username||u.password||u.hash)invalid();}catch{invalid();}
- if(body!==t.checkoutUrl&&!body.endsWith('\n'+t.checkoutUrl))invalid();
+ const body=t.body;textSafe(body,4096);if(Array.from(body).length>1024)invalid();
  return {body,boundarySha256:digest(stableJson({headerText:t.provenance.headerText,answerText:t.answerText,footerText:t.footerText,logicalBody:t.logicalBody,body}),sha256)};
 }
 export function assertRecoveryCompositeImageBindingV2(plan:RecoveryCompositeImagePlanV2,trusted:RecoveryCompositeTrustedContextV2,sha256:PresentationDigest):void {

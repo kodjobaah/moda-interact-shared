@@ -1,3 +1,4 @@
+import type {RecoveryCompositeProfile} from "./composite-profile.js";
 import type { ConversationProductImageBinding } from "./product-image.js";
 /** Pure immutable wrapper projections. Host-owned persistence and sending stay outside Shared. */
 export type WrapperSource = "AI" | "HUMAN";
@@ -19,6 +20,8 @@ export type PreparedWrapper = Readonly<{
   family: "MODA_CONVERSATION_WRAPPER";
   responseSlot: "response.body";
   productImage?: ConversationProductImageBinding;
+  compositeProfile?: RecoveryCompositeProfile;
+  compositeProfileSha256?: string;
   header: readonly PreparedToken[];
   body: readonly PreparedToken[];
   footer: readonly PreparedToken[];

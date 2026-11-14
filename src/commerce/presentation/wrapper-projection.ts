@@ -1,3 +1,4 @@
+import {readRecoveryCompositeProfile,type RecoveryCompositeProfile} from "./composite-profile.js";
 import { ConversationProductImageBindingSchema } from "./product-image.js";
 import type { PreparedToken, PreparedWrapper, WrapperVariable } from "./wrapper-contracts.js";
 
@@ -66,10 +67,17 @@ export function readPreparedWrapper(localeAst: unknown, contentHash: string | nu
     return { kind: "missing" };
   }
   const prepared = localeAst.prepared;
-  if (!onlyKeys(prepared, ["schemaVersion", "family", "responseSlot", "header", "body", "footer", "conditionals", "productImage"]) ||
+  if (!onlyKeys(prepared, ["schemaVersion", "family", "responseSlot", "header", "body", "footer", "conditionals", "productImage", "compositeProfile", "compositeProfileSha256"]) ||
       prepared.schemaVersion !== 1 || prepared.family !== "MODA_CONVERSATION_WRAPPER" ||
       prepared.responseSlot !== SLOT || !Array.isArray(prepared.conditionals) ||
       prepared.conditionals.length > 1) return { kind: "invalid" };
+  let compositeProfile:RecoveryCompositeProfile|undefined;
+  const hasProfile=Object.hasOwn(prepared,"compositeProfile"),hasProfileHash=Object.hasOwn(prepared,"compositeProfileSha256");
+  if(hasProfile!==hasProfileHash)return {kind:"invalid"};
+  if(hasProfile){
+    if(typeof prepared.compositeProfileSha256!=="string")return {kind:"invalid"};
+    try{compositeProfile=readRecoveryCompositeProfile(prepared.compositeProfile,prepared.compositeProfileSha256,sha256);}catch{return {kind:"invalid"};}
+  }
   const binding = Object.hasOwn(prepared, "productImage") ? ConversationProductImageBindingSchema.safeParse(prepared.productImage) : undefined;
   if (binding && !binding.success) return { kind: "invalid" };
   const header = readTokens(prepared.header, "header");
@@ -93,5 +101,6 @@ export function readPreparedWrapper(localeAst: unknown, contentHash: string | nu
     schemaVersion: 1, family: "MODA_CONVERSATION_WRAPPER", responseSlot: SLOT,
     header, body, footer, conditionals,
     ...(binding?.success ? { productImage: binding.data } : {}),
+    ...(compositeProfile ? {compositeProfile,compositeProfileSha256:prepared.compositeProfileSha256 as string}:{}),
   } };
 }
