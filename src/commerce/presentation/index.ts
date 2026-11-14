@@ -27,3 +27,7 @@ export * from "./common-recovery-layout.js";
 export * from "./composite-image.js";
 
 export * from "./composite-recovery.js";
+
+export * from "./composite-profile.js";
+export * from "./composite-image-v2.js";
+export * from "./composite-recovery-v2.js";

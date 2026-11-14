@@ -11,3 +11,6 @@ export * from './product-image.js';
 export * from "./composite-renderer.js";
 
 export * from "./composite-image.js";
+
+export * from "./composite-renderer-v2.js";
+export * from "./composite-image-v2.js";
