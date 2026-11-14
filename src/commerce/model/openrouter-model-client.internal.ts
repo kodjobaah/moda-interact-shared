@@ -297,7 +297,6 @@ export function createOpenRouterInvoker(
     const modelOptions = configurationToChatFields(configuration);
     const modelKwargs = {
       ...(modelOptions.modelKwargs as Record<string, unknown>),
-      parallel_tool_calls: false,
     };
     let model: ChatModelAdapter;
     try {
