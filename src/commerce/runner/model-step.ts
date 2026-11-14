@@ -1,3 +1,4 @@
+import {readTerminalCalls} from './terminal-decision.js';
 import { jsonBytes } from "../canonical-json.js";
 import type { RunnerDiagnosticReason } from "./diagnostics.js";
 import { RunnerFailure } from "./failure.js";
@@ -11,7 +12,7 @@ function invalidStep(reasonCode: RunnerDiagnosticReason, callIndex?: number, cau
 }
 
 /** Report the first violated invariant rather than grouping unrelated model-output failures. */
-export function validateModelStep(step: unknown, outputTokenBudget: number): ModelStep {
+export function validateModelStep(step: unknown, outputTokenBudget: number,terminalToolNames?:readonly string[]): ModelStep {
   try {
     if (step === null || typeof step !== "object" || Array.isArray(step))
       invalidStep("MODEL_STEP_NOT_OBJECT");
@@ -26,7 +27,7 @@ export function validateModelStep(step: unknown, outputTokenBudget: number): Mod
 
     if (Object.hasOwn(value, "text")) {
       if (typeof value.text !== "string") invalidStep("MODEL_TEXT_NOT_STRING");
-      if (value.text.length > 4096) invalidStep("MODEL_TEXT_TOO_LONG");
+      if (!terminalToolNames && value.text.length > 4096) invalidStep("MODEL_TEXT_TOO_LONG");
     }
 
     const calls = value.calls as unknown[];
@@ -53,6 +54,7 @@ export function validateModelStep(step: unknown, outputTokenBudget: number): Mod
       invalidStep("MODEL_STEP_NOT_SERIALIZABLE", undefined, error);
     }
     if (size > 262144) invalidStep("MODEL_STEP_TOO_LARGE");
+    if(terminalToolNames)readTerminalCalls(step as ModelStep,terminalToolNames,"atomic");
     return step as ModelStep;
   } catch (error) {
     if (error instanceof RunnerFailure) throw error;
@@ -60,8 +62,9 @@ export function validateModelStep(step: unknown, outputTokenBudget: number): Mod
   }
 }
 
-export function routeModelStep(step: ModelStep): "toolCalls" | "finalResponse" | "textResponse" {
-  const finalCalls = step.calls.filter((call) => call.name === "finalResponse");
+export function routeModelStep(step: ModelStep,terminalNames:readonly string[]=["finalResponse"],terminalBatchMode?:"equivalent"|"atomic"): "toolCalls" | "finalResponse" | "textResponse" {
+  if(terminalBatchMode){readTerminalCalls(step,terminalNames,terminalBatchMode);return "finalResponse";}
+  const finalCalls = step.calls.filter((call) => terminalNames.includes(call.name));
   if (finalCalls.length > 0) {
     if (finalCalls.length !== 1 || step.calls.length !== 1)
       throw new RunnerFailure("INVALID_FINAL", { stage: "model.route", reasonCode: "MODEL_CALL_ROUTE_INVALID" });

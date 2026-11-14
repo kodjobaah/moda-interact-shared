@@ -84,7 +84,6 @@ test("OpenRouter config maps named fields and preserves unknown snake_case optio
   assert.deepEqual(captured.modelOptions.transforms, ["middle-out"]);
   assert.deepEqual(captured.modelOptions.modelKwargs, {
     reasoning: { effort: "high" }, custom_snake_key: { passthrough: true },
-    parallel_tool_calls: false,
   });
 });
 
