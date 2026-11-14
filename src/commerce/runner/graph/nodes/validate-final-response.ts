@@ -1,3 +1,4 @@
+import {appendCurrentTurnTool,type CurrentTurnToolPayload} from '../../tool-transcript.js';
 import { hasCommerceAcceptedProductSelection } from "../../../recommendation-selection.js";
 import { hasObservedProducts, productSelectionFields } from "../../product-selection.js";
 import { RunnerFailure } from "../../failure.js";
@@ -8,9 +9,11 @@ import type { CommerceTurnGraphExecution } from "../graph.js";
 import type { CommerceTurnGraphStateValue } from "../state.js";
 
 export function validateFinalResponseNode(execution: CommerceTurnGraphExecution) {
-  return async (state: CommerceTurnGraphStateValue) => {
+  return async (state: CommerceTurnGraphStateValue):Promise<Partial<CommerceTurnGraphStateValue>> => {
     if (!state.pendingStep)
       throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "MODEL_RESULT_MISSING" });
+    const withOutcome=(payload:CurrentTurnToolPayload)=>execution.input.toolProtocol==='native'&&state.pendingStep!.calls.length===1
+      ? {toolTranscript:appendCurrentTurnTool(state.toolTranscript,state.pendingStep!.calls[0]!,payload)}:{};
     let validationPhase: "schema" | "selection" | "observations" = "schema";
     try {
       // Natural text may finish a turn, but cannot override mandatory referral
@@ -53,14 +56,14 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
       if (!state.requiredReferral && final.answerKind === 'ANSWER' && supportsSelections && observedProducts && !selected) {
         if (state.selectionRepairUsed) throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "FINAL_PRODUCT_SELECTION_MISSING", modelStep: state.modelSteps });
         logModelInvalid(execution.logger, state.modelSteps, 'MISSING_PRODUCT_SELECTION_REPAIR');
-        return { selectionRepairUsed: true, pendingStep: null, finalResult: null };
+        return { selectionRepairUsed: true, pendingStep: null, finalResult: null, ...withOutcome({kind:"runner-feedback",reasonCode:"FINAL_PRODUCT_SELECTION_MISSING"}) };
       }
-      return { finalResult: final };
+      return { finalResult: final, ...withOutcome({kind:"runner-feedback",reasonCode:"FINAL_RESPONSE_ACCEPTED"}) };
     } catch (error) {
       logModelInvalid(execution.logger, state.modelSteps, error instanceof RunnerFailure ? error.diagnostic.reasonCode : "UNEXPECTED_EXCEPTION");
       if (error instanceof RunnerFailure) {
         if (error.diagnostic.reasonCode === "FINAL_SCHEMA_INVALID" && !state.selectionRepairUsed) {
-          return { selectionRepairUsed: true, schemaRepairDiagnostic:error.diagnostic, schemaRepairIssues: error.diagnostic.issuePaths?.length ? error.diagnostic.issuePaths : ["finalResponse"], pendingStep: null, finalResult: null };
+          return { ...withOutcome({kind:"runner-feedback",reasonCode:"FINAL_SCHEMA_INVALID",...(error.diagnostic.issuePaths?.length?{issuePaths:error.diagnostic.issuePaths}:{})}), selectionRepairUsed: true, schemaRepairDiagnostic:error.diagnostic, schemaRepairIssues: error.diagnostic.issuePaths?.length ? error.diagnostic.issuePaths : ["finalResponse"], pendingStep: null, finalResult: null };
         }
         throw error;
       }

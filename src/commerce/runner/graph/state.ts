@@ -1,3 +1,4 @@
+import type {CurrentTurnTransportMessage} from '../tool-transcript.js';
 import type { RunnerDiagnostic } from "../diagnostics.js";
 import { Annotation } from "@langchain/langgraph";
 import type { CommerceFinalResponse } from "../../response.js";
@@ -16,6 +17,7 @@ export const CommerceTurnGraphState = Annotation.Root({
   availableTools: Annotation<readonly ToolDescriptor[]>(),
   pendingStep: Annotation<ModelStep | null>(),
   runtimeMessages: Annotation<readonly CommerceRuntimeMessage[]>(),
+  toolTranscript: Annotation<readonly CurrentTurnTransportMessage[]>(),
   evidenceById: Annotation<Readonly<Record<string, CommerceEvidence>>>(),
   requiredReferral: Annotation<CommerceFinalResponse["referralReason"]>(),
   finalResult: Annotation<CommerceFinalResponse | null>(),
@@ -33,6 +35,7 @@ export function initialCommerceTurnGraphState(): CommerceTurnGraphStateValue {
     availableTools: [],
     pendingStep: null,
     runtimeMessages: [],
+    toolTranscript: Object.freeze([]),
     evidenceById: {},
     requiredReferral: null,
     finalResult: null,

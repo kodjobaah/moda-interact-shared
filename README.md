@@ -2621,3 +2621,37 @@ trusted derivative/R2/deadline fields and V2 provenance. Common raster/font and
 preparation mechanics are reused; Node fallback keeps the original single budget
 and immutable upload/public proof. Missing or tampered profile cannot select a
 fallback policy. No profile/configuration source is chosen inside Shared.
+
+### Native current-turn tool transport (unreleased)
+
+Hosts opt into strict native transport using `RunCommerceTurnInput.toolProtocol:
+"native"`. The runner supplies `ModelRequest.toolTranscript`, including an empty
+array on the first invocation; its presence makes the Node SDK adapter strict.
+Production consumers must set this option explicitly. Unsupported selectors fail
+before model work. Existing custom/offline invokers may omit the option.
+
+`ModelCall.id` carries the opaque provider-issued ID. Native mode requires bounded,
+nonblank IDs unique throughout the current turn; none are generated, normalized
+or derived from names/indexes. The JSON-only `CurrentTurnTransportMessage` records
+assistant text/calls and exactly one matching terminal tool outcome per call.
+`readCurrentTurnTransportTranscript` rejects malformed, unanswered, mismatched or
+reused IDs. The technical ceiling is 1 MiB with no truncation; snapshots are copied
+and frozen. Native arguments/results retain their canonical values. Provider
+reasoning, metadata and opaque SDK objects are not retained.
+
+`runtimeMessages` / `ModelRequest.messages` remain canonical commerce observations
+for evidence and selection guards. The native adapter requires ordered commerce
+payloads in the transcript to match these observations exactly, preventing silent
+loss/replacement. It emits native `AIMessage.tool_calls` and correlated
+`ToolMessage.tool_call_id`, with the original data-only result labels, and emits no
+duplicate human tool-result JSON. Historical dialogue, trusted context and the
+separate latest customer objective keep their order; current-turn protocol follows.
+
+`commerce-result` payloads carry existing validated results. Distinct bounded
+`runner-feedback` payloads acknowledge budget-skipped calls and final-response
+validation/selection repair, never successful commerce facts or evidence. Cache
+reuse binds the new requesting ID; retries have one terminal result. Existing
+model/remote/deadline/cancellation, business validation, authorization, referral and
+selection guards remain authoritative. SDK classes stay in the Node model adapter;
+pure contracts contain JSON only. Publication and actual provider conformance
+require separate accepted-package evidence and explicit approval.

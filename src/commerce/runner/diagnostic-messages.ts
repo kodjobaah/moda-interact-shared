@@ -4,6 +4,9 @@ type Explanation = Readonly<{ message: string; action: string }>;
 
 /** Fixed operator-facing explanations. No provider-supplied or customer-supplied text is interpolated. */
 const explanations = {
+  MODEL_TOOL_CALL_ID_INVALID: ["Native tool-call IDs were missing, malformed or duplicated.", "Preserve actual provider call IDs; never manufacture IDs or execute unmatched calls."],
+  MODEL_TRANSCRIPT_INVALID: ["The native current-turn transcript has invalid or unmatched messages.", "Supply ordered assistant calls and exactly one matching terminal tool outcome per call."],
+  MODEL_TRANSCRIPT_TOO_LARGE: ["The native current-turn transcript exceeded its technical byte ceiling.", "Stop the turn without truncating protocol pairs or silently dropping observations."],
   MODEL_OUTPUT_TOKENS_EXHAUSTED: ["The provider exhausted output tokens without visible text or tool calls.", "Inspect token usage and provider response; do not fabricate a reply or retry silently."],
   CANCELLED_BY_CALLER: ["The calling service cancelled this conversation turn.", "Inspect caller cancellation and superseded-message handling."],
   TURN_DEADLINE_EXCEEDED: ["The conversation turn exceeded its overall deadline.", "Inspect elapsed time across the model and tool calls."],

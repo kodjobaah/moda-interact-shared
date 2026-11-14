@@ -52,6 +52,7 @@ function validatePreflight<T>(parse: () => T, code: "INVALID_INPUT" | "INCOMPATI
 }
 
 export function prepareCommerceTurn(input: RunCommerceTurnInput): PreparedCommerceTurn {
+  if(input.toolProtocol!==undefined&&input.toolProtocol!=="native")throw new RunnerFailure("INVALID_INPUT",{stage:"preflight.validate",reasonCode:"MODEL_TRANSCRIPT_INVALID"});
   if (input.signal.aborted) throw new RunnerFailure("CANCELLED", {
     stage: "runtime.cancellation", reasonCode: "CANCELLED_BY_CALLER",
   });

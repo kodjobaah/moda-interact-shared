@@ -1,3 +1,4 @@
+import {appendCurrentTurnAssistant,readCurrentTurnTransportTranscript} from '../../tool-transcript.js';
 import { hasCanonicalCommerceRecommendationContract } from "../../../recommendation-selection.js";
 import { hasObservedProducts, productSelectionConstraint, productSelectionFields } from "../../product-selection.js";
 import { finalResponseToolSchema, ReferralReasonSchema } from "../../../response.js";
@@ -14,6 +15,7 @@ const FORCED_FINAL_RESPONSE_ENVELOPE_INSTRUCTION =
 export function invokeModelNode(execution: CommerceTurnGraphExecution) {
   return async (state: CommerceTurnGraphStateValue) => {
     execution.runtime.checkCancellationAndDeadline();
+    if(execution.input.toolProtocol==='native')readCurrentTurnTransportTranscript(state.toolTranscript);
     const modelStep = state.modelSteps + 1;
     execution.stats.modelSteps = modelStep;
     const startedAt = execution.input.dependencies.now();
@@ -36,6 +38,7 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
         history: execution.input.history,
         ...(execution.prepared.currentCustomerMessages === undefined ? {} : { currentCustomerMessages: execution.prepared.currentCustomerMessages }),
         messages: state.runtimeMessages,
+        ...(execution.input.toolProtocol==='native'?{toolTranscript:state.toolTranscript}:{}),
         tools: [
           ...(state.selectionRepairUsed ? [] : state.availableTools).map((descriptor) => ({
             name: descriptor.name,
@@ -57,10 +60,12 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
       throw new RunnerFailure("UNAVAILABLE", { stage: "model.invoke", reasonCode: "MODEL_INVOCATION_FAILED", modelStep }, error);
     }
     let step: ModelStep;
+    let toolTranscript=state.toolTranscript;
     let observedStep: ModelStep | undefined;
     try {
       step = validateModelStep(raw, execution.prepared.budgets.outputTokens);
       observedStep = step;
+      if(execution.input.toolProtocol==='native')toolTranscript=appendCurrentTurnAssistant(toolTranscript,step);
       routeModelStep(step);
       if (state.selectionRepairUsed && (step.calls.length !== 1 || step.calls[0]?.name !== "finalResponse"))
         throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: state.schemaRepairIssues?.length ? "FINAL_SCHEMA_INVALID" : "FINAL_PRODUCT_SELECTION_MISSING", modelStep, ...(state.schemaRepairIssues?.length ? {issuePaths:[...state.schemaRepairIssues]} : {}) });
@@ -82,6 +87,6 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
       durationMs: elapsedDuration(execution.input, startedAt),
       providerSummary: step.providerSummary,
     });
-    return { modelSteps: modelStep, pendingStep: step };
+    return { modelSteps: modelStep, pendingStep: step, toolTranscript };
   };
 }

@@ -11,7 +11,7 @@ import type {
 import type { GrantedTool, ToolDescriptor } from "../definitions.js";
 import type { StructuredLogger } from "../../logging/index.js";
 
-export type ModelCall = { name: string; arguments: unknown };
+export type ModelCall = { id?: string; name: string; arguments: unknown };
 /** `text` is optional so existing structured-tool invokers remain compatible. */
 /** Only bounded provider metadata is carried into the runner. Never include response bodies or reasoning. */
 export type ModelResponseSummary = {
@@ -23,6 +23,8 @@ export type ModelResponseSummary = {
 };
 export type ModelStep = { calls: ModelCall[]; outputTokens: number; text?: string; providerSummary?: ModelResponseSummary };
 export type ModelRequest = {
+  /** Present (even empty) only for strict native current-turn tool transport. */
+  toolTranscript?: readonly import("./tool-transcript.js").CurrentTurnTransportMessage[];
   /** Runner-controlled finalization; never supplied by merchant configuration. */
   requiredToolName?: "finalResponse";
   instructions: readonly string[];
@@ -44,6 +46,8 @@ export type RunnerTool = {
   extractEvidence?: (result: CommerceToolResult) => unknown[];
 };
 export type RunCommerceTurnInput = {
+  /** Host opt-in; production SDK consumers use strict native IDs and paired messages. */
+  toolProtocol?: "native";
   /** Trusted service context only; never copied from model or tool arguments. */
   executionPurpose?: import("../definitions.js").CommerceExecutionPurpose;
   platform?: "SHOPIFY" | "WOOCOMMERCE";
