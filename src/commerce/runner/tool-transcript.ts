@@ -14,7 +14,7 @@ export type CurrentTurnToolPayload =
 export type CurrentTurnRunnerFeedback = Readonly<{role:"runner-feedback";reasonCode:"FINAL_SCHEMA_INVALID"|"FINAL_PRODUCT_SELECTION_MISSING";issuePaths?:readonly string[]}>;
 export type CurrentTurnTransportMessage =
  | CurrentTurnRunnerFeedback
- | Readonly<{role:'assistant';text?:string;calls:readonly NativeModelCall[]}>
+ | Readonly<{role:'assistant';terminalOnly?:true;text?:string;calls:readonly NativeModelCall[]}>
  | Readonly<{role:'tool';callId:string;name:string;payload:CurrentTurnToolPayload}>;
 function fail():never{throw new RunnerFailure('INVALID_FINAL',{stage:'model.validate',reasonCode:'MODEL_TRANSCRIPT_INVALID'});}
 const object=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&(Object.getPrototypeOf(v)===Object.prototype||Object.getPrototypeOf(v)===null);
@@ -39,31 +39,35 @@ function validIssuePaths(row:Record<string,unknown>):boolean {
  return JSON.stringify(normalized)===JSON.stringify(row.issuePaths);
 }
 /** Complete native protocol only: no orphan, duplicate, reordered or unanswered calls. */
-function validateTranscript(raw:unknown,allowPending=false):readonly CurrentTurnTransportMessage[] {
+function validateTranscript(raw:unknown,allowPending=false,allowTerminalOnly=false):readonly CurrentTurnTransportMessage[] {
  try{
   if(!Array.isArray(raw)||raw.length>4096)fail();assertCurrentTurnTransportBounded(raw);
-  let pending:NativeModelCall[]=[];const ids=new Set<string>();
+  let terminal=false;let pending:NativeModelCall[]=[];const ids=new Set<string>();
   for(const [index,row] of raw.entries()){
    if(!object(row))fail();
    if(row.role==='assistant'){
-    if(pending.length||!keys(row,['role','text','calls'])||!Array.isArray(row.calls)||row.calls.length>32||Object.hasOwn(row,'text')&&(typeof row.text!=='string'||row.text.length>4096))fail();
+    if(terminal||pending.length||!keys(row,['role','text','calls','terminalOnly'])||Object.hasOwn(row,'terminalOnly')&&row.terminalOnly!==true||row.terminalOnly&&!allowTerminalOnly||!Array.isArray(row.calls)||row.calls.length>32||Object.hasOwn(row,'text')&&(typeof row.text!=='string'||!row.terminalOnly&&row.text.length>4096))fail();
+    if(row.terminalOnly){if(!row.calls.length||jsonBytes(row)>262144)fail();terminal=true;}
     for(const call of row.calls){if(!object(call)||!keys(call,['id','name','arguments'])||!isNativeToolCallId(call.id)||ids.has(call.id)||typeof call.name!=='string'||!call.name.length||call.name.length>128||!object(call.arguments))fail();ids.add(call.id);}
     pending=[...row.calls];
    }else if(row.role==='tool'){
     const call=pending.shift();if(!call||!keys(row,['role','callId','name','payload'])||row.callId!==call.id||row.name!==call.name||!object(row.payload))fail();
     const p=row.payload;
+    if(terminal&&(p.kind!=='runner-feedback'||p.reasonCode!=='FINAL_RESPONSE_ACCEPTED'))fail();
     if(p.kind==='commerce-result'){if(!keys(p,['kind','result'])||!CommerceToolResultSchema.safeParse(p.result).success)fail();}
     else if(p.kind==='runner-feedback'){
      if(!keys(p,['kind','reasonCode','issuePaths'])||!(RUNNER_TOOL_FEEDBACK_REASONS as readonly unknown[]).includes(p.reasonCode)||!validIssuePaths(p))fail();
     }else fail();
    }else if(row.role==='runner-feedback'){
     const previous=raw[index-1];
-    if(pending.length||!keys(row,['role','reasonCode','issuePaths'])||!['FINAL_SCHEMA_INVALID','FINAL_PRODUCT_SELECTION_MISSING'].includes(row.reasonCode as string)||!validIssuePaths(row)||!object(previous)||previous.role!=='assistant'||!Array.isArray(previous.calls)||previous.calls.length!==0||typeof previous.text!=='string')fail();
+    if(terminal||pending.length||!keys(row,['role','reasonCode','issuePaths'])||!['FINAL_SCHEMA_INVALID','FINAL_PRODUCT_SELECTION_MISSING'].includes(row.reasonCode as string)||!validIssuePaths(row)||!object(previous)||previous.role!=='assistant'||!Array.isArray(previous.calls)||previous.calls.length!==0||typeof previous.text!=='string')fail();
    }else fail();
   }
   if(pending.length&&!allowPending)fail();return raw as CurrentTurnTransportMessage[];
  }catch(error){if(error instanceof RunnerFailure)throw error;return fail();}
 }
+/** Terminal-only journals are inspectable but never eligible for a subsequent SDK request. */
+export function readTerminalTurnTransportJournal(raw:unknown):readonly CurrentTurnTransportMessage[]{return validateTranscript(raw,false,true);}
 export function readCurrentTurnTransportTranscript(raw:unknown):readonly CurrentTurnTransportMessage[]{return validateTranscript(raw);}
 function snapshot<T>(value:T):T {
  const copy=structuredClone(value);
@@ -79,14 +83,14 @@ export function assertCurrentTurnTransportObservations(messages:readonly Current
   const payload=row.payload;if(payload.kind!=='commerce-result'||canonicalJson(payload.result)!==canonicalJson(observation.result))fail();
  }
 }
-export function appendCurrentTurnAssistant(messages:readonly CurrentTurnTransportMessage[],step:ModelStep):readonly CurrentTurnTransportMessage[]{
+export function appendCurrentTurnAssistant(messages:readonly CurrentTurnTransportMessage[],step:ModelStep,terminalOnly=false):readonly CurrentTurnTransportMessage[]{
  readCurrentTurnTransportTranscript(messages);
  const ids=new Set(messages.flatMap(row=>row.role==='assistant'?row.calls.map(call=>call.id):[]));for(const call of step.calls){if(!isNativeToolCallId(call.id)||ids.has(call.id))throw new RunnerFailure('INVALID_FINAL',{stage:'model.validate',reasonCode:'MODEL_TOOL_CALL_ID_INVALID'});ids.add(call.id);}
- const next:CurrentTurnTransportMessage[]=[...messages,{role:'assistant',...(step.text===undefined?{}:{text:step.text}),calls:step.calls.map(call=>({id:call.id!,name:call.name,arguments:call.arguments as Record<string,unknown>}))}];
- validateTranscript(next,true);return snapshot(next);
+ const next:CurrentTurnTransportMessage[]=[...messages,{role:'assistant',...(terminalOnly?{terminalOnly:true as const}:{}),...(step.text===undefined?{}:{text:step.text}),calls:step.calls.map(call=>({id:call.id!,name:call.name,arguments:call.arguments as Record<string,unknown>}))}];
+ validateTranscript(next,true,terminalOnly);return snapshot(next);
 }
 export function appendCurrentTurnTool(messages:readonly CurrentTurnTransportMessage[],call:{id?:string;name:string},payload:CurrentTurnToolPayload):readonly CurrentTurnTransportMessage[]{
- if(!isNativeToolCallId(call.id))fail();const next:CurrentTurnTransportMessage[]=[...messages,{role:'tool',callId:call.id,name:call.name,payload}];validateTranscript(next,true);return snapshot(next);
+ if(!isNativeToolCallId(call.id))fail();const next:CurrentTurnTransportMessage[]=[...messages,{role:'tool',callId:call.id,name:call.name,payload}];validateTranscript(next,true,true);return snapshot(next);
 }
 export function nativeToolPayloadContent(payload:CurrentTurnToolPayload,name:string):string {
  return payload.kind==='commerce-result'

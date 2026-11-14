@@ -29,6 +29,8 @@ export type ModelRequest = {
   requiredToolName?: "finalResponse";
   /** Generic required choice among explicitly advertised terminal tools. */
   requireToolCall?: boolean;
+  /** Runner-only pure terminal response; its journal is never eligible for SDK reentry. */
+  terminalResponseOnly?: boolean;
   instructions: readonly string[];
   context: unknown;
   history: readonly unknown[];

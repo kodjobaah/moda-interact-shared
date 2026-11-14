@@ -1,3 +1,4 @@
+import {validateModelStep} from '../runner/model-step.js';
 import {readCurrentTurnTransportTranscript,assertCurrentTurnTransportObservations,isNativeToolCallId,nativeToolPayloadContent,nativeRunnerFeedbackContent} from '../runner/tool-transcript.js';
 import { prepareCurrentCustomerMessages, CURRENT_CUSTOMER_MESSAGES_INSTRUCTION } from "../current-customer-messages.js";
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from "@langchain/core/messages";
@@ -339,6 +340,7 @@ export function createOpenRouterInvoker(
 
         let bound: BoundChatModel;
         try {
+          if(request.terminalResponseOnly!==undefined&&request.terminalResponseOnly!==true||request.terminalResponseOnly&&(!request.requireToolCall||!Object.hasOwn(request,"toolTranscript")))throw new Error("Invalid terminal-only request");
           if(request.requireToolCall!==undefined&&typeof request.requireToolCall!=="boolean"||request.requireToolCall&&(request.requiredToolName!==undefined||request.tools.length===0))throw new Error("Conflicting or invalid required tool choice");
           if (request.requiredToolName !== undefined && (request.requiredToolName !== "finalResponse" || !request.tools.some(tool => tool.name === request.requiredToolName)))
             throw new Error("Required finalization tool is absent");
@@ -366,7 +368,10 @@ export function createOpenRouterInvoker(
         }
 
         try {
-          return modelStepFromResponse(response, Object.hasOwn(request,"toolTranscript"));
+          const step=modelStepFromResponse(response, Object.hasOwn(request,"toolTranscript"));
+          if(request.terminalResponseOnly)return validateModelStep(step,request.maxOutputTokens,request.tools.map(t=>t.name));
+          if(step.text&&step.text.length>4096)throw unavailable({stage:"response",reason:"PROVIDER_RESPONSE_INVALID"});
+          return step;
         } catch (error) {
           const reason = error instanceof CommerceModelInvocationFailure
             && ["PROVIDER_RESPONSE_USAGE_INVALID", "PROVIDER_RESPONSE_TOOL_CALL_INVALID"].includes(error.diagnostic.reasonCode)
