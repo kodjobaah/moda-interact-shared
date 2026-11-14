@@ -2,12 +2,12 @@ import {canonicalJson,jsonBytes,type Digest} from '../canonical-json.js';
 import type {CommerceFinalResponse} from '../response.js';
 import type {CommerceTurnIdentity} from '../schemas.js';
 import type {ModelStep} from './types.js';
-import {assertCurrentTurnTransportBounded,type NativeModelCall} from './tool-transcript.js';
+import {assertCurrentTurnTransportBounded,isNativeToolCallId,type NativeModelCall} from './tool-transcript.js';
 import {RunnerFailure} from './failure.js';
 import type {CommerceTurnRuntime} from './runtime.js';
 export type TerminalToolDescriptor=Readonly<{name:string;description:string;inputSchema:unknown}>;
-export type TerminalDecisionBinding=Readonly<{turn:Readonly<CommerceTurnIdentity>;modelStep:number;callId:string;toolName:string;rawCallSha256:string;responseContractHash:string}>;
-export type TerminalDecisionInput=Readonly<{binding:TerminalDecisionBinding;transportStep:Readonly<ModelStep>;call:NativeModelCall;observations:readonly Readonly<{tool:string;result:unknown}>[];requiredReferral:CommerceFinalResponse['referralReason']}>;
+export type TerminalDecisionBinding=Readonly<{turn:Readonly<CommerceTurnIdentity>;modelStep:number;callId:string;callIds:readonly string[];toolName:string;rawCallSha256:string;rawStepSha256:string;rawCallsSha256:string;responseContractHash:string}>;
+export type TerminalDecisionInput=Readonly<{binding:TerminalDecisionBinding;transportStep:Readonly<ModelStep>;call:NativeModelCall;calls:readonly NativeModelCall[];observations:readonly Readonly<{tool:string;result:unknown}>[];requiredReferral:CommerceFinalResponse['referralReason']}>;
 export type TerminalDecisionResult=Readonly<{kind:'decision';binding:TerminalDecisionBinding;value:unknown}>|Readonly<{kind:'invalid';binding:TerminalDecisionBinding}>;
 export type TerminalToolSelectionInput=Readonly<{turn:Readonly<CommerceTurnIdentity>;modelStep:number;responseContractHash:string;observations:readonly Readonly<{tool:string;result:unknown}>[];requiredReferral:CommerceFinalResponse['referralReason']}>;
 export type TerminalDecisionPort=Readonly<{responseContractHash:string;terminalTools:readonly TerminalToolDescriptor[];selectTools?(input:TerminalToolSelectionInput):readonly string[];project(input:TerminalDecisionInput):TerminalDecisionResult}>;
@@ -39,14 +39,25 @@ export function selectTerminalDecisionTools(port:TerminalDecisionPort,context:Te
  if(failed||!Array.isArray(result)||result.length<1||result.length>port.terminalTools.length||new Set(result).size!==result.length||result.some(n=>typeof n!=='string'||!port.terminalTools.some(t=>t.name===n)))throw new RunnerFailure('INVALID_FINAL',{stage:'model.invoke',reasonCode:'TERMINAL_TOOL_SELECTION_INVALID'});
  return Object.freeze(result.map(name=>port.terminalTools.find(t=>t.name===name)!));
 }
+/** Establish the whole equivalence class before exposing any representative actual call. */
+export function readEquivalentTerminalCalls(step:ModelStep,allowedToolNames:readonly string[]):readonly NativeModelCall[]{
+ const first=step.calls[0];
+ if(!first||!allowedToolNames.includes(first.name))invalidDecision();
+ const args=canonicalJson(first.arguments),ids=new Set<string>();
+ for(const call of step.calls){
+  if(!isNativeToolCallId(call.id)||ids.has(call.id)||!allowedToolNames.includes(call.name)||call.name!==first.name||canonicalJson(call.arguments)!==args)invalidDecision();
+  ids.add(call.id);
+ }
+ return step.calls as readonly NativeModelCall[];
+}
 /** Project once, synchronously, using a framework-issued binding. No model/tool invocation occurs here. */
 export function projectTerminalDecision(input:{port:TerminalDecisionPort;step:ModelStep;turn:CommerceTurnIdentity;modelStep:number;responseContractHash:string;observations:readonly Readonly<{tool:string;result:unknown}>[];requiredReferral:CommerceFinalResponse['referralReason'];allowedToolNames:readonly string[];digest:Digest;runtime:Pick<CommerceTurnRuntime,'checkCancellationAndDeadline'>}):unknown {
  input.runtime.checkCancellationAndDeadline();
- const stepBefore=canonicalJson(input.step),call=input.step.calls[0];
- if(input.port.responseContractHash!==input.responseContractHash||input.step.calls.length!==1||!call?.id||!input.allowedToolNames.includes(call.name)||!input.port.terminalTools.some(t=>t.name===call.name))invalidDecision();
- const hash=input.digest(canonicalJson(call));if(!/^[a-f0-9]{64}$/.test(hash))invalidDecision();
- const binding=immutableTerminalSnapshot<TerminalDecisionBinding>({turn:input.turn,modelStep:input.modelStep,callId:call.id,toolName:call.name,rawCallSha256:hash,responseContractHash:input.responseContractHash});
- const request=Object.freeze({binding,transportStep:immutableTerminalSnapshot(input.step),call:immutableTerminalSnapshot(call as NativeModelCall),observations:immutableTerminalSnapshot(input.observations),requiredReferral:input.requiredReferral});
+ const stepBefore=canonicalJson(input.step),calls=readEquivalentTerminalCalls(input.step,input.allowedToolNames),call=calls[0]!;
+ if(input.port.responseContractHash!==input.responseContractHash||!input.port.terminalTools.some(t=>t.name===call.name))invalidDecision();
+ const hash=input.digest(canonicalJson(call)),rawStepSha256=input.digest(stepBefore),rawCallsSha256=input.digest(canonicalJson(calls));if(![hash,rawStepSha256,rawCallsSha256].every(h=>/^[a-f0-9]{64}$/.test(h)))invalidDecision();
+ const binding=immutableTerminalSnapshot<TerminalDecisionBinding>({turn:input.turn,modelStep:input.modelStep,callId:call.id,callIds:calls.map(c=>c.id),toolName:call.name,rawCallSha256:hash,rawStepSha256,rawCallsSha256,responseContractHash:input.responseContractHash});
+ const request=Object.freeze({binding,transportStep:immutableTerminalSnapshot(input.step),call:immutableTerminalSnapshot(call),calls:immutableTerminalSnapshot(calls),observations:immutableTerminalSnapshot(input.observations),requiredReferral:input.requiredReferral});
  let result:unknown,failed=false;
  try{result=input.port.project(request);}catch{failed=true;}
  input.runtime.checkCancellationAndDeadline();

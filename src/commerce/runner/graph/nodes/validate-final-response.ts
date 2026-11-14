@@ -15,6 +15,7 @@ export function validateFinalResponseNode(execution: CommerceTurnGraphExecution)
       throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: "MODEL_RESULT_MISSING" });
     const withOutcome=(payload:CurrentTurnToolPayload)=>{
       if(execution.input.toolProtocol!=='native')return {};
+      if(state.terminalProjection&&state.pendingStep!.calls.length){let transcript=state.toolTranscript;for(const call of state.pendingStep!.calls)transcript=appendCurrentTurnTool(transcript,call,payload);return {toolTranscript:transcript};}
       if(state.pendingStep!.calls.length===1)return {toolTranscript:appendCurrentTurnTool(state.toolTranscript,state.pendingStep!.calls[0]!,payload)};
       if(payload.kind==='runner-feedback'&&(payload.reasonCode==='FINAL_SCHEMA_INVALID'||payload.reasonCode==='FINAL_PRODUCT_SELECTION_MISSING'))return {toolTranscript:appendCurrentTurnRunnerFeedback(state.toolTranscript,{reasonCode:payload.reasonCode,...(payload.issuePaths===undefined?{}:{issuePaths:payload.issuePaths})})};
       return {};

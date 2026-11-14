@@ -71,8 +71,8 @@ export function invokeModelNode(execution: CommerceTurnGraphExecution) {
       if(finalizer)step=immutableTerminalSnapshot(step);
       observedStep = step;
       if(execution.input.toolProtocol==='native')toolTranscript=appendCurrentTurnAssistant(toolTranscript,step);
-      routeModelStep(step,terminalToolNames);
-      if (state.selectionRepairUsed && (step.calls.length !== 1 || !terminalToolNames.includes(step.calls[0]?.name??'')))
+      routeModelStep(step,terminalToolNames,!!finalizer);
+      if (state.selectionRepairUsed && !finalizer && (step.calls.length !== 1 || !terminalToolNames.includes(step.calls[0]?.name??'')))
         throw new RunnerFailure("INVALID_FINAL", { stage: "final.validate", reasonCode: state.schemaRepairIssues?.length ? "FINAL_SCHEMA_INVALID" : "FINAL_PRODUCT_SELECTION_MISSING", modelStep, ...(state.schemaRepairIssues?.length ? {issuePaths:[...state.schemaRepairIssues]} : {}) });
     } catch (error) {
       if (!finalizer && state.schemaRepairIssues?.length && error instanceof RunnerFailure && error.code === "INVALID_FINAL")

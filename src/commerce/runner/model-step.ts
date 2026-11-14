@@ -1,3 +1,4 @@
+import {readEquivalentTerminalCalls} from './terminal-decision.js';
 import { jsonBytes } from "../canonical-json.js";
 import type { RunnerDiagnosticReason } from "./diagnostics.js";
 import { RunnerFailure } from "./failure.js";
@@ -60,7 +61,8 @@ export function validateModelStep(step: unknown, outputTokenBudget: number): Mod
   }
 }
 
-export function routeModelStep(step: ModelStep,terminalNames:readonly string[]=["finalResponse"]): "toolCalls" | "finalResponse" | "textResponse" {
+export function routeModelStep(step: ModelStep,terminalNames:readonly string[]=["finalResponse"],allowEquivalentTerminalBatch=false): "toolCalls" | "finalResponse" | "textResponse" {
+  if(allowEquivalentTerminalBatch){readEquivalentTerminalCalls(step,terminalNames);return "finalResponse";}
   const finalCalls = step.calls.filter((call) => terminalNames.includes(call.name));
   if (finalCalls.length > 0) {
     if (finalCalls.length !== 1 || step.calls.length !== 1)
