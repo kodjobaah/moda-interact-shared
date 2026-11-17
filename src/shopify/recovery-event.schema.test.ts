@@ -159,3 +159,71 @@ test("v3 checkout.updated rejects unknown payload and envelope fields", () => {
     unexpected: true,
   }).success, false);
 });
+
+const VALID_CART_CORRELATION_MARKER = `m1_${"A".repeat(42)}B`;
+
+test("v3 checkout.updated round-trips the cart-correlation marker pair exactly", () => {
+  const event = parseShopifyRecoveryEvent(checkoutUpdatedV3Event({
+    checkoutToken: "checkout_1",
+    cartCorrelationMarker: VALID_CART_CORRELATION_MARKER,
+    cartCorrelationMarkerStatus: "PRESENT",
+  }));
+
+  if (event.schemaVersion !== SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION_V3) {
+    assert.fail("expected a v3 checkout.updated event");
+  }
+  assert.equal(event.payload.cartCorrelationMarker, VALID_CART_CORRELATION_MARKER);
+  assert.equal(event.payload.cartCorrelationMarkerStatus, "PRESENT");
+});
+
+test("v3 checkout.updated transports every non-present marker status without a marker", () => {
+  for (const status of ["ABSENT", "INVALID", "AMBIGUOUS"] as const) {
+    const event = parseShopifyRecoveryEvent(checkoutUpdatedV3Event({
+      checkoutToken: "checkout_1",
+      cartCorrelationMarkerStatus: status,
+    }));
+
+    if (event.schemaVersion !== SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION_V3) {
+      assert.fail("expected a v3 checkout.updated event");
+    }
+    assert.equal(event.payload.cartCorrelationMarkerStatus, status);
+    assert.equal(event.payload.cartCorrelationMarker, undefined);
+  }
+});
+
+test("v3 checkout.updated rejects malformed markers and statuses before publication", () => {
+  for (const payload of [
+    { checkoutToken: "checkout_1", cartCorrelationMarker: `m2_${"A".repeat(43)}` },
+    { checkoutToken: "checkout_1", cartCorrelationMarker: `m1_${"A".repeat(42)}` },
+    { checkoutToken: "checkout_1", cartCorrelationMarker: `m1_${"A".repeat(44)}` },
+    { checkoutToken: "checkout_1", cartCorrelationMarker: `m1_${"A".repeat(42)}!` },
+    { checkoutToken: "checkout_1", cartCorrelationMarker: "" },
+    { checkoutToken: "checkout_1", cartCorrelationMarker: null },
+    { checkoutToken: "checkout_1", cartCorrelationMarkerStatus: "present" },
+    { checkoutToken: "checkout_1", cartCorrelationMarkerStatus: "NOT_OBSERVED" },
+    { checkoutToken: "checkout_1", cartCorrelationMarkerStatus: null },
+  ]) {
+    assert.equal(safeParseShopifyRecoveryEvent(checkoutUpdatedV3Event(payload)).success, false);
+  }
+});
+
+test("legacy v3 checkout.updated events without marker fields remain compatible", () => {
+  const event = parseShopifyRecoveryEvent(checkoutUpdatedV3Event());
+  if (event.schemaVersion !== SHOPIFY_COMMERCE_EVENT_SCHEMA_VERSION_V3) {
+    assert.fail("expected a v3 checkout.updated event");
+  }
+  assert.deepEqual(event.payload, { checkoutToken: "checkout_1" });
+  assert.equal(event.payload.cartCorrelationMarker, undefined);
+  assert.equal(event.payload.cartCorrelationMarkerStatus, undefined);
+});
+
+test("v2 checkout.updated payload does not transport the marker fields", () => {
+  assert.equal(safeParseShopifyRecoveryEvent({
+    ...checkoutUpdatedV2Event(),
+    payload: {
+      checkoutToken: "checkout_1",
+      cartCorrelationMarker: VALID_CART_CORRELATION_MARKER,
+      cartCorrelationMarkerStatus: "PRESENT",
+    },
+  }).success, false);
+});
