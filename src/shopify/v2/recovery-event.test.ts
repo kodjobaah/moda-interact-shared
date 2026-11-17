@@ -9,6 +9,7 @@ import {
   createShopifyOrderCorrelationOrderingKey,
   createShopifyCartActivityOrderingKey,
   isCartActivityEventV2,
+  isCheckoutCreatedEventV2,
   createShopifyPendingRecoveryOrderingKey,
   parseShopifyRecoveryEventV2,
   safeParseShopifyRecoveryEventV2,
@@ -212,6 +213,85 @@ test("parses v2 order.completed with nullable correlation identifiers", () => {
   assert.equal(event.eventType, "order.completed");
   assert.equal(event.payload.checkoutToken, null);
   assert.equal(event.payload.cartToken, null);
+});
+
+const VALID_CART_CORRELATION_MARKER = `m1_${"A".repeat(42)}B`;
+
+test("v2 checkout.created round-trips the cart-correlation marker pair exactly", () => {
+  const event = parseShopifyRecoveryEventV2({
+    ...checkoutCreatedV2Event(),
+    payload: {
+      ...checkoutCreatedV2Event().payload,
+      cartCorrelationMarker: VALID_CART_CORRELATION_MARKER,
+      cartCorrelationMarkerStatus: "PRESENT",
+    },
+  });
+
+  assert.ok(isCheckoutCreatedEventV2(event));
+  assert.equal(event.payload.cartCorrelationMarker, VALID_CART_CORRELATION_MARKER);
+  assert.equal(event.payload.cartCorrelationMarkerStatus, "PRESENT");
+});
+
+test("v2 checkout.created transports every non-present marker status without a marker", () => {
+  for (const status of ["ABSENT", "INVALID", "AMBIGUOUS"] as const) {
+    const event = parseShopifyRecoveryEventV2({
+      ...checkoutCreatedV2Event(),
+      payload: {
+        ...checkoutCreatedV2Event().payload,
+        cartCorrelationMarkerStatus: status,
+      },
+    });
+
+    assert.ok(isCheckoutCreatedEventV2(event));
+    assert.equal(event.payload.cartCorrelationMarkerStatus, status);
+    assert.equal(event.payload.cartCorrelationMarker, undefined);
+  }
+});
+
+test("v2 checkout.created rejects malformed markers and statuses before publication", () => {
+  const malformed = [
+    { cartCorrelationMarker: `m2_${"A".repeat(43)}` },
+    { cartCorrelationMarker: `m1_${"A".repeat(42)}` },
+    { cartCorrelationMarker: `m1_${"A".repeat(44)}` },
+    { cartCorrelationMarker: `m1_${"A".repeat(42)}!` },
+    { cartCorrelationMarker: "" },
+    { cartCorrelationMarkerStatus: "present" },
+    { cartCorrelationMarkerStatus: "NOT_OBSERVED" },
+    { cartCorrelationMarkerStatus: null },
+    { cartCorrelationMarker: null },
+  ];
+
+  for (const fields of malformed) {
+    const result = safeParseShopifyRecoveryEventV2({
+      ...checkoutCreatedV2Event(),
+      payload: {
+        ...checkoutCreatedV2Event().payload,
+        ...fields,
+      },
+    });
+    assert.equal(result.success, false);
+  }
+});
+
+test("legacy v2 checkout.created events without marker fields remain compatible", () => {
+  const event = parseShopifyRecoveryEventV2(checkoutCreatedV2Event());
+  assert.ok(isCheckoutCreatedEventV2(event));
+  assert.equal(event.payload.cartCorrelationMarker, undefined);
+  assert.equal(event.payload.cartCorrelationMarkerStatus, undefined);
+});
+
+test("v2 checkout.created payload remains strict around the marker fields", () => {
+  assert.throws(() =>
+    parseShopifyRecoveryEventV2({
+      ...checkoutCreatedV2Event(),
+      payload: {
+        ...checkoutCreatedV2Event().payload,
+        cartCorrelationMarker: VALID_CART_CORRELATION_MARKER,
+        cartCorrelationMarkerStatus: "PRESENT",
+        note_attributes: [{ name: "moda_cart_correlation_v1", value: "x" }],
+      },
+    }),
+  );
 });
 
 test("rejects v2 checkout.created payload carrying pre-recovery basket/customer fields", () => {

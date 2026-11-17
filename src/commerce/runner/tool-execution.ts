@@ -1,3 +1,4 @@
+import {appendCurrentTurnTool,type CurrentTurnTransportMessage} from './tool-transcript.js';
 import {hasObservedProducts,productSelectionFields} from "./product-selection.js";
 import { CommerceProductSchema } from "../schemas.js";
 import { isBuiltInTool } from "../definitions.js";
@@ -16,6 +17,7 @@ import { resolveToolCall } from "./tool-policy.js";
 import type { RunCommerceTurnInput, ModelStep } from "./types.js";
 
 export type ToolExecutionResult = {
+  toolTranscript?:readonly CurrentTurnTransportMessage[];
   finalizationRequired: boolean;
   remoteCalls: number;
   runtimeMessages: ReadonlyArray<{ tool: string; result: unknown }>;
@@ -27,6 +29,7 @@ export async function executeToolCalls(input: {
   source: RunCommerceTurnInput;
   prepared: PreparedCommerceTurn;
   runtime: CommerceTurnRuntime;
+  toolTranscript?:readonly CurrentTurnTransportMessage[];
   modelStep: number;
   step: ModelStep;
   availableTools: Parameters<typeof resolveToolCall>[2];
@@ -43,11 +46,17 @@ export async function executeToolCalls(input: {
   const runtimeMessages = [...input.runtimeMessages];
   const evidenceById = { ...input.evidenceById };
   let requiredReferral = input.requiredReferral;
+  let toolTranscript=input.toolTranscript;
+  const recordResult=(call:ModelStep['calls'][number],result:ReturnType<typeof CommerceToolResultSchema.parse>)=>{
+    runtimeMessages.push({tool:call.name,result});
+    if(toolTranscript!==undefined)toolTranscript=appendCurrentTurnTool(toolTranscript,call,{kind:'commerce-result',result});
+  };
 
-  toolCalls: for (const call of input.step.calls) {
+  toolCalls: for (const [callIndex,call] of input.step.calls.entries()) {
     input.runtime.checkCancellationAndDeadline();
     if(remoteCalls>=input.prepared.budgets.remoteCalls && hasObservedProducts(runtimeMessages) && productSelectionFields(input.prepared.response).length>0) {
       finalizationRequired=true;
+      if(toolTranscript!==undefined)for(const skipped of input.step.calls.slice(callIndex))toolTranscript=appendCurrentTurnTool(toolTranscript,skipped,{kind:'runner-feedback',reasonCode:'VERIFICATION_CAPACITY_RESERVED'});
       safeLog(input.logger,"debug","commerce.turn.discovery.completed",{modelStep:input.modelStep,reasonCode:"VERIFICATION_CAPACITY_RESERVED",remoteCalls});
       break;
     }
@@ -59,10 +68,7 @@ export async function executeToolCalls(input: {
         toolName: call.name,
         reasonCode: policy.denial,
       });
-      runtimeMessages.push({
-        tool: call.name,
-        result: { contractVersion: "commerce.v1", status: "ERROR", code: "DENIED", retryable: false },
-      });
+      recordResult(call,{contractVersion:"commerce.v1",status:"ERROR",code:"DENIED",retryable:false});
       continue;
     }
     const { grant, tool } = policy;
@@ -75,16 +81,13 @@ export async function executeToolCalls(input: {
         toolName: call.name,
         reasonCode: "TOOL_REVOKED",
       });
-      runtimeMessages.push({
-        tool: call.name,
-        result: { contractVersion: "commerce.v1", status: "ERROR", code: "DENIED", retryable: false },
-      });
+      recordResult(call,{contractVersion:"commerce.v1",status:"ERROR",code:"DENIED",retryable:false});
       continue;
     }
     resolveToolCall(call.name, input.prepared, input.availableTools);
     const args = compileSubset(tool.descriptor.inputSchema, "input").safeParse(call.arguments);
     if (!args.success) {
-      runtimeMessages.push({tool:call.name,result:{contractVersion:"commerce.v1",status:"ERROR",code:"INVALID_INPUT",retryable:false}});
+      recordResult(call,{contractVersion:"commerce.v1",status:"ERROR",code:"INVALID_INPUT",retryable:false});
       safeLog(input.logger,"warn","commerce.turn.tool.invalid_input",{toolName:call.name,reasonCode:"TOOL_INPUT_INVALID",...schemaIssueMetadata(args.error)});
       continue;
     }
@@ -95,7 +98,7 @@ export async function executeToolCalls(input: {
     const cached = cacheKey === undefined ? undefined : input.productReadCache?.get(cacheKey);
     if (cached) {
       finalizationRequired = true;
-      runtimeMessages.push({ tool: call.name, result: structuredClone(cached) });
+      recordResult(call,structuredClone(cached));
       safeLog(input.logger, "debug", "commerce.turn.tool.reused", {
         modelStep: input.modelStep, toolName: call.name, reasonCode: "SAME_TURN_PRODUCT_READ",
       });
@@ -173,7 +176,7 @@ export async function executeToolCalls(input: {
         stage: "tool.authorize", reasonCode: "TOOL_AUTHORIZATION_FAILED", toolName: call.name, modelStep: input.modelStep,
       }))) {
         requiredReferral = "TOOL_REVOKED";
-        runtimeMessages.push({tool: call.name, result: {contractVersion: "commerce.v1", status: "ERROR", code: "DENIED", retryable: false}});
+        recordResult(call,{contractVersion:"commerce.v1",status:"ERROR",code:"DENIED",retryable:false});
         safeLog(input.logger, "warn", "commerce.turn.tool.denied", {toolName: call.name, reasonCode: "TOOL_REVOKED"});
         continue toolCalls;
       }
@@ -226,8 +229,8 @@ export async function executeToolCalls(input: {
     if (cacheKey !== undefined && result.status === "OK" &&
       (result.data as { product?: unknown } | null)?.product)
       input.productReadCache?.set(cacheKey, structuredClone(result));
-    runtimeMessages.push({ tool: call.name, result });
+    recordResult(call,result);
   }
 
-  return { finalizationRequired, remoteCalls, runtimeMessages, evidenceById, requiredReferral };
+  return { finalizationRequired, remoteCalls, runtimeMessages, evidenceById, requiredReferral, ...(toolTranscript===undefined?{}:{toolTranscript}) };
 }

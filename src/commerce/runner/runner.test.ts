@@ -1655,3 +1655,61 @@ test("current preflight failures retain no private validation cause", () => {
   assert.ok(depth<10);return true;
  });
 });
+
+// Native transport fixtures represent provider-returned IDs; the runner never generates them.
+import {readCurrentTurnTransportTranscript,assertCurrentTurnTransportObservations,appendCurrentTurnAssistant,appendCurrentTurnTool,type CurrentTurnTransportMessage} from './tool-transcript.js';
+const nativeStep=(step:ModelStep,id:string):ModelStep=>({...step,calls:step.calls.map((call,index)=>({...call,id:`${id}:${index}`}))});
+test('native batch emits one terminal result per call including invalid input and denial, separate from observations',async()=>{
+ const batch:ModelStep={calls:[{id:'provider-ok',name:exampleTool.name,arguments:{handle:'coat'}},{id:'provider-invalid',name:exampleTool.name,arguments:{}},{id:'provider-denied',name:'unknown_tool',arguments:{}}],outputTokens:20};
+ const f=fixture([batch,{calls:[],text:'Finish',outputTokens:5}],true);f.input.toolProtocol='native';
+ const result=await runCommerceTurn(f.input);assert.equal(result.ok,true,JSON.stringify(result));assert.equal(f.counts().tools,1);
+ const request=f.requests[1]!;const rows=readCurrentTurnTransportTranscript(request.toolTranscript);assertCurrentTurnTransportObservations(rows,request.messages);
+ assert.deepEqual(rows.map(r=>r.role),['assistant','tool','tool','tool']);assert.deepEqual(rows.filter(r=>r.role==='tool').map(r=>r.callId),['provider-ok','provider-invalid','provider-denied']);assert.equal(request.messages.length,3);
+ assert.ok(Object.isFrozen(rows));assert.ok(Object.isFrozen((rows[0] as any).calls[0].arguments));
+});
+test('native retries remain two remote attempts and one terminal transport result under the original call ID',async()=>{
+ const f=fixture([nativeStep(call(),'retry'),{calls:[],text:'Finish',outputTokens:2}],true);f.input.toolProtocol='native';let attempts=0;
+ f.input.dependencies.tools[0]!.execute=async()=>++attempts===1?{contractVersion:'commerce.v1',status:'ERROR',code:'THROTTLED',retryable:true}:{contractVersion:'commerce.v1',status:'OK',data:{source:'SHOPIFY_STOREFRONT',values:{title:'Coat'}},renderedText:'Coat'};
+ const result=await runCommerceTurn(f.input);assert.equal(result.ok,true,JSON.stringify(result));assert.equal(attempts,2);if(result.ok)assert.equal(result.usage.remoteCalls,2);
+ const rows=readCurrentTurnTransportTranscript(f.requests[1]!.toolTranscript);assert.equal(rows.length,2);assert.equal(rows[1]!.role==='tool'&&rows[1].callId,'retry:0');assert.equal(f.requests[1]!.messages.length,1);
+});
+test('native malformed or reused IDs refuse tool I/O without replacement IDs',async()=>{
+ for(const steps of [[call()],[{calls:[{id:'dup',name:exampleTool.name,arguments:{handle:'coat'}},{id:'dup',name:exampleTool.name,arguments:{handle:'coat'}}],outputTokens:1}],[nativeStep(call(),'same'),nativeStep(call(),'same')]]){
+  const f=fixture(steps,true);f.input.toolProtocol='native';const result=await runCommerceTurn(f.input);expectFailure(result,'INVALID_FINAL','MODEL_TOOL_CALL_ID_INVALID');assert.equal(f.counts().tools,steps.length===2?1:0);
+ }
+});
+test('native final schema repair pairs the real invalid final call and keeps existing one-correction budget',async()=>{
+ const f=fixture([nativeStep(final({...exampleFinal,replyText:null}),'bad-final'),nativeStep(final(),'good-final')]);f.input.toolProtocol='native';
+ const result=await runCommerceTurn(f.input);assert.equal(result.ok,true,JSON.stringify(result));assert.equal(f.requests.length,2);assert.equal(f.requests[1]!.requiredToolName,'finalResponse');
+ const rows=readCurrentTurnTransportTranscript(f.requests[1]!.toolTranscript);assert.equal(rows.length,2);assert.deepEqual(rows[1],{role:'tool',callId:'bad-final:0',name:'finalResponse',payload:{kind:'runner-feedback',reasonCode:'FINAL_SCHEMA_INVALID',issuePaths:['replyText']}});assert.deepEqual(f.requests[1]!.messages,[]);
+});
+test('native cached product results use the new requesting ID without another provider read',async()=>{
+ const f=productResultFixture('commerce_get_product',optionBoundaryProduct());f.input.toolProtocol='native';let n=0,reads=0;const execute=f.input.dependencies.tools[0]!.execute;f.input.dependencies.tools[0]!.execute=async(...args)=>{reads++;return execute(...args);};
+ const steps=[nativeStep(call('commerce_get_product'),'read-a'),nativeStep(call('commerce_get_product'),'read-b'),nativeStep(final({...exampleFinal,answerKind:'ANSWER',referralReason:null}),'final')];f.input.dependencies.model.invoke=async r=>{f.requests.push(r);return steps[n++]!;};
+ assert.equal((await runCommerceTurn(f.input)).ok,true);assert.equal(reads,1);const rows=readCurrentTurnTransportTranscript(f.requests[2]!.toolTranscript);assert.deepEqual(rows.filter(r=>r.role==='tool').map(r=>r.callId),['read-a:0','read-b:0']);assertCurrentTurnTransportObservations(rows,f.requests[2]!.messages);
+});
+test('native budget reservation closes every unexecuted call in a batch with feedback, never fabricated facts',async()=>{
+ const f=productResultFixture('commerce_get_product',optionBoundaryProduct());f.input.toolProtocol='native';f.input.budgets={remoteCalls:1};
+ f.input.manifest.responseContract.detailsSchema={type:'object',properties:{productDetailSelections:{type:'array',maxItems:3,items:{type:'object',properties:{productId:{type:'string',maxLength:128},variantId:{type:['string','null'],maxLength:128}},required:['productId','variantId'],additionalProperties:false}}},required:[],additionalProperties:false};f.input.manifest.responseContractHash=digest(responseContractCanonicalJson(f.input.manifest.responseContract));
+ const batch:ModelStep={calls:[{id:'first',name:'commerce_get_product',arguments:{handle:'coat'}},{id:'skipped-a',name:'commerce_get_product',arguments:{handle:'other'}},{id:'skipped-b',name:'commerce_get_product',arguments:{handle:'third'}}],outputTokens:10};
+ let n=0;const steps=[batch,nativeStep(final({...exampleFinal,answerKind:'ANSWER',referralReason:null,details:{productDetailSelections:[{productId:'7',variantId:'8'}]}}),'complete')];f.input.dependencies.model.invoke=async request=>{f.requests.push(request);return steps[n++]!;};
+ const result=await runCommerceTurn(f.input);assert.equal(result.ok,true,JSON.stringify(result));if(result.ok)assert.equal(result.usage.remoteCalls,1);
+ const request=f.requests[1]!,rows=readCurrentTurnTransportTranscript(request.toolTranscript);assert.equal(request.messages.length,1);assert.equal(rows.length,4);assert.equal(rows[2]!.role==='tool'&&rows[2].payload.kind,'runner-feedback');assert.equal(rows[3]!.role==='tool'&&rows[3].payload.kind,'runner-feedback');assertCurrentTurnTransportObservations(rows,request.messages);assert.equal(request.requiredToolName,'finalResponse');
+});
+test('native cancellation, deadline and model/remote ceilings cannot start another model invocation',async()=>{
+ for(const mode of ['cancel','deadline','model','remote'] as const){const f=fixture([nativeStep(call(),'first'),nativeStep(call(),'second')],true);f.input.toolProtocol='native';
+  if(mode==='model')f.input.budgets={modelSteps:1};if(mode==='remote')f.input.budgets={remoteCalls:1};
+  if(mode==='cancel'){const abort=new AbortController();f.input.signal=abort.signal;f.input.dependencies.tools[0]!.execute=async()=>{abort.abort();return {contractVersion:'commerce.v1',status:'OK',data:{},renderedText:''};};}
+  if(mode==='deadline'){let clock=now;f.input.dependencies.now=()=>clock;f.input.budgets={deadlineMs:10};f.input.dependencies.tools[0]!.execute=async()=>{clock+=11;return {contractVersion:'commerce.v1',status:'OK',data:{},renderedText:''};};}
+  const result=await runCommerceTurn(f.input);expectFailure(result,mode==='cancel'?'CANCELLED':mode==='deadline'?'DEADLINE':'BUDGET_EXHAUSTED');assert.equal(f.requests.length,mode==='remote'?2:1);
+ }
+});
+test('native product selection repair retains actual plain text and uses feedback only for actual final tool calls',async()=>{
+ const f=fixture([final()]);f.input.toolProtocol='native';const prepared=prepareCommerceTurn(f.input);prepared.response={...prepared.response,detailsSchema:{type:'object',properties:{productRecommendations:{type:'array',maxItems:3,items:{type:'string',maxLength:128}}},required:[],additionalProperties:false}};prepared.finalSchema=finalResponseSchema(prepared.response);
+ const execution={input:f.input,prepared,runtime:{checkCancellationAndDeadline:()=>{}},logger:{},stats:{modelSteps:1,remoteCalls:0}} as unknown as Parameters<typeof validateFinalResponseNode>[0];
+ const observed={contractVersion:'commerce.v1' as const,status:'OK' as const,data:{products:[optionBoundaryProduct()]},renderedText:'Observed'};
+ let trace=appendCurrentTurnAssistant([],{calls:[{id:'observed',name:'commerce_search_products',arguments:{}}],outputTokens:1});trace=appendCurrentTurnTool(trace,{id:'observed',name:'commerce_search_products'},{kind:'commerce-result',result:observed});
+ for(const plain of [false,true]){const step=plain?{calls:[],text:'Actual plaintext completion',outputTokens:3}:nativeStep(final({...exampleFinal,answerKind:'ANSWER',referralReason:null}),'missing-selection');const toolTranscript=appendCurrentTurnAssistant(trace,step);const state={...initialCommerceTurnGraphState(),modelSteps:2,toolTranscript,pendingStep:step,runtimeMessages:[{tool:'commerce_search_products',result:observed}]};const update=await validateFinalResponseNode(execution)(state);assert.equal(update.selectionRepairUsed,true);const complete=readCurrentTurnTransportTranscript(update.toolTranscript??toolTranscript);if(plain){assert.equal(complete.at(-1)?.role,'runner-feedback');assert.equal((complete.at(-2) as any).text,'Actual plaintext completion');assert.equal((complete.at(-1) as any).reasonCode,'FINAL_PRODUCT_SELECTION_MISSING');}else assert.equal(complete.at(-1)?.role==='tool'&&(complete.at(-1) as any).payload.reasonCode,'FINAL_PRODUCT_SELECTION_MISSING');}
+});
+
+test('unsupported native protocol selectors cannot silently choose legacy transport',async()=>{const f=fixture([final()]);(f.input as unknown as {toolProtocol:string}).toolProtocol='typo-native';expectFailure(await runCommerceTurn(f.input),'INVALID_INPUT','MODEL_TRANSCRIPT_INVALID');assert.equal(f.requests.length,0);});
